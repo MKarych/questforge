@@ -160,4 +160,5 @@
 
 **Кодовое имя проекта:** Adventure Engine  
 **Главный принцип:** *Жесткое разделение слоев. Engine — единственный источник истины.*
+**GitHub:** [github.com/MKarych/questforge](https://github.com/MKarych/questforge)
 ```
