@@ -1,6 +1,13 @@
 ```markdown
 # 🚀 Adventure Engine
 
+**Кодовое имя проекта:** Adventure Engine  
+**Статус:** Проектирование / Pre-MVP  
+**Главная цель:** Создать платформу для проведения интерактивных мероприятий (Steam для мероприятий).  
+**GitHub:** [github.com/mkarych/questforge](https://github.com/mkarych/questforge)  
+
+---
+
 [![GitHub](https://img.shields.io/badge/GitHub-mkarych/questforge-blue?logo=github)](https://github.com/mkarych/questforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status: Planning](https://img.shields.io/badge/Status-Planning-ff69b4.svg)]()
@@ -9,10 +16,6 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.x-black?logo=next.js)](https://nextjs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5.x-blue?logo=prisma)](https://www.prisma.io/)
 [![Docker](https://img.shields.io/badge/Docker-24.x-blue?logo=docker)](https://www.docker.com/)
-
-**Кодовое имя проекта:** Adventure Engine  
-**Статус:** Проектирование / Pre-MVP  
-**Главная цель:** Создать платформу для проведения интерактивных мероприятий (Steam для мероприятий).
 
 ---
 
@@ -132,31 +135,48 @@
 
 ---
 
-## 📁 Документация для команды
+## 📁 Полная документация (35 документов)
 
 Вся стратегия и технические требования зафиксированы в папке `/docs`:
 
 | # | Документ | Описание |
 | :--- | :--- | :--- |
-| 1 | `01-vision-and-mission.md` | Миссия, видение, принципы |
-| 2 | `02-ecosystem-growth-strategy.md` | Роли, жизненный цикл, сообщество |
-| 3 | `03-platform-ecosystem-blueprint.md` | "Steam для мероприятий" |
-| 4 | `04-execution-model.md` | Ядро системы (Engine + Orchestrator) |
-| 5 | `05-api-specification.md` | Контракты API |
-| 6 | `06-database-schema.md` | Схема БД |
-| 7 | `07-game-engine-spec.md` | Детальная спецификация движка |
-| 8 | `08-mvp-roadmap.md` | План на 30 дней |
-| 9 | `09-ux-guidelines.md` | Принципы дизайна |
-| 10 | `10-development-rules.md` | Строгие правила для агентов |
-| 11 | `11-event-contract-spec.md` | Типизированный контракт событий |
-| 12 | `12-scenario-validation-spec.md` | Валидация сценариев |
-| 13 | `13-versioning-and-migrations.md` | Версионирование и миграции |
-| 14 | `14-runtime-data-flow.md` | Полный поток данных |
-| 15 | `15-engine-determinism-contract.md` | Детерминизм как закон |
-| 16 | `16-error-model-and-recovery.md` | Ошибки и восстановление |
-| 17 | `17-state-replication-model.md` | Распределенное состояние |
-| 18 | `18-security-and-cheating-model.md` | Безопасность и античит |
-| 19 | `19-code-architecture.md` | Структура проекта и файлов |
+| 1 | `README.md` | Продуктовая стратегия |
+| 2 | `01-vision-and-mission.md` | Миссия, видение, принципы |
+| 3 | `02-ecosystem-growth-strategy.md` | Роли, жизненный цикл, сообщество |
+| 4 | `03-platform-ecosystem-blueprint.md` | "Steam для мероприятий" |
+| 5 | `04-execution-model.md` | Ядро системы (Engine + Orchestrator) |
+| 6 | `05-api-specification.md` | Контракты API |
+| 7 | `06-database-schema.md` | Схема БД |
+| 8 | `07-game-engine-spec.md` | Детальная спецификация движка |
+| 9 | `08-mvp-roadmap.md` | План на 30 дней |
+| 10 | `09-ux-guidelines.md` | Принципы дизайна |
+| 11 | `10-development-rules.md` | Строгие правила для агентов |
+| 12 | `11-event-contract-spec.md` | Типизированный контракт событий |
+| 13 | `12-scenario-validation-spec.md` | Валидация сценариев |
+| 14 | `13-versioning-and-migrations.md` | Версионирование и миграции |
+| 15 | `14-runtime-data-flow.md` | Полный поток данных |
+| 16 | `15-engine-determinism-contract.md` | Детерминизм как закон |
+| 17 | `16-error-model-and-recovery.md` | Ошибки и восстановление |
+| 18 | `17-state-replication-model.md` | Распределенное состояние |
+| 19 | `18-security-and-cheating-model.md` | Безопасность и античит |
+| 20 | `19-code-architecture.md` | Структура проекта и файлов |
+| 21 | `20-game-mechanics-spec.md` | Полная классификация механик |
+| 22 | `21-engine-mechanics-contracts.md` | Контракты механик для движка |
+| 23 | `22-engine-state-machine.md` | Жизненный цикл игры и команды |
+| 24 | `23-event-sourcing-spec.md` | Все события системы |
+| 25 | `24-scenario-json-schema.md` | Формат сценария |
+| 26 | `25-plugin-system-spec.md` | Механики как плагины |
+| 27 | `26-domain-model.md` | Единая доменная модель |
+| 28 | `27-permissions-rbac.md` | Права доступа |
+| 29 | `28-system-architecture.md` | Физическая архитектура |
+| 30 | `29-engine-runtime-spec.md` | Как движок исполняет сценарий |
+| 31 | `30-builder-spec.md` | Визуальный редактор сценариев |
+| 32 | `31-validation-spec.md` | Правила проверки сценариев |
+| 33 | `32-database-schema.md` | Физическая модель БД |
+| 34 | `33-api-contracts.md` | Контракты запросов/ответов |
+| 35 | `34-state-model.md` | Полный автомат состояний |
+| 36 | `35-plugin-sdk-spec.md` | SDK для разработчиков плагинов |
 
 ---
 
