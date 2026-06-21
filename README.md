@@ -1,6 +1,15 @@
 ```markdown
 # 🚀 Adventure Engine
 
+[![GitHub](https://img.shields.io/badge/GitHub-mkarych/questforge-blue?logo=github)](https://github.com/mkarych/questforge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status: Planning](https://img.shields.io/badge/Status-Planning-ff69b4.svg)]()
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-10.x-red?logo=nestjs)](https://nestjs.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14.x-black?logo=next.js)](https://nextjs.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.x-blue?logo=prisma)](https://www.prisma.io/)
+[![Docker](https://img.shields.io/badge/Docker-24.x-blue?logo=docker)](https://www.docker.com/)
+
 **Кодовое имя проекта:** Adventure Engine  
 **Статус:** Проектирование / Pre-MVP  
 **Главная цель:** Создать платформу для проведения интерактивных мероприятий (Steam для мероприятий).
@@ -147,18 +156,59 @@
 | 16 | `16-error-model-and-recovery.md` | Ошибки и восстановление |
 | 17 | `17-state-replication-model.md` | Распределенное состояние |
 | 18 | `18-security-and-cheating-model.md` | Безопасность и античит |
+| 19 | `19-code-architecture.md` | Структура проекта и файлов |
 
 ---
 
-## 🚀 Следующий шаг
+## 🚀 Быстрый старт (для разработчиков)
 
-Мы начинаем с **MVP v0.1** — создаем работающий прототип за 30 дней, который заменит Encounter для организаторов автоквестов.
+```bash
+# Клонировать репозиторий
+git clone https://github.com/mkarych/questforge.git
+cd questforge
 
-Подробный план — в **`docs/08-mvp-roadmap.md`**.
+# Установить зависимости
+npm install
+
+# Запустить инфраструктуру (PostgreSQL, Redis, MinIO)
+npm run docker:up
+
+# Запустить API (NestJS)
+npm run dev:api
+
+# Запустить веб-панель (Next.js)
+npm run dev:web
+```
+
+---
+
+## 🛠️ Технологический стек
+
+| Компонент | Технология |
+| :--- | :--- |
+| **Backend** | NestJS, TypeScript, Prisma |
+| **Frontend** | Next.js, React, Tailwind CSS |
+| **База данных** | PostgreSQL, Redis |
+| **Хранилище** | MinIO / S3 |
+| **Контейнеризация** | Docker, Docker Compose |
+| **Мониторинг** | Prometheus, Grafana (v2.0+) |
+
+---
+
+## 🤝 Команда
+
+**Karych Team** © 2026
+
+Разрабатывается с ❤️ для организаторов и авторов городских игр.
+
+---
+
+## 📄 Лицензия
+
+MIT © 2026 Karych Team
 
 ---
 
 **Кодовое имя проекта:** Adventure Engine  
 **Главный принцип:** *Жесткое разделение слоев. Engine — единственный источник истины.*
-**GitHub:** [github.com/MKarych/questforge](https://github.com/MKarych/questforge)
 ```
