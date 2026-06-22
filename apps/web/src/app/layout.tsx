@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: 'Adventure Engine — Платформа городских игр',
   description: 'Создавайте и проводите захватывающие городские квесты. Присоединяйтесь к игре прямо сейчас!',
   keywords: ['квесты', 'городские игры', 'Adventure Engine', 'командные игры'],
+  icons: {
+    icon: '/images/logo/favicon.png',
+    apple: '/images/logo/favicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -21,7 +25,6 @@ export default function RootLayout({
   return (
     <html lang="ru" className={inter.className}>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
         <meta name="theme-color" content="#0F1117" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>

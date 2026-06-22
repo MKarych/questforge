@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { register } from '@/lib/api/client';
@@ -47,6 +48,15 @@ export default function RegisterPage() {
       
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto">
+          <div className="text-center mb-6">
+            <Image
+              src="/images/logo/logo.png"
+              alt="Adventure Engine"
+              width={120}
+              height={40}
+              className="h-10 w-auto mx-auto"
+            />
+          </div>
           <div className="card">
             <h1 className="text-2xl font-bold text-text-primary mb-2">Регистрация</h1>
             <p className="text-text-secondary mb-6">

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getProfile, logout, type User } from '@/lib/api/client';
@@ -56,10 +57,13 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">A</span>
-            </div>
-            <span className="text-xl font-bold text-text-primary">Adventure Engine</span>
+            <Image
+              src="/images/logo/logo.png"
+              alt="Adventure Engine"
+              width={120}
+              height={32}
+              className="h-8 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}

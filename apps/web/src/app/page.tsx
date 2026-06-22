@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getPublicGames, type Game } from '@/lib/api/client';
 import GameCard from '@/components/ui/GameCard';
@@ -33,6 +34,15 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <section className="mb-12 text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/images/logo/logo.png"
+              alt="Adventure Engine"
+              width={160}
+              height={54}
+              className="h-12 w-auto"
+            />
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">
             Городские игры нового поколения
           </h1>
