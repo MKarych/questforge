@@ -418,7 +418,7 @@ export class EngineOrchestrator {
     });
 
     if (snapshot) {
-      return snapshot.state as unknown as SessionState;
+      return snapshot.state as SessionState;
     }
 
     return null;

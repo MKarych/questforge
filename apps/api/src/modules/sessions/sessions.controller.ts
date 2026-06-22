@@ -10,18 +10,20 @@ import {
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UserRequest } from '../../common/types/user-request.type';
 
 @Controller('sessions')
-@UseGuards(JwtAuthGuard)
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
 
   @Post()
-  async create(@Request() req: any, @Body() dto: CreateSessionDto) {
+  @UseGuards(JwtAuthGuard)
+  async create(@Request() req: UserRequest, @Body() dto: CreateSessionDto) {
     return this.sessionsService.create(req.user.userId, dto);
   }
 
   @Post(':teamId/answer')
+  @UseGuards(JwtAuthGuard)
   async submitAnswer(
     @Param('teamId') teamId: string,
     @Body('gameId') gameId: string,
@@ -32,11 +34,13 @@ export class SessionsController {
   }
 
   @Get(':teamId')
+  @UseGuards(JwtAuthGuard)
   async getState(@Param('teamId') teamId: string) {
     return this.sessionsService.getState(teamId);
   }
 
   @Post(':teamId/finish')
+  @UseGuards(JwtAuthGuard)
   async finish(@Param('teamId') teamId: string) {
     return this.sessionsService.finish(teamId);
   }

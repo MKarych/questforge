@@ -98,7 +98,7 @@ export class EventStore implements IEventStore {
       orderBy: { timestamp: 'asc' },
     });
 
-    return events.map((e: any) => this.toEvent(e));
+    return events.map((e) => this.toEvent(e));
   }
 
   async getTeamEvents(teamId: string): Promise<Event[]> {
@@ -107,7 +107,7 @@ export class EventStore implements IEventStore {
       orderBy: { timestamp: 'asc' },
     });
 
-    return events.map((e: any) => this.toEvent(e));
+    return events.map((e) => this.toEvent(e));
   }
 
   async getEventsAfter(teamId: string, timestamp: number): Promise<Event[]> {
@@ -121,7 +121,7 @@ export class EventStore implements IEventStore {
       orderBy: { timestamp: 'asc' },
     });
 
-    return events.map((e: any) => this.toEvent(e));
+    return events.map((e) => this.toEvent(e));
   }
 
   async isProcessed(eventId: string): Promise<boolean> {

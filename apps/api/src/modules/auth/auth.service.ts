@@ -161,7 +161,14 @@ export class AuthService {
     };
   }
 
-  private async generateTokens(user: any) {
+  async logout(userId: string) {
+    // In a production system, you would blacklist the token here
+    // For now, just log the logout event
+    this.logger.log(`User ${userId} logged out`);
+    return { message: 'Logged out successfully' };
+  }
+
+  private async generateTokens(user: { id: string; email: string; role: string }) {
     const accessToken = this.jwtService.sign(
       { sub: user.id, email: user.email, role: user.role },
       {

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EngineOrchestrator } from '../../engine/orchestrator/engine-orchestrator';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { SessionState } from '../../engine/types/engine.types';
 
 @Injectable()
 export class SessionsService {
@@ -48,7 +49,7 @@ export class SessionsService {
     // Get start node from scenario
     const startNodeId = game.scenario?.startNodeId || 'node-1';
     const nodes = game.scenario?.nodes ? this.parseNodes(game.scenario.nodes) : [];
-    const hasStartNode = nodes.some((n: any) => n.id === startNodeId);
+    const hasStartNode = nodes.some((n) => n.id === startNodeId);
 
     if (!hasStartNode) {
       throw new BadRequestException(
@@ -83,7 +84,7 @@ export class SessionsService {
     );
 
     // Get first node info
-    const firstNode = nodes.find((n: any) => n.id === startNodeId) || {
+    const firstNode = nodes.find((n) => n.id === startNodeId) || {
       id: startNodeId,
       type: 'text',
       question: 'Welcome to the game!',
@@ -121,7 +122,7 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    const state = snapshot.state as any;
+    const state = snapshot.state as SessionState;
 
     // Process answer through engine
     const result = await this.engineOrchestrator.processAnswer(
@@ -168,7 +169,7 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    const state = snapshot.state as any;
+    const state = snapshot.state as SessionState;
 
     return {
       sessionId: state.sessionId,
@@ -202,9 +203,9 @@ export class SessionsService {
     });
   }
 
-  private parseNodes(nodes: unknown): any[] {
+  private parseNodes(nodes: unknown): Array<{ id: string; type: string; question: string }> {
     if (!nodes) return [];
-    if (Array.isArray(nodes)) return nodes;
+    if (Array.isArray(nodes)) return nodes as Array<{ id: string; type: string; question: string }>;
     if (typeof nodes === 'string') {
       try {
         return JSON.parse(nodes);
