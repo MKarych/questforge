@@ -1,0 +1,438 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { CreateGameDto } from './dto/create-game.dto';
+import { GameStateMachine } from '../../engine/state-machine/state-machine';
+
+@Injectable()
+export class GamesService {
+  private readonly logger = new Logger(GamesService.name);
+  private readonly gameStateMachine = new GameStateMachine();
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  // ============================================================
+  // Public methods
+  // ============================================================
+
+  async findAll(params: {
+    status?: string;
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: Record<string, unknown> = {
+      publishedAt: { not: null }, // Only show published games
+      deletedAt: null,
+    };
+
+    if (params.status) {
+      where.status = params.status;
+    }
+    if (params.city) {
+      where.city = params.city;
+    }
+
+    const [games, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where,
+        take: params.limit || 20,
+        skip: params.offset || 0,
+        orderBy: { date: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          city: true,
+          date: true,
+          duration: true,
+          price: true,
+          maxTeams: true,
+          imageUrl: true,
+          status: true,
+          publishedAt: true,
+          organizer: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              teams: true,
+              reviews: true,
+            },
+          },
+        },
+      }),
+      this.prisma.game.count({ where }),
+    ]);
+
+    return {
+      data: games.map((g) => ({
+        ...g,
+        averageRating: g._count.reviews > 0
+          ? g._count.reviews // Placeholder — would need a separate query for actual avg
+          : 0,
+      })),
+      meta: {
+        total,
+        limit: params.limit || 20,
+        offset: params.offset || 0,
+      },
+    };
+  }
+
+  async findOne(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId, deletedAt: null },
+      include: {
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        scenario: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            version: true,
+          },
+        },
+        reviews: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            rating: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+        _count: {
+          select: {
+            teams: true,
+            reviews: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    // Calculate average rating
+    const avgRating =
+      game.reviews.length > 0
+        ? game.reviews.reduce((sum, r) => sum + r.rating, 0) / game.reviews.length
+        : 0;
+
+    return {
+      ...game,
+      averageRating: Math.round(avgRating * 100) / 100,
+      shareLink: game.shareLink,
+    };
+  }
+
+  async getReviews(
+    gameId: string,
+    params: { limit?: number; offset?: number },
+  ) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where: { gameId },
+        take: params.limit || 10,
+        skip: params.offset || 0,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { name: true, avatarUrl: true } },
+        },
+      }),
+      this.prisma.review.count({ where: { gameId } }),
+    ]);
+
+    return {
+      data: reviews,
+      meta: { total, limit: params.limit || 10, offset: params.offset || 0 },
+    };
+  }
+
+  async getTeams(
+    gameId: string,
+    params: { limit?: number; offset?: number },
+  ) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    const [teams, total] = await Promise.all([
+      this.prisma.team.findMany({
+        where: { gameId },
+        take: params.limit || 20,
+        skip: params.offset || 0,
+        orderBy: { score: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          score: true,
+          penalties: true,
+          status: true,
+          finishedAt: true,
+          captain: { select: { name: true } },
+        },
+      }),
+      this.prisma.team.count({ where: { gameId } }),
+    ]);
+
+    return {
+      data: teams,
+      meta: { total, limit: params.limit || 20, offset: params.offset || 0 },
+    };
+  }
+
+  // ============================================================
+  // Protected methods (require auth)
+  // ============================================================
+
+  async create(userId: string, dto: CreateGameDto) {
+    const game = await this.prisma.game.create({
+      data: {
+        ...dto,
+        organizerId: userId,
+        shareLink: this.generateShareLink(),
+      },
+    });
+
+    this.logger.log(`Game created: ${game.id} by user ${userId}`);
+    return game;
+  }
+
+  async findAllForOrganizer(
+    userId: string,
+    params: { status?: string; limit?: number; offset?: number },
+  ) {
+    const where: Record<string, unknown> = {
+      organizerId: userId,
+      deletedAt: null,
+    };
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    const [games, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where,
+        take: params.limit || 20,
+        skip: params.offset || 0,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          city: true,
+          date: true,
+          status: true,
+          moderationStatus: true,
+          shareLink: true,
+          publishedAt: true,
+          _count: { select: { teams: true, reviews: true } },
+        },
+      }),
+      this.prisma.game.count({ where }),
+    ]);
+
+    return {
+      data: games,
+      meta: { total, limit: params.limit || 20, offset: params.offset || 0 },
+    };
+  }
+
+  async findOneForOrganizer(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId, organizerId: userId, deletedAt: null },
+      include: {
+        scenario: true,
+        reviews: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        },
+        _count: { select: { teams: true, reviews: true } },
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    return game;
+  }
+
+  async update(
+    userId: string,
+    gameId: string,
+    dto: Partial<CreateGameDto>,
+  ) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: dto,
+    });
+  }
+
+  async remove(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    // Soft delete
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async submitForModeration(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    if (!game.scenarioId) {
+      throw new ForbiddenException('Cannot submit without a scenario');
+    }
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        moderationStatus: 'PENDING',
+        submittedAt: new Date(),
+      },
+    });
+  }
+
+  async startGame(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    // Use state machine for transition
+    if (!this.gameStateMachine.canTransition(game.status, 'start')) {
+      throw new ForbiddenException(
+        `Cannot start game in status: ${game.status}`,
+      );
+    }
+
+    // Transition through state machine
+    const newStatus = this.gameStateMachine.transition(game.status, 'start');
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: newStatus,
+        startedAt: new Date(),
+      },
+    });
+  }
+
+  async finishGame(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('You do not have access to this game');
+    }
+
+    if (!this.gameStateMachine.canTransition(game.status, 'finish')) {
+      throw new ForbiddenException(
+        `Cannot finish game in status: ${game.status}`,
+      );
+    }
+
+    const newStatus = this.gameStateMachine.transition(game.status, 'finish');
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: newStatus,
+        finishedAt: new Date(),
+      },
+    });
+  }
+
+  private generateShareLink(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 16; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+}

@@ -1,0 +1,48 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') || 3000;
+
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+      stopAtFirstError: true,
+    }),
+  );
+
+  // Global exception filter
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Global interceptors
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  // CORS
+  app.enableCors({
+    origin: configService.get('CORS_ORIGIN') || 'http://localhost:3001',
+    credentials: true,
+  });
+
+  // Prefix
+  app.setGlobalPrefix('api');
+
+  await app.listen(port);
+  console.log(`🚀 Adventure Engine API running on port ${port}`);
+}
+
+bootstrap();
