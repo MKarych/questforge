@@ -56,14 +56,17 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-3">
             <Image
               src="/images/logo/logo.png"
               alt="Adventure Engine"
-              width={120}
-              height={32}
+              width={40}
+              height={40}
               className="h-8 w-auto"
             />
+            <span className="text-xl font-bold text-white hidden sm:block">
+              Adventure <span className="text-primary">Engine</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
