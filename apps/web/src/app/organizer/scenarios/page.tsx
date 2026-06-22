@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getScenarios, type Scenario } from '@/lib/api/client';
+import { getScenarios, publishScenario, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -12,6 +12,7 @@ export default function ScenariosPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadScenarios() {
@@ -32,6 +33,19 @@ export default function ScenariosPage() {
 
     loadScenarios();
   }, [router]);
+
+  const handlePublish = async (id: string) => {
+    setPublishingId(id);
+    try {
+      await publishScenario(id);
+      setScenarios(prev => prev.map(s => s.id === id ? { ...s, isPublished: true } : s));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось опубликовать сценарий';
+      setError(message);
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -140,8 +154,12 @@ export default function ScenariosPage() {
                     Редактировать
                   </Link>
                   {!scenario.isPublished && (
-                    <button className="btn-primary text-sm">
-                      Опубликовать
+                    <button
+                      className="btn-primary text-sm"
+                      onClick={() => handlePublish(scenario.id)}
+                      disabled={publishingId === scenario.id}
+                    >
+                      {publishingId === scenario.id ? 'Публикация...' : 'Опубликовать'}
                     </button>
                   )}
                 </div>

@@ -472,6 +472,13 @@ class ApiClient {
     });
   }
 
+  async publishScenario(id: string, price?: number, licenseType?: string): Promise<ApiResponse<Scenario>> {
+    return this.request(`/scenarios/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ price, licenseType }),
+    });
+  }
+
   // ==================== Sessions ====================
 
   async createSession(data: CreateSessionRequest): Promise<ApiResponse<Session>> {
@@ -576,6 +583,8 @@ export const getGames = () => apiClient.getMyGames();
 export const getGame = (id: string) => apiClient.getGame(id);
 export const getScenarios = (params?: { published?: boolean }) => apiClient.getScenarios(params);
 export const createScenario = (data: CreateScenarioRequest) => apiClient.createScenario(data);
+export const publishScenario = (id: string, price?: number, licenseType?: string) =>
+  apiClient.publishScenario(id, price, licenseType);
 export const startSession = (data: CreateSessionRequest) => apiClient.createSession(data);
 export const submitAnswer = (teamId: string, gameId: string, nodeId: string, answer: string) =>
   apiClient.submitAnswer(teamId, gameId, nodeId, answer);
