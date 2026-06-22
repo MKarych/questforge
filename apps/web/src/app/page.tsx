@@ -45,7 +45,7 @@ export default function HomePage() {
                 priority
               />
               <span className="text-2xl font-bold text-white">
-                Adventure <span className="text-primary">Engine</span>
+                Город Приключений
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">

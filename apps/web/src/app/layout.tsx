@@ -8,8 +8,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Adventure Engine — Платформа городских игр',
-  description: 'Создавайте и проводите захватывающие городские квесты. Присоединяйтесь к игре прямо сейчас!',
+  title: 'Город Приключений | Adventure City',
+  description: 'Городские игры нового поколения. Создавай и проходи квесты в своём городе.',
+  openGraph: {
+    title: 'Город Приключений',
+  },
   keywords: ['квесты', 'городские игры', 'Adventure Engine', 'командные игры'],
   icons: {
     icon: '/images/logo/favicon.png',

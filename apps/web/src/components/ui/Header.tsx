@@ -65,7 +65,7 @@ export default function Header() {
               className="h-8 w-auto"
             />
             <span className="text-xl font-bold text-white hidden sm:block">
-              Adventure <span className="text-primary">Engine</span>
+              Город Приключений
             </span>
           </Link>
 
