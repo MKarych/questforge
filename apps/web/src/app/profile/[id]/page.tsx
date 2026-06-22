@@ -121,7 +121,7 @@ export default function PublicProfilePage() {
                   />
                 ) : (
                   <span className="text-5xl text-primary">
-                    {profile.name.charAt(0).toUpperCase()}
+                    {profile.name?.charAt(0)?.toUpperCase() || '?'}
                   </span>
                 )}
               </div>

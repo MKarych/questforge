@@ -13,6 +13,8 @@ export default function Header() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    
     async function loadProfile() {
       try {
         const response = await getProfile();
@@ -24,8 +26,13 @@ export default function Header() {
       }
     }
 
-    // Only load profile on auth-related pages or dashboard
-    if (pathname.startsWith('/auth') || pathname.startsWith('/organizer') || pathname.startsWith('/dashboard')) {
+    // Синхронизация: если токен есть, но user отсутствует — загружаем профиль
+    if (token && !user) {
+      loadProfile();
+    }
+    
+    // Загружаем профиль на страницах авторизации и в дашборде
+    if (pathname.startsWith('/auth') || pathname.startsWith('/organizer') || pathname.startsWith('/dashboard') || pathname.startsWith('/profile')) {
       loadProfile();
     } else {
       setLoading(false);
@@ -81,7 +88,7 @@ export default function Header() {
                         <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-sm text-primary font-semibold">
-                          {user.name.charAt(0).toUpperCase()}
+                          {user.name?.charAt(0)?.toUpperCase() || '?'}
                         </span>
                       )}
                     </div>
@@ -147,7 +154,7 @@ export default function Header() {
                           <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-sm text-primary font-semibold">
-                            {user.name.charAt(0).toUpperCase()}
+                            {user.name?.charAt(0)?.toUpperCase() || '?'}
                           </span>
                         )}
                       </div>
