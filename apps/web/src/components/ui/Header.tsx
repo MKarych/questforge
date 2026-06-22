@@ -75,7 +75,7 @@ export default function Header() {
               Игры
             </Link>
             <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
-              🏴 Команды
+              Команды
             </Link>
             <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
               Организаторам
@@ -144,7 +144,7 @@ export default function Header() {
                 Игры
               </Link>
               <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
-                🏴 Команды
+                Команды
               </Link>
               <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
                 Организаторам
