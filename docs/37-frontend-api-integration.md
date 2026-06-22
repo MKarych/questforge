@@ -32,6 +32,8 @@
 | `/games/[id]` (детальная) | `getPublicGame(id)` | ✅ |
 | `/organizer/dashboard` | `getMyGames()`, `getProfile()` | ✅ |
 | `/organizer/games/create` | `createGame(data)` | ✅ |
+| `/organizer/games/[id]` (детальная) | `getGame(id)` | ✅ |
+| `/organizer/games/[id]/edit` | — (в разработке) | 🚧 |
 | `/auth/login` | `login(credentials)` | ✅ |
 | `/auth/register` | `register(userData)` | ✅ |
 
@@ -76,6 +78,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api
 | `apps/web/src/app/games/page.tsx` | Использует `getPublicGames()` |
 | `apps/web/src/app/games/[id]/page.tsx` | Использует `getPublicGame(id)` |
 | `apps/web/src/app/organizer/games/create/page.tsx` | Отправляет POST на `/games` |
+| `apps/web/src/app/organizer/games/[id]/page.tsx` | Использует `getGame(id)` |
 | `apps/web/src/app/organizer/dashboard/page.tsx` | Загружает реальные данные |
 | `apps/web/src/components/ui/Header.tsx` | Показывает auth-статус, кнопку logout |
 | `apps/web/.env.local` | Создан с API URL |
@@ -120,6 +123,15 @@ Inconsistent column data: Error creating UUID
 2. Заполни форму (название, город, дата, цена)
 3. Нажми "Создать игру"
 4. При успехе — переадресация на страницу игры
+```
+
+### 4. Страница игры организатора
+```
+1. После создания игры откроется /organizer/games/[id]
+2. Отображаются: название, описание, статус, дата, город
+3. Статистика: количество команд, средний рейтинг
+4. Кнопки: Редактировать, Опубликовать, Удалить
+5. Ссылка на игру с возможностью копирования
 ```
 
 ### 4. Каталог игр

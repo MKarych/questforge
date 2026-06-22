@@ -34,6 +34,8 @@ export interface GameDetails extends Game {
   } | null;
   reviews: Review[];
   comments: Comment[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Review {
