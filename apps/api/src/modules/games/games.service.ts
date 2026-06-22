@@ -30,7 +30,7 @@ export class GamesService {
     offset?: number;
   }) {
     const where: Record<string, unknown> = {
-      status: { in: ['APPROVED', 'IN_PROGRESS', 'STARTED'] }, // Only show approved and active games
+      status: { in: ['PUBLISHED', 'IN_PROGRESS', 'STARTED'] }, // Only show published and active games
       deletedAt: null,
     };
 
