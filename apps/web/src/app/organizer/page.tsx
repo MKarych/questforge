@@ -1,113 +1,225 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getProfile, type User } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function OrganizerPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    city: '',
+    phone: '',
+    telegram: '',
+    experience: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const response = await getProfile();
+        setUser(response.data);
+      } catch (err) {
+        router.push('/auth/login');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadUser();
+  }, [router]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('http://localhost:3000/api/organizer/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Ошибка при подаче заявки');
+      }
+
+      setSuccess(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось подать заявку';
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex justify-center items-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const isOrganizer = user.role === 'ORGANIZER' || user.role === 'ADMIN';
+  const hasPendingApplication = user.organizerStatus === 'PENDING';
+
   return (
     <div className="min-h-screen">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <section className="text-center mb-16">
-          <div className="text-6xl mb-6">🎯</div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">
-            Станьте организатором игр
-          </h1>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-8">
-            Создавайте захватывающие городские квесты, управляйте играми и зарабатывайте
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/auth/register" className="btn-primary">
-              Стать организатором
-            </Link>
-            <Link href="/organizer/dashboard" className="btn-secondary">
-              Панель организатора
-            </Link>
-          </div>
-        </section>
+        <div className="max-w-2xl mx-auto">
+          {isOrganizer ? (
+            <div className="card text-center py-12">
+              <div className="text-6xl mb-6">🎉</div>
+              <h1 className="text-3xl font-bold text-text-primary mb-4">
+                Вы уже организатор!
+              </h1>
+              <p className="text-text-secondary mb-8">
+                Поздравляем! Вы имеете доступ ко всем функциям панели организатора.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Link href="/organizer/dashboard" className="btn-primary">
+                  Панель организатора
+                </Link>
+                <Link href="/organizer/games" className="btn-secondary">
+                  Мои игры
+                </Link>
+              </div>
+            </div>
+          ) : hasPendingApplication ? (
+            <div className="card text-center py-12">
+              <div className="text-6xl mb-6">⏳</div>
+              <h1 className="text-3xl font-bold text-text-primary mb-4">
+                Заявка на рассмотрении
+              </h1>
+              <p className="text-text-secondary mb-8">
+                Ваша заявка sedang diproses. Мы свяжемся с вами в ближайшее время.
+              </p>
+              <Link href="/games" className="btn-secondary">
+                Смотреть игры
+              </Link>
+            </div>
+          ) : success ? (
+            <div className="card text-center py-12">
+              <div className="text-6xl mb-6">✅</div>
+              <h1 className="text-3xl font-bold text-text-primary mb-4">
+                Заявка подана!
+              </h1>
+              <p className="text-text-secondary mb-8">
+                Спасибо за интерес! Мы рассмотрим вашу заявку и свяжемся с вами.
+              </p>
+              <Link href="/games" className="btn-secondary">
+                Смотреть игры
+              </Link>
+            </div>
+          ) : (
+            <div className="card">
+              <div className="text-center mb-8">
+                <div className="text-5xl mb-4">🚀</div>
+                <h1 className="text-3xl font-bold text-text-primary mb-2">
+                  Станьте организатором!
+                </h1>
+                <p className="text-text-secondary">
+                  Создавайте свои игры и зарабатывайте на проведении квестов
+                </p>
+              </div>
 
-        {/* Features */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-          <div className="card">
-            <div className="text-4xl mb-4">✏️</div>
-            <h3 className="text-lg font-semibold mb-2 text-text-primary">Конструктор сценариев</h3>
-            <p className="text-text-secondary">
-              Создавайте сценарии с разными типами заданий: текст, код, фото, GPS, QR-коды
-            </p>
-          </div>
-          <div className="card">
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-lg font-semibold mb-2 text-text-primary">Управление играми</h3>
-            <p className="text-text-secondary">
-              Отслеживайте прогресс команд в реальном времени, управляйте сессиями
-            </p>
-          </div>
-          <div className="card">
-            <div className="text-4xl mb-4">💰</div>
-            <h3 className="text-lg font-semibold mb-2 text-text-primary">Монетизация</h3>
-            <p className="text-text-secondary">
-              Устанавливайте цену на игры, получайте доход от каждой команды
-            </p>
-          </div>
-        </section>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {error && (
+                  <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                    {error}
+                  </div>
+                )}
 
-        {/* How it works */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold text-text-primary mb-8 text-center">Как это работает</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="card text-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold">1</span>
-              </div>
-              <h3 className="font-semibold mb-2 text-text-primary">Подайте заявку</h3>
-              <p className="text-text-secondary text-sm">
-                Заполните форму и расскажите о своём опыте
-              </p>
-            </div>
-            <div className="card text-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold">2</span>
-              </div>
-              <h3 className="font-semibold mb-2 text-text-primary">Создайте сценарий</h3>
-              <p className="text-text-secondary text-sm">
-                Используйте конструктор для создания увлекательного квеста
-              </p>
-            </div>
-            <div className="card text-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold">3</span>
-              </div>
-              <h3 className="font-semibold mb-2 text-text-primary">Пройдите модерацию</h3>
-              <p className="text-text-secondary text-sm">
-                Наша команда проверит качество вашего сценария
-              </p>
-            </div>
-            <div className="card text-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white font-bold">4</span>
-              </div>
-              <h3 className="font-semibold mb-2 text-text-primary">Запустите игру</h3>
-              <p className="text-text-secondary text-sm">
-                Опубликуйте игру и принимайте команды
-              </p>
-            </div>
-          </div>
-        </section>
+                <div>
+                  <label className="label">Город</label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    placeholder="Москва"
+                    className="input-field"
+                    required
+                  />
+                </div>
 
-        {/* CTA */}
-        <section className="card text-center py-12 bg-primary/10 border-primary">
-          <h2 className="text-2xl font-bold text-text-primary mb-4">
-            Готовы создать свою первую игру?
-          </h2>
-          <p className="text-text-secondary mb-6 max-w-xl mx-auto">
-            Присоединяйтесь к сообществу организаторов Adventure Engine и начните проводить захватывающие городские квесты
-          </p>
-          <Link href="/organizer/scenarios/create" className="btn-primary">
-            Создать сценарий
-          </Link>
-        </section>
+                <div>
+                  <label className="label">Телефон</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="+7 (999) 000-00-00"
+                    className="input-field"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Telegram (необязательно)</label>
+                  <input
+                    type="text"
+                    name="telegram"
+                    value={formData.telegram}
+                    onChange={handleChange}
+                    placeholder="@username"
+                    className="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Опыт проведения игр (необязательно)</label>
+                  <textarea
+                    name="experience"
+                    value={formData.experience}
+                    onChange={handleChange}
+                    placeholder="Расскажите о вашем опыте..."
+                    className="input-field min-h-[100px]"
+                    rows={4}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Отправка...' : 'Подать заявку'}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

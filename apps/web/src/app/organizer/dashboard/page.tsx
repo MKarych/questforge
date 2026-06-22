@@ -15,7 +15,7 @@ export default function OrganizerDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [gamesResponse, profileResponse] = await Promise.all([
+        const [gamesResponse] = await Promise.all([
           getMyGames(),
           getProfile(),
         ]);
@@ -196,9 +196,9 @@ export default function OrganizerDashboardPage() {
           </Link>
           <Link href="/organizer/games" className="card card-hover">
             <div className="text-3xl mb-3">📊</div>
-            <h3 className="font-semibold text-text-primary mb-1">Аналитика</h3>
+            <h3 className="font-semibold text-text-primary mb-1">Мои игры</h3>
             <p className="text-sm text-text-secondary">
-              Посмотрите статистику по играм
+              Посмотрите список своих игр
             </p>
           </Link>
           <Link href="/organizer/settings" className="card card-hover">

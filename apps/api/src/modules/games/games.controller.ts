@@ -22,6 +22,32 @@ export class GamesController {
   // Public endpoints (no auth required)
   // ============================================================
 
+  @Get('public')
+  async findAllPublic(
+    @Query('city') city?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('type') type?: string,
+    @Query('sort') sort?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.gamesService.findAllPublic({
+      city,
+      dateFrom,
+      dateTo,
+      type,
+      sort,
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Get('public/:shareLink')
+  async findOneByShareLink(@Param('shareLink') shareLink: string) {
+    return this.gamesService.findOneByShareLink(shareLink);
+  }
+
   @Get()
   async findAll(
     @Query('status') status?: string,

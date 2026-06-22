@@ -7,6 +7,7 @@ import { getPublicGame, startSession, type GameDetails } from '@/lib/api/client'
 import Header from '@/components/ui/Header';
 
 interface GamePageParams {
+  [key: string]: string;
   id: string;
 }
 

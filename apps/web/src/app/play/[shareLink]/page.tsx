@@ -7,6 +7,7 @@ import { startSession } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface PlayLobbyPageParams {
+  [key: string]: string;
   shareLink: string;
 }
 

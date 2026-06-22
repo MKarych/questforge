@@ -16,6 +16,15 @@ export class ScenariosService {
       },
     });
 
+    // Auto-promote user to AUTHOR if they have created a scenario
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        scenariosCreated: { increment: 1 },
+      },
+    });
+
+    this.logger.log(`Scenario created: ${scenario.id} by user ${userId}`);
     return scenario;
   }
 

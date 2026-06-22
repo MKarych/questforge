@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+   url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -93,7 +93,11 @@ model User {
   status                UserStatus @default(ACTIVE)
   contacts              Json      @default("{}")
   organizerStatus       OrganizerStatus @default(NOT_APPLIED) @map("organizer_status")
+  organizerApplicationId String?  @map("organizer_application_id") @db.Uuid
   organizerApprovedAt   DateTime? @map("organizer_approved_at")
+  gamesCreated          Int       @default(0) @map("games_created")
+  gamesConducted        Int       @default(0) @map("games_conducted")
+  scenariosCreated      Int       @default(0) @map("scenarios_created")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
   lastLoginAt           DateTime? @map("last_login_at")
@@ -109,6 +113,8 @@ model User {
   licenses              License[]
   captainTeams          Team[]
   mediaUploads          Media[] @relation("MediaUploader")
+  organizerApplication  OrganizerApplication?
+  reviewedApplications  OrganizerApplication[] @relation("ApplicationReviewer")
 
   @@index([email])
   @@index([role])
@@ -426,5 +432,26 @@ model HeatmapData {
 
   @@index([gameId])
   @@index([teamId])
+  @@index([createdAt])
+}
+
+model OrganizerApplication {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id])
+  city                  String    @db.VarChar(100)
+  phone                 String    @db.VarChar(20)
+  telegram              String?   @db.VarChar(100)
+  experience            String?   @db.Text
+  status                String    @default("PENDING") @db.VarChar(50) // PENDING | APPROVED | REJECTED
+  rejectionReason       String?   @map("rejection_reason") @db.Text
+  reviewedBy            String?   @map("reviewed_by") @db.Uuid
+  reviewer              User?     @relation("ApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt            DateTime? @map("reviewed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
   @@index([createdAt])
 }

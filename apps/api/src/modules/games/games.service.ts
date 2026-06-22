@@ -20,6 +20,165 @@ export class GamesService {
   // Public methods
   // ============================================================
 
+  async findAllPublic(params: {
+    city?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    type?: string;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: Record<string, unknown> = {
+      status: { in: ['APPROVED', 'IN_PROGRESS', 'STARTED'] }, // Only show approved and active games
+      deletedAt: null,
+    };
+
+    if (params.city) {
+      where.city = params.city;
+    }
+
+    if (params.dateFrom) {
+      where.date = { gte: new Date(params.dateFrom) };
+    }
+
+    if (params.dateTo) {
+      where.date = { 
+        ...(where.date as object),
+        lte: new Date(params.dateTo) 
+      };
+    }
+
+    const [games, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where,
+        take: params.limit || 20,
+        skip: params.offset || 0,
+        orderBy: { date: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          city: true,
+          date: true,
+          duration: true,
+          price: true,
+          maxTeams: true,
+          shareLink: true,
+          imageUrl: true,
+          status: true,
+          publishedAt: true,
+          organizer: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              teams: true,
+              reviews: true,
+            },
+          },
+        },
+      }),
+      this.prisma.game.count({ where }),
+    ]);
+
+    return {
+      data: games.map((g) => ({
+        ...g,
+        averageRating: g._count.reviews > 0
+          ? g._count.reviews // Placeholder — would need a separate query for actual avg
+          : 0,
+        reviewsCount: g._count.reviews,
+        teamsCount: g._count.teams,
+      })),
+      meta: {
+        total,
+        limit: params.limit || 20,
+        offset: params.offset || 0,
+      },
+    };
+  }
+
+  async findOneByShareLink(shareLink: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { shareLink, deletedAt: null },
+      include: {
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        scenario: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            version: true,
+          },
+        },
+        reviews: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            rating: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+        comments: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+        _count: {
+          select: {
+            teams: true,
+            reviews: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    // Calculate average rating
+    const reviews = game.reviews || [];
+    const avgRating =
+      reviews.length > 0
+        ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length
+        : 0;
+
+    const count = game._count || { teams: 0, reviews: 0, comments: 0 };
+
+    return {
+      ...game,
+      averageRating: Math.round(avgRating * 100) / 100,
+      reviewsCount: count.reviews,
+      teamsCount: count.teams,
+      commentsCount: count.comments,
+    };
+  }
+
   async findAll(params: {
     status?: string;
     city?: string;
@@ -226,6 +385,14 @@ export class GamesService {
         ...dto,
         organizerId: userId,
         shareLink: this.generateShareLink(),
+      },
+    });
+
+    // Auto-promote user to ORGANIZER if they have created and conducted games
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        gamesCreated: { increment: 1 },
       },
     });
 

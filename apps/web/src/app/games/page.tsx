@@ -10,7 +10,7 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [cities, setCities] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadGames() {

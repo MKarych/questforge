@@ -28,7 +28,7 @@ interface UseGameReturn {
 }
 
 export function useGame({
-  sessionId,
+  sessionId: _sessionId,
   teamId,
   gameId,
   autoRefresh = true,

@@ -69,6 +69,12 @@ export default function Header() {
                   <Link href="/organizer/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
                     Панель
                   </Link>
+                  <Link href="/organizer/games" className="text-text-secondary hover:text-text-primary transition-colors">
+                    Игры
+                  </Link>
+                  <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary transition-colors">
+                    Сценарии
+                  </Link>
                   <span className="text-text-secondary text-sm">{user.name}</span>
                   <button onClick={handleLogout} className="btn-secondary">
                     Выйти
@@ -118,6 +124,12 @@ export default function Header() {
                   <div className="flex flex-col gap-3 pt-2">
                     <Link href="/organizer/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
                       Панель
+                    </Link>
+                    <Link href="/organizer/games" className="text-text-secondary hover:text-text-primary transition-colors">
+                      Игры
+                    </Link>
+                    <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary transition-colors">
+                      Сценарии
                     </Link>
                     <span className="text-text-secondary text-sm">{user.name}</span>
                     <button onClick={handleLogout} className="btn-secondary">

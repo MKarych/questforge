@@ -7,6 +7,7 @@ import { getSessionState, type SessionState } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface PlayFinishPageParams {
+  [key: string]: string;
   shareLink: string;
   sessionId: string;
 }
@@ -63,7 +64,7 @@ export default function PlayFinishPage() {
   }
 
   const totalTime = sessionState.finishedAt
-    ? Math.floor((new Date(sessionState.finishedAt).getTime() - sessionState.startedAt) / 1000 / 60)
+    ? Math.floor((new Date(sessionState.finishedAt).getTime() - new Date(sessionState.startedAt).getTime()) / 1000 / 60)
     : 0;
 
   return (

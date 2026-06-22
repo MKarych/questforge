@@ -8,6 +8,7 @@ import { GamesModule } from './modules/games/games.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
 import { UsersModule } from './modules/users/users.module';
+import { OrganizerModule } from './modules/organizer/organizer.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -23,6 +24,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     SessionsModule,
     ScenariosModule,
     UsersModule,
+    OrganizerModule,
     EngineModule,
   ],
   controllers: [AppController],

@@ -120,8 +120,12 @@ export interface User {
   email: string;
   name: string;
   avatarUrl: string | null;
-  role: string;
-  organizerStatus: string;
+  role: 'PLAYER' | 'ORGANIZER' | 'ADMIN' | 'MODERATOR';
+  organizerStatus: 'NOT_APPLIED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  organizerApprovedAt?: string;
+  gamesCreated?: number;
+  scenariosCreated?: number;
+  gamesConducted?: number;
   stats: {
     gamesPlayed: number;
     gamesCompleted: number;
@@ -167,6 +171,37 @@ export interface CreateGameResponse {
   city: string;
   status: string;
   shareLink: string;
+  createdAt: string;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  version: number;
+  isPublished: boolean;
+  salesCount: number;
+  rating: number;
+  createdAt: string;
+}
+
+export interface CreateScenarioRequest {
+  name: string;
+  nodes: Array<{
+    id: string;
+    type: string;
+    question: string;
+    answer?: string;
+    transitions?: Array<{ when: string; to: string }>;
+  }>;
+  startNodeId: string;
+}
+
+export interface CreateScenarioResponse {
+  id: string;
+  name: string;
+  version: number;
+  nodesCount: number;
+  valid: boolean;
   createdAt: string;
 }
 
@@ -225,9 +260,9 @@ class ApiClient {
     options: RequestInit = {},
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {
@@ -350,6 +385,29 @@ class ApiClient {
     return this.request(`/games/${gameId}/teams${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
   }
 
+  // ==================== Scenarios ====================
+
+  async getScenarios(params?: {
+    published?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ data: Scenario[]; meta: { total: number; limit: number; offset: number } }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.published !== undefined) queryParams.append('published', params.published.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request(`/scenarios${query ? `?${query}` : ''}`);
+  }
+
+  async createScenario(data: CreateScenarioRequest): Promise<ApiResponse<CreateScenarioResponse>> {
+    return this.request('/scenarios', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // ==================== Sessions ====================
 
   async createSession(data: CreateSessionRequest): Promise<ApiResponse<Session>> {
@@ -381,12 +439,22 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL);
 
 // Export named methods for convenience
-export const getPublicGames = (params?: { city?: string }) => apiClient.getPublicGames(params);
+export const getPublicGames = (params?: {
+  city?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  type?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}) => apiClient.getPublicGames(params);
 export const getPublicGame = (id: string) => apiClient.getPublicGame(id);
 export const createGame = (data: CreateGameRequest) => apiClient.createGame(data);
 export const getMyGames = (params?: { status?: string }) => apiClient.getMyGames(params);
 export const getGames = () => apiClient.getMyGames();
 export const getGame = (id: string) => apiClient.getGame(id);
+export const getScenarios = (params?: { published?: boolean }) => apiClient.getScenarios(params);
+export const createScenario = (data: CreateScenarioRequest) => apiClient.createScenario(data);
 export const startSession = (data: CreateSessionRequest) => apiClient.createSession(data);
 export const submitAnswer = (teamId: string, gameId: string, nodeId: string, answer: string) =>
   apiClient.submitAnswer(teamId, gameId, nodeId, answer);

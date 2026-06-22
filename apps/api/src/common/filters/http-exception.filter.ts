@@ -5,8 +5,10 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ValidationError } from 'class-validator';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -33,6 +35,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         code = (res as any).code || code;
         details = (res as any).details;
       }
+    } else if (exception instanceof BadRequestException && exception.getResponse() as any) {
+      const res = exception.getResponse() as any;
+      status = HttpStatus.BAD_REQUEST;
+      message = res.message || 'Ошибка валидации';
+      code = 'VALIDATION_ERROR';
+      if (Array.isArray(res.message)) {
+        details = { messages: res.message };
+      }
+      this.logger.warn(`Validation error: ${message}`);
     } else if (exception instanceof Error) {
       message = exception.message;
       this.logger.error(exception.message, exception.stack);
@@ -42,9 +53,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
       success: false,
       error: {
         code,
-        message,
+        message: this.translateMessage(message),
         details,
       },
     });
+  }
+
+  private translateMessage(message: string): string {
+    // Simple translation map for common validation errors
+    const translations: Record<string, string> = {
+      'Password must be longer than or equal to 6 characters': 'Пароль должен быть длиннее или равен 6 символам',
+      'Invalid credentials': 'Неверные учетные данные',
+      'Email already registered': 'Email уже зарегистрирован',
+      'User not found': 'Пользователь не найден',
+      'Invalid refresh token': 'Неверный токен обновления',
+      'Invalid token type': 'Неверный тип токена',
+      'Logged out successfully': 'Успешный выход',
+    };
+
+    return translations[message] || message;
   }
 }

@@ -7,6 +7,7 @@ import { getSessionState, submitAnswer, type SessionState } from '@/lib/api/clie
 import Header from '@/components/ui/Header';
 
 interface PlaySessionPageParams {
+  [key: string]: string;
   shareLink: string;
   sessionId: string;
 }
