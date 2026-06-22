@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getSessionState, submitAnswer, type SessionState } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+import GameTimer from '@/components/game/Timer';
+import HintsPanel from '@/components/game/HintsPanel';
+import ProgressBar from '@/components/game/ProgressBar';
+import Feedback from '@/components/game/Feedback';
+import { useGameSession, type NodeData } from '@/hooks/useGameSession';
 
 interface PlaySessionPageParams {
   [key: string]: string;
@@ -12,27 +17,76 @@ interface PlaySessionPageParams {
   sessionId: string;
 }
 
+// Mock node data - in real implementation this comes from backend
+const MOCK_NODE_DATA: Record<string, NodeData> = {
+  'node-1': {
+    id: 'node-1',
+    type: 'TEXT',
+    title: 'Первое задание',
+    description: 'Найдите код на памятнике. Посмотрите на постамент с северной стороны.',
+    timeout: 120,
+    maxAttempts: 3,
+    hints: [
+      { level: 1, text: 'Посмотрите на постамент', penalty: -2, unlockedAt: 30 },
+      { level: 2, text: 'Код выгравирован на бронзовой табличке', penalty: -5, unlockedAt: 60 },
+      { level: 3, text: 'Код состоит из 4 цифр', penalty: -10, unlockedAt: 90 },
+    ],
+  },
+  'node-2': {
+    id: 'node-2',
+    type: 'CODE',
+    title: 'Второе задание',
+    description: 'Введите координаты места, где был сделан первый снимок.',
+    timeout: 180,
+    maxAttempts: 3,
+    hints: [
+      { level: 1, text: 'Это место в центре города', penalty: -2, unlockedAt: 30 },
+      { level: 2, text: 'Рядом с главной площадью', penalty: -5, unlockedAt: 60 },
+      { level: 3, text: '55.7558, 37.6173', penalty: -10, unlockedAt: 90 },
+    ],
+  },
+};
+
 export default function PlaySessionPage() {
   const params = useParams<PlaySessionPageParams>();
   const router = useRouter();
-  const shareLink = params.shareLink;
   const sessionId = params.sessionId;
+  const shareLink = params.shareLink;
 
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [currentNodeData, setCurrentNodeData] = useState<NodeData | null>(null);
+  const [totalNodes] = useState(10);
+  const [currentNodeIndex, setCurrentNodeIndex] = useState(1);
+  const [hintPenalty, setHintPenalty] = useState(0);
+  const [transitionFeedback, setTransitionFeedback] = useState<{ type: 'success' | 'error'; message: string; points: number } | null>(null);
 
   useEffect(() => {
     async function loadState() {
       try {
-        // In a real implementation, we'd use the teamId from the session
-        // For now, we'll use sessionId as a proxy
         const response = await getSessionState(sessionId);
         setSessionState(response.data);
+        
+        // Load node data (in real implementation from backend)
+        const nodeData = MOCK_NODE_DATA[response.data.currentNodeId] || {
+          id: response.data.currentNodeId,
+          type: 'TEXT',
+          title: `Задание`,
+          description: 'Текст задания загружается из сценария...',
+          timeout: 120,
+          maxAttempts: 3,
+          hints: [
+            { level: 1, text: 'Подсказка 1', penalty: -2, unlockedAt: 30 },
+            { level: 2, text: 'Подсказка 2', penalty: -5, unlockedAt: 60 },
+            { level: 3, text: 'Подсказка 3', penalty: -10, unlockedAt: 90 },
+          ],
+        };
+        
+        setCurrentNodeData(nodeData);
       } catch (err) {
-        setMessage({ type: 'error', text: 'Не удалось загрузить состояние игры' });
+        console.error('Failed to load session state:', err);
       } finally {
         setLoading(false);
       }
@@ -41,21 +95,42 @@ export default function PlaySessionPage() {
     loadState();
   }, [sessionId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sessionState || !answer.trim()) return;
+  const handleTimeout = useCallback(() => {
+    setTransitionFeedback({
+      type: 'error',
+      message: 'Время вышло!',
+      points: -5,
+    });
+    
+    // Auto-advance to next node would happen here via backend
+    setTimeout(() => {
+      router.push(`/play/${shareLink}/${sessionId}/finish`);
+    }, 2000);
+  }, [shareLink, sessionId, router]);
 
+  const handleHintUsed = useCallback((_level: number, penalty: number) => {
+    setHintPenalty((prev) => prev + Math.abs(penalty));
+    setTransitionFeedback({
+      type: 'error',
+      message: `Подсказка использована!`,
+      points: penalty,
+    });
+  }, []);
+
+  const handleSubmitAnswer = useCallback(async (answerText: string) => {
+    if (!sessionState) return;
+    
     setSubmitting(true);
-    setMessage(null);
-
+    
     try {
       const response = await submitAnswer(
         sessionState.teamId,
-        '', // gameId would be needed here
+        '', // gameId
         sessionState.currentNodeId,
-        answer.trim(),
+        answerText,
       );
 
+      // Update session state
       setSessionState({
         ...sessionState,
         score: response.data.score,
@@ -64,22 +139,64 @@ export default function PlaySessionPage() {
         history: response.data.history,
       });
 
+      // Check if finished
       if (response.data.status === 'finished') {
-        router.push(`/play/${shareLink}/${sessionId}/finish`);
+        setTransitionFeedback({
+          type: 'success',
+          message: 'Игра завершена!',
+          points: response.data.score,
+        });
+        setTimeout(() => {
+          router.push(`/play/${shareLink}/${sessionId}/finish`);
+        }, 2000);
         return;
       }
 
-      setMessage({
+      // Show feedback
+      const points = response.data.status === 'success' 
+        ? (response.data.score - sessionState.score) 
+        : -3;
+      
+      setTransitionFeedback({
         type: response.data.status === 'success' ? 'success' : 'error',
-        text: response.data.message,
+        message: response.data.status === 'success' ? 'Правильно!' : 'Неверно',
+        points,
       });
+
+      // Update node index for progress
+      if (response.data.status === 'success') {
+        setCurrentNodeIndex((prev) => prev + 1);
+      }
+
       setAnswer('');
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Ошибка отправки ответа' });
+      console.error('Failed to submit answer:', err);
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [sessionState, shareLink, sessionId, router]);
+
+  const handleFormSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!answer.trim()) return;
+    await handleSubmitAnswer(answer.trim());
+  }, [answer, handleSubmitAnswer]);
+
+  const {
+    timeLeft,
+    hasTimedOut,
+    unlockedHints,
+    usedHints,
+    useHint,
+    attempts,
+    maxAttempts,
+    feedback,
+    isTransitioning,
+  } = useGameSession(currentNodeData, {
+    onTimeout: handleTimeout,
+    onHintUsed: handleHintUsed,
+    onAnswerSubmit: handleSubmitAnswer,
+  });
 
   if (loading) {
     return (
@@ -96,7 +213,7 @@ export default function PlaySessionPage() {
     );
   }
 
-  if (!sessionState) {
+  if (!sessionState || !currentNodeData) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -113,45 +230,87 @@ export default function PlaySessionPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Header />
       
-      <div className="container mx-auto px-4 py-8">
-        {/* Game Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary">Игра в процессе</h1>
-            <p className="text-text-secondary">Команда: {sessionState.teamName}</p>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Top Bar: Score & Timer */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* Score */}
+          <div className="card text-center">
+            <div className="text-3xl font-bold text-primary">{sessionState.score}</div>
+            <div className="text-xs text-text-secondary">Очки</div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="card text-center">
-              <div className="text-2xl font-bold text-primary">{sessionState.score}</div>
-              <div className="text-xs text-text-secondary">Очки</div>
+          
+          {/* Timer */}
+          <div className="flex justify-center">
+            <GameTimer
+              seconds={timeLeft}
+              totalSeconds={currentNodeData.timeout || 120}
+              showCircular={true}
+            />
+          </div>
+          
+          {/* Penalties */}
+          <div className="card text-center">
+            <div className="text-3xl font-bold text-error">
+              {sessionState.penalties + hintPenalty}
             </div>
-            {sessionState.penalties > 0 && (
-              <div className="card text-center">
-                <div className="text-2xl font-bold text-error">{sessionState.penalties}</div>
-                <div className="text-xs text-text-secondary">Штрафы</div>
-              </div>
-            )}
+            <div className="text-xs text-text-secondary">Штрафы</div>
           </div>
         </div>
 
-        {/* Message */}
-        {message && (
-          <div className={`card mb-6 ${message.type === 'success' ? 'border-success' : 'border-error'}`}>
-            <p className={message.type === 'success' ? 'text-success' : 'text-error'}>{message.text}</p>
-          </div>
+        {/* Progress Bar */}
+        <div className="mb-6">
+          <ProgressBar
+            current={currentNodeIndex}
+            total={totalNodes}
+            difficulty="medium"
+          />
+        </div>
+
+        {/* Feedback Overlay */}
+        {(feedback || transitionFeedback) && (
+          <Feedback
+            type={feedback?.type || transitionFeedback!.type}
+            message={feedback?.message || transitionFeedback!.message}
+            points={feedback?.points || transitionFeedback!.points}
+            visible={!!(feedback || transitionFeedback)}
+          />
         )}
 
         {/* Task Card */}
-        <div className="card mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-text-primary">Задание #{sessionState.currentNodeId}</h2>
-          <p className="text-text-secondary mb-6">
-            Текст задания будет отображаться здесь. В реальной реализации он загружается из сценария.
+        <div className={`card mb-6 transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-text-primary">
+              {currentNodeData.title}
+            </h2>
+            <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
+              {currentNodeData.type}
+            </span>
+          </div>
+          
+          <p className="text-text-secondary mb-6 text-lg leading-relaxed">
+            {currentNodeData.description}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Attempts indicator */}
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm text-text-secondary">Попытки:</span>
+            <div className="flex gap-1">
+              {[...Array(maxAttempts)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full ${
+                    i < attempts ? 'bg-error' : 'bg-surface border border-border'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Answer Form */}
+          <form onSubmit={handleFormSubmit} className="space-y-4">
             <div>
               <label className="label">Ваш ответ</label>
               <input
@@ -159,24 +318,49 @@ export default function PlaySessionPage() {
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 placeholder="Введите ответ"
-                className="input-field"
-                disabled={submitting}
+                className="input-field text-lg"
+                disabled={submitting || hasTimedOut || attempts >= maxAttempts}
+                autoFocus
               />
             </div>
+            
+            {hasTimedOut && (
+              <div className="text-error text-sm text-center">
+                ⏰ Время вышло! Переход к следующему заданию...
+              </div>
+            )}
+            
+            {attempts >= maxAttempts && (
+              <div className="text-error text-sm text-center">
+                ❌ Превышено количество попыток
+              </div>
+            )}
+            
             <button
               type="submit"
-              disabled={submitting || !answer.trim()}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={submitting || !answer.trim() || hasTimedOut || attempts >= maxAttempts}
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed text-lg py-3"
             >
               {submitting ? 'Отправка...' : 'Отправить ответ'}
             </button>
           </form>
         </div>
 
+        {/* Hints Panel */}
+        {currentNodeData.hints && (
+          <HintsPanel
+            hints={currentNodeData.hints}
+            unlockedLevels={unlockedHints}
+            usedLevels={usedHints}
+            onUseHint={useHint}
+            currentPenalty={hintPenalty}
+          />
+        )}
+
         {/* History */}
         {sessionState.history.length > 0 && (
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-4 text-text-primary">История</h3>
+          <div className="card mt-6">
+            <h3 className="text-lg font-semibold mb-4 text-text-primary">История прохождений</h3>
             <div className="space-y-2">
               {sessionState.history.map((entry, index) => (
                 <div
@@ -185,12 +369,23 @@ export default function PlaySessionPage() {
                     entry.result === 'success' ? 'bg-success/10' : 'bg-error/10'
                   }`}
                 >
-                  <span className="text-sm text-text-secondary">Задание {entry.nodeId}</span>
-                  <span className={`text-sm font-medium ${
-                    entry.result === 'success' ? 'text-success' : 'text-error'
-                  }`}>
-                    {entry.result === 'success' ? '✓' : '✗'}
+                  <span className="text-sm text-text-secondary">
+                    Задание {entry.nodeId}
                   </span>
+                  <div className="flex items-center gap-3">
+                    {entry.score && (
+                      <span className={`text-sm font-bold ${
+                        entry.score > 0 ? 'text-success' : 'text-error'
+                      }`}>
+                        {entry.score > 0 ? '+' : ''}{entry.score}
+                      </span>
+                    )}
+                    <span className={`text-lg font-bold ${
+                      entry.result === 'success' ? 'text-success' : 'text-error'
+                    }`}>
+                      {entry.result === 'success' ? '✓' : '✗'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
