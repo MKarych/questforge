@@ -14,17 +14,8 @@ export class TeamsController {
    * Создать новую команду
    */
   @Post()
-  async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto, @Query('gameId') gameId: string) {
-    if (!gameId) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'gameId обязателен',
-        },
-      };
-    }
-    const result = await this.teamsService.create(req.user.userId, dto, gameId);
+  async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto) {
+    const result = await this.teamsService.create(req.user.userId, dto, dto.gameId);
     return {
       success: true,
       data: result,

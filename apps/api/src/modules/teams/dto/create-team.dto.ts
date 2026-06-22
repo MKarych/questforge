@@ -11,4 +11,8 @@ export class CreateTeamDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  gameId?: string;
 }

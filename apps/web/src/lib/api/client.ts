@@ -251,6 +251,7 @@ export interface TeamDetails extends Team {
 export interface CreateTeamRequest {
   name: string;
   description?: string;
+  gameId?: string;
 }
 
 export interface InviteUserRequest {

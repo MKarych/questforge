@@ -227,8 +227,8 @@ model ScenarioVersion {
 model Team {
   id                    String      @id @default(uuid()) @db.Uuid
   name                  String      @db.VarChar(100)
-  gameId                String      @map("game_id") @db.Uuid
-  game                  Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId                String?     @map("game_id") @db.Uuid
+  game                  Game?       @relation(fields: [gameId], references: [id], onDelete: Cascade)
   captainId             String      @map("captain_id") @db.Uuid
   captain               User        @relation(fields: [captainId], references: [id], onDelete: Restrict)
   currentNodeId         String?     @map("current_node_id") @db.VarChar(50)

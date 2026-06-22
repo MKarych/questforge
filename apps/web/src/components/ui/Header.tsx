@@ -74,9 +74,11 @@ export default function Header() {
             <Link href="/games" className="text-text-secondary hover:text-text-primary transition-colors">
               Игры
             </Link>
-            <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
-              Команды
-            </Link>
+            {user && (
+              <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
+                Команды
+              </Link>
+            )}
             <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
               Организаторам
             </Link>
@@ -140,15 +142,17 @@ export default function Header() {
         {mobileMenuOpen && (
           <nav className="md:hidden py-4 border-t border-border">
             <div className="flex flex-col gap-4">
-              <Link href="/games" className="text-text-secondary hover:text-text-primary transition-colors">
-                Игры
-              </Link>
+            <Link href="/games" className="text-text-secondary hover:text-text-primary transition-colors">
+              Игры
+            </Link>
+            {user && (
               <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
                 Команды
               </Link>
-              <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
-                Организаторам
-              </Link>
+            )}
+            <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
+              Организаторам
+            </Link>
               {!loading && (
                 user ? (
                   <div className="flex flex-col gap-3 pt-2">

@@ -10,23 +10,25 @@ export class TeamsService {
   /**
    * Создать новую команду (в рамках игры)
    */
-  async create(userId: string, dto: CreateTeamDto, gameId: string) {
+  async create(userId: string, dto: CreateTeamDto, gameId?: string) {
     // Проверяем, нет ли уже команды от этого капитана в этой игре
-    const existingTeam = await this.prisma.team.findFirst({
-      where: {
-        gameId,
-        captainId: userId,
-      },
-    });
+    if (gameId) {
+      const existingTeam = await this.prisma.team.findFirst({
+        where: {
+          gameId,
+          captainId: userId,
+        },
+      });
 
-    if (existingTeam) {
-      throw new BadRequestException('У вас уже есть команда в этой игре');
+      if (existingTeam) {
+        throw new BadRequestException('У вас уже есть команда в этой игре');
+      }
     }
 
     const team = await this.prisma.team.create({
       data: {
         name: dto.name,
-        gameId,
+        ...(gameId ? { gameId } : {}),
         captainId: userId,
       },
       include: {
@@ -54,6 +56,7 @@ export class TeamsService {
       id: team.id,
       name: team.name,
       captainId: team.captainId,
+      gameId: team.gameId,
       createdAt: team.createdAt,
     };
   }

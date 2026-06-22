@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 export default function CreateTeamPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const gameId = searchParams.get('gameId');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ export default function CreateTeamPage() {
     setError(null);
 
     try {
-      await createTeam({ name, description: description || undefined });
+      await createTeam({ name, description: description || undefined, gameId: gameId || undefined });
       router.push('/teams');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания команды');
