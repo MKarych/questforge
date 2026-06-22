@@ -14,7 +14,7 @@ export default function TeamsPage() {
     async function loadTeams() {
       try {
         const response = await getTeams({ limit: 50 });
-        setTeams(response.data.items);
+        setTeams(response.data?.items || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось загрузить команды');
       } finally {
@@ -58,7 +58,7 @@ export default function TeamsPage() {
           <div className="card border-error">
             <p className="text-error">{error}</p>
           </div>
-        ) : teams.length === 0 ? (
+        ) : !teams || teams.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-text-secondary mb-4">Команд пока нет</p>
             <Link href="/teams/create" className="btn-primary">
