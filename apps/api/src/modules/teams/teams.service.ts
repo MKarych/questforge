@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 
@@ -8,21 +8,33 @@ export class TeamsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Создать новую команду
+   * Создать новую команду (в рамках игры)
    */
-  async create(userId: string, dto: CreateTeamDto) {
+  async create(userId: string, dto: CreateTeamDto, gameId: string) {
+    // Проверяем, нет ли уже команды от этого капитана в этой игре
+    const existingTeam = await this.prisma.team.findFirst({
+      where: {
+        gameId,
+        captainId: userId,
+      },
+    });
+
+    if (existingTeam) {
+      throw new BadRequestException('У вас уже есть команда в этой игре');
+    }
+
     const team = await this.prisma.team.create({
       data: {
         name: dto.name,
+        gameId,
         captainId: userId,
-        description: dto.description,
       },
       include: {
         captain: {
           select: {
             id: true,
             name: true,
-            avatar: true,
+            avatarUrl: true,
           },
         },
       },
@@ -41,7 +53,6 @@ export class TeamsService {
     return {
       id: team.id,
       name: team.name,
-      description: team.description,
       captainId: team.captainId,
       createdAt: team.createdAt,
     };
@@ -50,10 +61,16 @@ export class TeamsService {
   /**
    * Получить список команд с пагинацией
    */
-  async findAll(query: { city?: string; limit?: number; offset?: number }) {
-    const { city, limit = 20, offset = 0 } = query;
+  async findAll(query: { gameId?: string; city?: string; limit?: number; offset?: number }) {
+    const { gameId, city, limit = 20, offset = 0 } = query;
 
-    const where = city ? { captain: { city } } : {};
+    const where: Record<string, unknown> = {};
+    if (gameId) {
+      where.gameId = gameId;
+    }
+    if (city) {
+      where.captain = { city };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.team.findMany({
@@ -65,7 +82,8 @@ export class TeamsService {
             select: {
               id: true,
               name: true,
-              avatar: true,
+              avatarUrl: true,
+              city: true,
             },
           },
           members: {
@@ -75,7 +93,7 @@ export class TeamsService {
                 select: {
                   id: true,
                   name: true,
-                  avatar: true,
+                  avatarUrl: true,
                 },
               },
             },
@@ -89,13 +107,12 @@ export class TeamsService {
     ]);
 
     return {
-      items: items.map((team) => ({
+      items: items.map((team: any) => ({
         id: team.id,
         name: team.name,
-        description: team.description,
         captain: team.captain,
         membersCount: team.members.length,
-        rating: 0, // TODO: рассчитать рейтинг
+        rating: 0,
         createdAt: team.createdAt,
       })),
       total,
@@ -113,8 +130,9 @@ export class TeamsService {
           select: {
             id: true,
             name: true,
-            avatar: true,
+            avatarUrl: true,
             email: true,
+            city: true,
           },
         },
         members: {
@@ -124,7 +142,7 @@ export class TeamsService {
               select: {
                 id: true,
                 name: true,
-                avatar: true,
+                avatarUrl: true,
               },
             },
           },
@@ -142,22 +160,21 @@ export class TeamsService {
     return {
       id: team.id,
       name: team.name,
-      description: team.description,
       captain: {
         id: team.captain.id,
         name: team.captain.name,
-        avatar: team.captain.avatar,
+        avatarUrl: team.captain.avatarUrl,
       },
-      members: team.members.map((member) => ({
+      members: team.members.map((member: any) => ({
         id: member.user.id,
         name: member.user.name,
-        avatar: member.user.avatar,
+        avatarUrl: member.user.avatarUrl,
         role: member.role,
         joinedAt: member.joinedAt,
       })),
-      rating: 0, // TODO: рассчитать рейтинг
-      gamesPlayed: 0, // TODO: получить из статистики
-      gamesWon: 0, // TODO: получить из статистики
+      rating: 0,
+      gamesPlayed: 0,
+      gamesWon: 0,
       createdAt: team.createdAt,
     };
   }
@@ -181,7 +198,7 @@ export class TeamsService {
     // Проверяем, не состоит ли уже пользователь в команде
     const existingMember = await this.prisma.teamMember.findUnique({
       where: {
-        teamId_userId: {
+        team_member_unique: {
           teamId,
           userId: dto.userId,
         },
@@ -192,8 +209,7 @@ export class TeamsService {
       throw new BadRequestException('Пользователь уже состоит в команде');
     }
 
-    // TODO: Создать приглашение (отдельная таблица invites)
-    // Пока просто создаем участника со статусом pending
+    // Создаем участника со статусом pending
     const member = await this.prisma.teamMember.create({
       data: {
         teamId,
@@ -213,7 +229,7 @@ export class TeamsService {
   /**
    * Вступить в команду по приглашению
    */
-  async join(userId: string, teamId: string, inviteToken?: string) {
+  async join(userId: string, teamId: string) {
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
     });
@@ -224,7 +240,7 @@ export class TeamsService {
 
     const member = await this.prisma.teamMember.findUnique({
       where: {
-        teamId_userId: {
+        team_member_unique: {
           teamId,
           userId,
         },
@@ -268,7 +284,7 @@ export class TeamsService {
 
     const member = await this.prisma.teamMember.findUnique({
       where: {
-        teamId_userId: {
+        team_member_unique: {
           teamId,
           userId,
         },
@@ -280,7 +296,6 @@ export class TeamsService {
     }
 
     if (member.role === 'captain') {
-      // TODO: Реализовать передачу капитанства или роспуск команды
       throw new BadRequestException('Капитан не может покинуть команду. Передайте капитанство другому участнику или распустите команду.');
     }
 
@@ -320,7 +335,7 @@ export class TeamsService {
 
     const member = await this.prisma.teamMember.findUnique({
       where: {
-        teamId_userId: {
+        team_member_unique: {
           teamId,
           userId: targetUserId,
         },
@@ -361,7 +376,7 @@ export class TeamsService {
               select: {
                 id: true,
                 name: true,
-                avatar: true,
+                avatarUrl: true,
               },
             },
             members: {
@@ -371,7 +386,7 @@ export class TeamsService {
                   select: {
                     id: true,
                     name: true,
-                    avatar: true,
+                    avatarUrl: true,
                   },
                 },
               },
@@ -390,16 +405,15 @@ export class TeamsService {
     return {
       id: team.id,
       name: team.name,
-      description: team.description,
       captain: {
         id: team.captain.id,
         name: team.captain.name,
-        avatar: team.captain.avatar,
+        avatarUrl: team.captain.avatarUrl,
       },
-      members: team.members.map((m) => ({
+      members: team.members.map((m: any) => ({
         id: m.user.id,
         name: m.user.name,
-        avatar: m.user.avatar,
+        avatarUrl: m.user.avatarUrl,
         role: m.role,
       })),
       myRole: membership.role,

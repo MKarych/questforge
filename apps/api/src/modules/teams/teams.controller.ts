@@ -14,8 +14,17 @@ export class TeamsController {
    * Создать новую команду
    */
   @Post()
-  async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto) {
-    const result = await this.teamsService.create(req.user.userId, dto);
+  async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto, @Query('gameId') gameId: string) {
+    if (!gameId) {
+      return {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'gameId обязателен',
+        },
+      };
+    }
+    const result = await this.teamsService.create(req.user.userId, dto, gameId);
     return {
       success: true,
       data: result,
@@ -66,8 +75,8 @@ export class TeamsController {
    * Вступить в команду
    */
   @Post(':id/join')
-  async join(@Request() req: UserRequest, @Param('id') teamId: string, @Body('inviteToken') inviteToken?: string) {
-    const result = await this.teamsService.join(req.user.userId, teamId, inviteToken);
+  async join(@Request() req: UserRequest, @Param('id') teamId: string) {
+    const result = await this.teamsService.join(req.user.userId, teamId);
     return {
       success: true,
       data: result,
