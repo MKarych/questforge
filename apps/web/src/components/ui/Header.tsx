@@ -75,7 +75,17 @@ export default function Header() {
                   <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary transition-colors">
                     Сценарии
                   </Link>
-                  <span className="text-text-secondary text-sm">{user.name}</span>
+                  <Link href={`/profile/${user.id}`} className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                      {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm text-primary font-semibold">
+                          {user.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
                   <button onClick={handleLogout} className="btn-secondary">
                     Выйти
                   </button>
@@ -131,7 +141,18 @@ export default function Header() {
                     <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary transition-colors">
                       Сценарии
                     </Link>
-                    <span className="text-text-secondary text-sm">{user.name}</span>
+                    <Link href={`/profile/${user.id}`} className="flex items-center gap-3 text-text-secondary hover:text-text-primary transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                        {user.avatarUrl ? (
+                          <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-sm text-primary font-semibold">
+                            {user.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-text-secondary text-sm">{user.name}</span>
+                    </Link>
                     <button onClick={handleLogout} className="btn-secondary">
                       Выйти
                     </button>

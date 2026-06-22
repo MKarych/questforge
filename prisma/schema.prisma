@@ -89,6 +89,15 @@ model User {
   passwordHash          String    @map("password_hash") @db.VarChar(255)
   name                  String    @db.VarChar(100)
   avatarUrl             String?   @map("avatar_url") @db.Text
+  city                  String?   @db.VarChar(100)
+  bio                   String?   @db.Text
+  telegram              String?   @db.VarChar(100)
+  vk                    String?   @db.VarChar(255)
+  whatsapp              String?   @db.VarChar(100)
+  rating                Float?    @default(0)
+  reputation            Int       @default(0)
+  achievements          Json      @default("[]") @db.Json
+  lastSeenAt            DateTime? @map("last_seen_at")
   role                  Role      @default(PLAYER)
   status                UserStatus @default(ACTIVE)
   contacts              Json      @default("{}")
@@ -120,6 +129,8 @@ model User {
   @@index([role])
   @@index([status])
   @@index([organizerStatus])
+  @@index([city])
+  @@index([rating])
 }
 
 model Game {

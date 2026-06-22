@@ -120,9 +120,24 @@ export interface User {
   email: string;
   name: string;
   avatarUrl: string | null;
-  role: 'PLAYER' | 'ORGANIZER' | 'ADMIN' | 'MODERATOR';
+  city: string | null;
+  bio: string | null;
+  telegram: string | null;
+  vk: string | null;
+  whatsapp: string | null;
+  role: 'PLAYER' | 'ORGANIZER' | 'ADMIN' | 'MODERATOR' | 'AUTHOR';
   organizerStatus: 'NOT_APPLIED' | 'PENDING' | 'APPROVED' | 'REJECTED';
   organizerApprovedAt?: string;
+  rating?: number;
+  reputation?: number;
+  achievements?: Array<{
+    id: string;
+    type: string;
+    name: string;
+    description: string;
+    icon: string;
+    unlockedAt: string;
+  }>;
   gamesCreated?: number;
   scenariosCreated?: number;
   gamesConducted?: number;
