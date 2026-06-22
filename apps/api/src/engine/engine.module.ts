@@ -1,5 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventStore } from './event-store/event-store';
 import { EngineOrchestrator } from './orchestrator/engine-orchestrator';
 import { PluginRegistry, PluginSandbox } from './plugin-sdk/plugin-sdk';
@@ -12,9 +12,10 @@ import { ChoiceMissionPlugin } from './plugins/choice-mission.plugin';
 import { TimerMissionPlugin } from './plugins/timer-mission.plugin';
 import { GameStateMachine, TeamStateMachine } from './state-machine/state-machine';
 import { LockManager } from './lock-manager/lock-manager';
+import { PrismaModule } from '../common/prisma/prisma.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, PrismaModule],
   providers: [
     EventStore,
     EngineOrchestrator,
@@ -63,6 +64,5 @@ export class EngineModule implements OnModuleInit {
     this.pluginRegistry.register(this.qrMissionPlugin);
     this.pluginRegistry.register(this.choiceMissionPlugin);
     this.pluginRegistry.register(this.timerMissionPlugin);
-    this.lockManager; // Ensure it initializes
   }
 }

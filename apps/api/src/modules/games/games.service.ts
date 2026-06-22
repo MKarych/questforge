@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { GameStateMachine } from '../../engine/state-machine/state-machine';
+import { GameStatus } from '../../engine/types/engine.types';
 
 @Injectable()
 export class GamesService {
@@ -379,14 +380,14 @@ export class GamesService {
     }
 
     // Use state machine for transition
-    if (!this.gameStateMachine.canTransition(game.status, 'start')) {
+    if (!this.gameStateMachine.canTransition(game.status as GameStatus, 'start')) {
       throw new ForbiddenException(
         `Cannot start game in status: ${game.status}`,
       );
     }
 
     // Transition through state machine
-    const newStatus = this.gameStateMachine.transition(game.status, 'start');
+    const newStatus = this.gameStateMachine.transition(game.status as GameStatus, 'start');
 
     return this.prisma.game.update({
       where: { id: gameId },
@@ -410,13 +411,13 @@ export class GamesService {
       throw new ForbiddenException('You do not have access to this game');
     }
 
-    if (!this.gameStateMachine.canTransition(game.status, 'finish')) {
+    if (!this.gameStateMachine.canTransition(game.status as GameStatus, 'finish')) {
       throw new ForbiddenException(
         `Cannot finish game in status: ${game.status}`,
       );
     }
 
-    const newStatus = this.gameStateMachine.transition(game.status, 'finish');
+    const newStatus = this.gameStateMachine.transition(game.status as GameStatus, 'finish');
 
     return this.prisma.game.update({
       where: { id: gameId },

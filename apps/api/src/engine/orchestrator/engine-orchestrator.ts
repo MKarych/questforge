@@ -49,7 +49,7 @@ export class EngineOrchestrator {
   private readonly logger = new Logger(EngineOrchestrator.name);
 
   constructor(
-    private readonly eventStore: IEventStore,
+    private readonly eventStore: EventStore,
     private readonly gameStateMachine: GameStateMachine,
     private readonly teamStateMachine: TeamStateMachine,
     private readonly pluginRegistry: PluginRegistry,
@@ -418,7 +418,7 @@ export class EngineOrchestrator {
     });
 
     if (snapshot) {
-      return snapshot.state as SessionState;
+      return snapshot.state as unknown as SessionState;
     }
 
     return null;

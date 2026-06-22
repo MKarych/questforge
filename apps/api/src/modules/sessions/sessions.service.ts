@@ -122,7 +122,7 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    const state = snapshot.state as SessionState;
+    const state = snapshot.state as unknown as SessionState;
 
     // Process answer through engine
     const result = await this.engineOrchestrator.processAnswer(
@@ -169,7 +169,7 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    const state = snapshot.state as SessionState;
+    const state = snapshot.state as unknown as SessionState;
 
     return {
       sessionId: state.sessionId,

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { PrismaService } from './common/prisma/prisma.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EngineModule } from './engine/engine.module';
@@ -9,6 +8,7 @@ import { GamesModule } from './modules/games/games.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
 import { UsersModule } from './modules/users/users.module';
+import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
 @Module({
@@ -17,6 +17,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, jwtConfig],
     }),
+    PrismaModule,
     AuthModule,
     GamesModule,
     SessionsModule,
@@ -25,6 +26,6 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     EngineModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService],
 })
 export class AppModule {}
