@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { getMyTeam, type MyTeam } from '@/lib/api/client';
 
 interface UserProfile {
   id: string;
@@ -40,6 +41,7 @@ interface Achievement {
 export default function PublicProfilePage() {
   const params = useParams() as { id: string };
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +57,16 @@ export default function PublicProfilePage() {
 
         const data = await response.json();
         setProfile(data);
+
+        // Загружаем команду для текущего пользователя
+        try {
+          const teamResponse = await getMyTeam();
+          if (teamResponse.data) {
+            setMyTeam(teamResponse.data);
+          }
+        } catch {
+          // Игнорируем ошибки загрузки команды
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки');
       } finally {
@@ -208,6 +220,46 @@ export default function PublicProfilePage() {
               <div className="text-sm text-text-secondary">Сценариев</div>
             </div>
           </div>
+
+          {/* My Team */}
+          {myTeam && (
+            <div className="card mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-text-primary">🏴 Моя команда</h2>
+                <Link href={`/teams/${myTeam.id}`} className="text-primary hover:text-primary-hover text-sm font-medium">
+                  Подробнее →
+                </Link>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-lg font-semibold text-text-primary">{myTeam.name}</div>
+                <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                  {myTeam.myRole === 'captain' ? 'Капитан' : 'Участник'}
+                </span>
+              </div>
+              <div className="mt-3 flex -space-x-2">
+                {myTeam.members.slice(0, 5).map((member) => (
+                  <div
+                    key={member.id}
+                    className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border-2 border-background"
+                    title={member.name}
+                  >
+                    {member.avatar ? (
+                      <img src={member.avatar} alt={member.name} className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-primary font-semibold">
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {myTeam.members.length > 5 && (
+                  <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center border-2 border-background text-xs text-text-secondary">
+                    +{myTeam.members.length - 5}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Achievements */}
           {profile.achievements && profile.achievements.length > 0 && (

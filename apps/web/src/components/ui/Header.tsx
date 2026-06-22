@@ -74,6 +74,9 @@ export default function Header() {
             <Link href="/games" className="text-text-secondary hover:text-text-primary transition-colors">
               Игры
             </Link>
+            <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
+              🏴 Команды
+            </Link>
             <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
               Организаторам
             </Link>
@@ -139,6 +142,9 @@ export default function Header() {
             <div className="flex flex-col gap-4">
               <Link href="/games" className="text-text-secondary hover:text-text-primary transition-colors">
                 Игры
+              </Link>
+              <Link href="/teams" className="text-text-secondary hover:text-text-primary transition-colors">
+                🏴 Команды
               </Link>
               <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
                 Организаторам

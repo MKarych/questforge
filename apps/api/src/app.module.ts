@@ -9,6 +9,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
 import { UsersModule } from './modules/users/users.module';
 import { OrganizerModule } from './modules/organizer/organizer.module';
+import { TeamsModule } from './modules/teams/teams.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -25,6 +26,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     ScenariosModule,
     UsersModule,
     OrganizerModule,
+    TeamsModule,
     EngineModule,
   ],
   controllers: [AppController],

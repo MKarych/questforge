@@ -220,6 +220,54 @@ export interface CreateScenarioResponse {
   createdAt: string;
 }
 
+// ==================== Teams ====================
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string | null;
+  captain: {
+    id: string;
+    name: string;
+    avatar: string | null;
+  };
+  membersCount: number;
+  rating: number;
+  createdAt: string;
+}
+
+export interface TeamDetails extends Team {
+  members: Array<{
+    id: string;
+    name: string;
+    avatar: string | null;
+    role: 'captain' | 'member';
+    joinedAt: string;
+  }>;
+  gamesPlayed: number;
+  gamesWon: number;
+}
+
+export interface CreateTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface InviteUserRequest {
+  userId: string;
+}
+
+export interface MyTeam extends Team {
+  myRole: 'captain' | 'member';
+  joinedAt: string;
+  members: Array<{
+    id: string;
+    name: string;
+    avatar: string | null;
+    role: 'captain' | 'member';
+  }>;
+}
+
 // API Error
 export interface ApiError {
   success: false;
@@ -448,6 +496,63 @@ class ApiClient {
       method: 'POST',
     });
   }
+
+  // ==================== Teams ====================
+
+  async createTeam(data: CreateTeamRequest): Promise<ApiResponse<Team>> {
+    return this.request('/teams', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTeams(params?: {
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ items: Team[]; total: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.city) queryParams.append('city', params.city);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request(`/teams${query ? `?${query}` : ''}`);
+  }
+
+  async getTeam(id: string): Promise<ApiResponse<TeamDetails>> {
+    return this.request(`/teams/${id}`);
+  }
+
+  async inviteToTeam(teamId: string, data: InviteUserRequest): Promise<ApiResponse<{ status: string; inviteId: string; message: string }>> {
+    return this.request(`/teams/${teamId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async joinTeam(teamId: string, inviteToken?: string): Promise<ApiResponse<{ status: string; teamId: string; message: string }>> {
+    return this.request(`/teams/${teamId}/join`, {
+      method: 'POST',
+      body: JSON.stringify({ inviteToken }),
+    });
+  }
+
+  async leaveTeam(teamId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/members/me`, {
+      method: 'DELETE',
+    });
+  }
+
+  async removeMember(teamId: string, userId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getMyTeam(): Promise<ApiResponse<MyTeam | null>> {
+    return this.request('/teams/me/team');
+  }
 }
 
 // Export singleton instance
@@ -478,3 +583,13 @@ export const login = (credentials: LoginRequest) => apiClient.login(credentials)
 export const register = (userData: RegisterRequest) => apiClient.register(userData);
 export const logout = () => apiClient.logout();
 export const getProfile = () => apiClient.getProfile();
+
+// Teams
+export const createTeam = (data: CreateTeamRequest) => apiClient.createTeam(data);
+export const getTeams = (params?: { city?: string; limit?: number; offset?: number }) => apiClient.getTeams(params);
+export const getTeam = (id: string) => apiClient.getTeam(id);
+export const inviteToTeam = (teamId: string, data: InviteUserRequest) => apiClient.inviteToTeam(teamId, data);
+export const joinTeam = (teamId: string, inviteToken?: string) => apiClient.joinTeam(teamId, inviteToken);
+export const leaveTeam = (teamId: string) => apiClient.leaveTeam(teamId);
+export const removeMember = (teamId: string, userId: string) => apiClient.removeMember(teamId, userId);
+export const getMyTeam = () => apiClient.getMyTeam();

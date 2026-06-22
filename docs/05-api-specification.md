@@ -1221,9 +1221,231 @@ POST /sessions/:sessionId/sos
 
 ---
 
-## 7. Reviews (Отзывы)
+## 7. Teams (Команды)
 
-### 7.1. Создать отзыв на игру
+### 7.1. Создать команду
+
+```
+POST /teams
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "name": "Ночные волки",
+  "description": "Команда для участия в городских квестах"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "team-123",
+    "name": "Ночные волки",
+    "description": "Команда для участия в городских квестах",
+    "captainId": "user-456",
+    "createdAt": "2025-01-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 7.2. Получить список команд
+
+```
+GET /teams
+```
+
+**Query Parameters:**
+
+| Параметр | Тип | Описание |
+| :--- | :--- | :--- |
+| `city` | string | Фильтр по городу |
+| `limit` | number | 1-100, по умолчанию 20 |
+| `offset` | number | Смещение для пагинации |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "team-123",
+        "name": "Ночные волки",
+        "rating": 1250,
+        "membersCount": 4,
+        "city": "Москва"
+      }
+    ],
+    "total": 10
+  }
+}
+```
+
+---
+
+### 7.3. Получить детали команды
+
+```
+GET /teams/:id
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "team-123",
+    "name": "Ночные волки",
+    "description": "Команда для участия в городских квестах",
+    "captain": {
+      "id": "user-456",
+      "name": "Алексей",
+      "avatar": "https://..."
+    },
+    "members": [
+      {
+        "id": "user-456",
+        "name": "Алексей",
+        "role": "captain",
+        "joinedAt": "2025-01-01T12:00:00Z"
+      },
+      {
+        "id": "user-789",
+        "name": "Мария",
+        "role": "member",
+        "joinedAt": "2025-01-02T10:00:00Z"
+      }
+    ],
+    "rating": 1250,
+    "gamesPlayed": 5,
+    "gamesWon": 2,
+    "createdAt": "2025-01-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 7.4. Пригласить в команду
+
+```
+POST /teams/:id/invite
+```
+
+**Authorization:** Bearer <token> (только капитан)
+
+**Request:**
+
+```json
+{
+  "userId": "user-789"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "invited",
+    "inviteId": "invite-123",
+    "message": "Приглашение отправлено"
+  }
+}
+```
+
+---
+
+### 7.5. Вступить в команду (по приглашению)
+
+```
+POST /teams/:id/join
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "inviteToken": "token-123"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "joined",
+    "teamId": "team-123",
+    "message": "Вы успешно вступили в команду"
+  }
+}
+```
+
+---
+
+### 7.6. Покинуть команду
+
+```
+DELETE /teams/:id/members/me
+```
+
+**Authorization:** Bearer <token>
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "left",
+    "message": "Вы покинули команду"
+  }
+}
+```
+
+---
+
+### 7.7. Исключить участника
+
+```
+DELETE /teams/:id/members/:userId
+```
+
+**Authorization:** Bearer <token> (только капитан)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "removed",
+    "message": "Участник исключен из команды"
+  }
+}
+```
+
+---
+
+## 8. Reviews (Отзывы)
+
+### 8.1. Создать отзыв на игру
 
 ```
 POST /games/:gameId/reviews
@@ -1351,7 +1573,7 @@ DELETE /reviews/:id
 
 ---
 
-## 8. Comments (Обсуждения)
+## 9. Comments (Обсуждения)
 
 ### 8.1. Создать комментарий к игре
 
@@ -1447,7 +1669,7 @@ DELETE /comments/:id
 
 ---
 
-## 9. Marketplace (Маркетплейс)
+## 10. Marketplace (Маркетплейс)
 
 ### 9.1. Получить каталог
 
@@ -1697,7 +1919,7 @@ POST /marketplace/:id/review
 
 ---
 
-## 10. Admin (Администрирование)
+## 11. Admin (Администрирование)
 
 ### 10.1. Получить статистику платформы
 
@@ -2019,7 +2241,7 @@ POST /admin/users/:id/block
 
 ---
 
-## 11. Analytics (Аналитика)
+## 12. Analytics (Аналитика)
 
 ### 11.1. Получить статистику игры
 
@@ -2093,7 +2315,7 @@ GET /analytics/organizer
 
 ---
 
-## 12. System (Системные эндпоинты)
+## 13. System (Системные эндпоинты)
 
 ### 12.1. Синхронизация времени
 
@@ -2116,7 +2338,7 @@ GET /time
 
 ---
 
-## 13. WebSocket (Realtime)
+## 14. WebSocket (Realtime)
 
 ### 13.1. Подключение
 
@@ -2154,7 +2376,7 @@ ws://localhost:3000/socket.io/?token=<jwt-token>
 
 ---
 
-## 14. Итоговый контракт
+## 15. Итоговый контракт
 
 > **API — единственный способ взаимодействия с платформой.**
 >
