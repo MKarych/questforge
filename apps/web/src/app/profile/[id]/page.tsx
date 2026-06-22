@@ -237,7 +237,7 @@ export default function PublicProfilePage() {
                 </span>
               </div>
               <div className="mt-3 flex -space-x-2">
-                {myTeam.members.slice(0, 5).map((member) => (
+                {myTeam?.members?.slice(0, 5)?.map((member) => (
                   <div
                     key={member.id}
                     className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border-2 border-background"
@@ -252,7 +252,7 @@ export default function PublicProfilePage() {
                     )}
                   </div>
                 ))}
-                {myTeam.members.length > 5 && (
+                {myTeam?.members?.length > 5 && (
                   <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center border-2 border-background text-xs text-text-secondary">
                     +{myTeam.members.length - 5}
                   </div>
