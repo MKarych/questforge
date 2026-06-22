@@ -603,4 +603,26 @@ export class GamesService {
     }
     return result;
   }
+
+  async publishGame(userId: string, gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('У вас нет доступа к этой игре');
+    }
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+    });
+  }
 }

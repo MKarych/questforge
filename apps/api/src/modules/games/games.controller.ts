@@ -135,4 +135,10 @@ export class GamesController {
   async finishGame(@Request() req: any, @Param('id') gameId: string) {
     return this.gamesService.finishGame(req.user.userId, gameId);
   }
+
+  @Post(':id/publish')
+  @UseGuards(JwtAuthGuard)
+  async publishGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.publishGame(req.user.userId, gameId);
+  }
 }

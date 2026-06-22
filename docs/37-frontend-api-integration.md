@@ -33,7 +33,11 @@
 | `/organizer/dashboard` | `getMyGames()`, `getProfile()` | ✅ |
 | `/organizer/games/create` | `createGame(data)` | ✅ |
 | `/organizer/games/[id]` (детальная) | `getGame(id)` | ✅ |
-| `/organizer/games/[id]/edit` | — (в разработке) | 🚧 |
+| `/organizer/games/[id]/edit` (редактирование) | `getGame(id)`, `updateGame(id)`, `publishGame(id)` | ✅ |
+| `/organizer/games/[id]/publish` | — (в разработке) | 🚧 |
+| `/organizer/scenarios` (список) | `getScenarios()` | ✅ |
+| `/organizer/scenarios/create` | `createScenario(data)` | ✅ |
+| `/organizer/scenarios/[id]/edit` (редактирование) | `getScenario(id)`, `updateScenario(id)`, `publishScenario(id)` | ✅ |
 | `/auth/login` | `login(credentials)` | ✅ |
 | `/auth/register` | `register(userData)` | ✅ |
 
@@ -79,6 +83,8 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api
 | `apps/web/src/app/games/[id]/page.tsx` | Использует `getPublicGame(id)` |
 | `apps/web/src/app/organizer/games/create/page.tsx` | Отправляет POST на `/games` |
 | `apps/web/src/app/organizer/games/[id]/page.tsx` | Использует `getGame(id)` |
+| `apps/web/src/app/organizer/games/[id]/edit/page.tsx` | Использует `updateGame(id)`, `publishGame(id)` |
+| `apps/web/src/app/organizer/scenarios/[id]/edit/page.tsx` | Использует `updateScenario(id)`, `publishScenario(id)` |
 | `apps/web/src/app/organizer/dashboard/page.tsx` | Загружает реальные данные |
 | `apps/web/src/components/ui/Header.tsx` | Показывает auth-статус, кнопку logout |
 | `apps/web/.env.local` | Создан с API URL |
@@ -134,7 +140,23 @@ Inconsistent column data: Error creating UUID
 5. Ссылка на игру с возможностью копирования
 ```
 
-### 4. Каталог игр
+### 5. Редактирование игры
+```
+1. Откройте /organizer/games/[id]/edit
+2. Измените данные (название, описание, дату и т.д.)
+3. Нажмите "Сохранить"
+4. Произойдёт редирект на страницу игры
+```
+
+### 6. Сценарии
+```
+1. Откройте /organizer/scenarios
+2. Создайте сценарий через кнопку "+ Создать сценарий"
+3. Отредактируйте через кнопку "Редактировать"
+4. Опубликуйте через кнопку "Опубликовать"
+```
+
+### 7. Каталог игр
 ```
 1. Открой http://localhost:3001/games
 2. Должен загрузиться список игр из API

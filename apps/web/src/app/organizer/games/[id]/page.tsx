@@ -244,9 +244,13 @@ export default function GamePage() {
                   Редактировать
                 </Link>
                 {game.status === 'CREATED' && (
-                  <Link href={`/organizer/games/${gameId}/publish`} className="btn-primary text-center">
+                  <button
+                    className="btn-primary text-center"
+                    disabled
+                    title="В разработке"
+                  >
                     Опубликовать
-                  </Link>
+                  </button>
                 )}
                 <button
                   className="btn-secondary text-center text-error hover:border-error"

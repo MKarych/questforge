@@ -437,6 +437,19 @@ class ApiClient {
     return this.request(`/games/${id}`);
   }
 
+  async updateGame(id: string, data: Partial<CreateGameRequest>): Promise<ApiResponse<GameDetails>> {
+    return this.request(`/games/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async publishGame(id: string): Promise<ApiResponse<GameDetails>> {
+    return this.request(`/games/${id}/publish`, {
+      method: 'POST',
+    });
+  }
+
   async getGameReviews(gameId: string, limit?: number, offset?: number): Promise<ApiResponse<{ data: Review[]; meta: { total: number; limit: number; offset: number } }>> {
     const queryParams = new URLSearchParams();
     if (limit) queryParams.append('limit', limit.toString());
@@ -465,6 +478,17 @@ class ApiClient {
 
     const query = queryParams.toString();
     return this.request(`/scenarios${query ? `?${query}` : ''}`);
+  }
+
+  async getScenario(id: string): Promise<ApiResponse<Scenario>> {
+    return this.request(`/scenarios/${id}`);
+  }
+
+  async updateScenario(id: string, data: Partial<CreateScenarioRequest>): Promise<ApiResponse<Scenario>> {
+    return this.request(`/scenarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   async createScenario(data: CreateScenarioRequest): Promise<ApiResponse<CreateScenarioResponse>> {
@@ -583,10 +607,17 @@ export const createGame = (data: CreateGameRequest) => apiClient.createGame(data
 export const getMyGames = (params?: { status?: string }) => apiClient.getMyGames(params);
 export const getGames = () => apiClient.getMyGames();
 export const getGame = (id: string) => apiClient.getGame(id);
+export const updateGame = (id: string, data: Partial<CreateGameRequest>) =>
+  apiClient.updateGame(id, data);
+export const publishGame = (id: string) => apiClient.publishGame(id);
 export const getScenarios = (params?: { published?: boolean }) => apiClient.getScenarios(params);
+export const getScenario = (id: string) => apiClient.getScenario(id);
+export const updateScenario = (id: string, data: Partial<CreateScenarioRequest>) =>
+  apiClient.updateScenario(id, data);
 export const createScenario = (data: CreateScenarioRequest) => apiClient.createScenario(data);
 export const publishScenario = (id: string, price?: number, licenseType?: string) =>
   apiClient.publishScenario(id, price, licenseType);
+export const getScenariosForGame = () => apiClient.getScenarios({ published: true });
 export const startSession = (data: CreateSessionRequest) => apiClient.createSession(data);
 export const submitAnswer = (teamId: string, gameId: string, nodeId: string, answer: string) =>
   apiClient.submitAnswer(teamId, gameId, nodeId, answer);

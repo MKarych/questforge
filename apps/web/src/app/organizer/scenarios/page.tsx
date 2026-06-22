@@ -148,7 +148,7 @@ export default function ScenariosPage() {
                 </div>
                 <div className="flex gap-2">
                   <Link
-                    href={`/organizer/scenarios/${scenario.id}`}
+                    href={`/organizer/scenarios/${scenario.id}/edit`}
                     className="btn-secondary text-sm flex-1 text-center"
                   >
                     Редактировать

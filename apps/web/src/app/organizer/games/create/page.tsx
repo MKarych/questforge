@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createGame, type CreateGameRequest } from '@/lib/api/client';
+import { createGame, getScenariosForGame, type CreateGameRequest, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 export default function CreateGamePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [scenariosLoading, setScenariosLoading] = useState(false);
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -17,10 +19,27 @@ export default function CreateGamePage() {
     duration: 180,
     price: 0,
     maxTeams: 20,
+    scenarioId: '',
   });
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  useEffect(() => {
+    async function loadScenarios() {
+      setScenariosLoading(true);
+      try {
+        const response = await getScenariosForGame();
+        setScenarios(response.data.data);
+      } catch (err) {
+        console.error('Failed to load scenarios:', err);
+      } finally {
+        setScenariosLoading(false);
+      }
+    }
+
+    loadScenarios();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -46,6 +65,7 @@ export default function CreateGamePage() {
         duration: formData.duration,
         price: formData.price,
         maxTeams: formData.maxTeams,
+        ...(formData.scenarioId && { scenarioId: formData.scenarioId }),
       };
 
       const response = await createGame(gameData);
@@ -180,6 +200,30 @@ export default function CreateGamePage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Сценарий (необязательно)</label>
+                <select
+                  name="scenarioId"
+                  value={formData.scenarioId}
+                  onChange={handleChange}
+                  className="input-field"
+                >
+                  <option value="">Без сценария</option>
+                  {scenariosLoading ? (
+                    <option disabled>Загрузка...</option>
+                  ) : (
+                    scenarios.map((scenario) => (
+                      <option key={scenario.id} value={scenario.id}>
+                        {scenario.name} (v{scenario.version})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <p className="text-xs text-text-secondary mt-1">
+                  Сценарий можно привязать позже в настройках игры
+                </p>
               </div>
 
               <div className="pt-4 border-t border-border">
