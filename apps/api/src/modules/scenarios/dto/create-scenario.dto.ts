@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, ValidateIf } from 'class-validator';
 
 export class CreateScenarioDto {
   @IsString()
@@ -9,8 +9,10 @@ export class CreateScenarioDto {
   description?: string;
 
   @IsArray()
-  nodes!: any[];
+  @IsOptional()
+  nodes?: any[];
 
+  @ValidateIf((o: CreateScenarioDto) => !o.nodes || o.nodes.length === 0)
   @IsString()
   startNodeId!: string;
 

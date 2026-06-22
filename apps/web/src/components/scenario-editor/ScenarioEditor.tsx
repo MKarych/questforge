@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -45,7 +45,7 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
 
   // Initialize with START and FINISH nodes
-  useState(() => {
+  useEffect(() => {
     if (nodes.length === 0) {
       const startId = uuidv4();
       const finishId = uuidv4();
@@ -65,7 +65,7 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
         },
       ]);
     }
-  });
+  }, []);
 
   const onDragStart = (event: React.DragEvent, blockType: BlockType) => {
     event.dataTransfer.setData('application/reactflow', blockType.type);
