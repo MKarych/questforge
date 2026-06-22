@@ -319,9 +319,202 @@ GET /organizer/status
 
 ---
 
-## 3. Public (Публичная часть — без авторизации)
+## 3. Users (Профили пользователей)
 
-### 3.1. Публичный каталог игр
+### 3.1. Получить публичный профиль пользователя
+
+```
+GET /users/:id
+```
+
+**Query Parameters:** нет
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123",
+    "name": "Алексей",
+    "avatarUrl": "https://...",
+    "city": "Минск",
+    "bio": "Люблю городские квесты",
+    "telegram": "@alex_quest",
+    "vk": "id123456",
+    "whatsapp": "+375291234567",
+    "role": "PLAYER",
+    "rating": 4.8,
+    "reputation": 150,
+    "achievements": [
+      {
+        "id": "ach_first_game",
+        "type": "FIRST_GAME",
+        "name": "Первая игра",
+        "description": "Пройдите свою первую игру",
+        "icon": "🎮",
+        "unlockedAt": "2025-01-01T12:00:00Z"
+      }
+    ],
+    "gamesCreated": 2,
+    "gamesConducted": 5,
+    "scenariosCreated": 1,
+    "gamesPlayed": 10,
+    "reviewsCount": 3,
+    "createdAt": "2025-01-01T12:00:00Z",
+    "lastSeenAt": "2025-01-10T15:00:00Z"
+  }
+}
+```
+
+---
+
+### 3.2. Получить мой профиль
+
+```
+GET /users/me
+```
+
+**Authorization:** Bearer <token>
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123",
+    "email": "alex@example.com",
+    "name": "Алексей",
+    "avatarUrl": "https://...",
+    "city": "Минск",
+    "bio": "Люблю городские квесты",
+    "telegram": "@alex_quest",
+    "vk": "id123456",
+    "whatsapp": "+375291234567",
+    "role": "PLAYER",
+    "rating": 4.8,
+    "reputation": 150,
+    "achievements": [],
+    "organizerStatus": "NOT_APPLIED",
+    "gamesCreated": 2,
+    "gamesConducted": 5,
+    "scenariosCreated": 1,
+    "createdAt": "2025-01-01T12:00:00Z",
+    "lastLoginAt": "2025-01-10T15:00:00Z",
+    "lastSeenAt": "2025-01-10T15:00:00Z"
+  }
+}
+```
+
+---
+
+### 3.3. Обновить мой профиль
+
+```
+PATCH /users/me
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "name": "Алексей Иванов",
+  "city": "Минск",
+  "bio": "Люблю городские квесты и автоквесты",
+  "telegram": "@alex_quest",
+  "vk": "id123456",
+  "whatsapp": "+375291234567"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123",
+    "name": "Алексей Иванов",
+    "avatarUrl": "https://...",
+    "city": "Минск",
+    "bio": "Люблю городские квесты и автоквесты",
+    "telegram": "@alex_quest",
+    "vk": "id123456",
+    "whatsapp": "+375291234567",
+    "role": "PLAYER",
+    "rating": 4.8,
+    "reputation": 150
+  }
+}
+```
+
+---
+
+### 3.4. Обновить аватар
+
+```
+POST /users/me/avatar
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "avatarUrl": "https://cdn.example.com/avatars/user-123.jpg"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123",
+    "avatarUrl": "https://cdn.example.com/avatars/user-123.jpg",
+    "name": "Алексей"
+  }
+}
+```
+
+---
+
+### 3.5. Проверить и выдать достижения
+
+```
+POST /users/me/check-achievements
+```
+
+**Authorization:** Bearer <token>
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "ach_first_game",
+      "type": "FIRST_GAME",
+      "name": "Первая игра",
+      "description": "Пройдите свою первую игру",
+      "icon": "🎮",
+      "unlockedAt": "2025-01-10T15:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 4. Public (Публичная часть — без авторизации)
+
+### 4.1. Публичный каталог игр
 
 ```
 GET /games/public
@@ -373,7 +566,7 @@ GET /games/public
 
 ---
 
-### 3.2. Публичная страница игры
+### 4.2. Публичная страница игры
 
 ```
 GET /games/public/:id
@@ -429,9 +622,9 @@ GET /games/public/:id
 
 ---
 
-## 4. Games (Игры)
+## 5. Games (Игры)
 
-### 4.1. Создать игру
+### 5.1. Создать игру
 
 ```
 POST /games
@@ -472,7 +665,7 @@ POST /games
 
 ---
 
-### 4.2. Получить список своих игр
+### 5.2. Получить список своих игр
 
 ```
 GET /games
@@ -513,7 +706,7 @@ GET /games
 
 ---
 
-### 4.3. Получить игру по ID (для организатора)
+### 5.3. Получить игру по ID (для организатора)
 
 ```
 GET /games/:id
@@ -551,7 +744,7 @@ GET /games/:id
 
 ---
 
-### 4.4. Обновить игру
+### 5.4. Обновить игру
 
 ```
 PUT /games/:id
@@ -585,7 +778,7 @@ PUT /games/:id
 
 ---
 
-### 4.5. Удалить игру
+### 5.5. Удалить игру
 
 ```
 DELETE /games/:id
@@ -604,7 +797,7 @@ DELETE /games/:id
 
 ---
 
-### 4.6. Отправить игру на модерацию
+### 5.6. Отправить игру на модерацию
 
 ```
 POST /games/:id/submit
@@ -628,7 +821,7 @@ POST /games/:id/submit
 
 ---
 
-### 4.7. Получить статус модерации игры
+### 5.7. Получить статус модерации игры
 
 ```
 GET /games/:id/moderation-status
@@ -653,7 +846,7 @@ GET /games/:id/moderation-status
 
 ---
 
-### 4.8. Запустить игру
+### 5.8. Запустить игру
 
 ```
 POST /games/:id/start
@@ -676,7 +869,7 @@ POST /games/:id/start
 
 ---
 
-### 4.9. Завершить игру
+### 5.9. Завершить игру
 
 ```
 POST /games/:id/finish
@@ -699,274 +892,9 @@ POST /games/:id/finish
 
 ---
 
-## 5. Scenarios (Сценарии)
+## 7. Sessions (Игровые сессии)
 
-### 5.1. Создать сценарий
-
-```
-POST /scenarios
-```
-
-**Authorization:** Bearer <token>
-
-**Request:**
-
-```json
-{
-  "name": "Мой первый сценарий",
-  "nodes": [
-    {
-      "id": "node-1",
-      "type": "text",
-      "question": "Как называется главная площадь?",
-      "answer": "Красная",
-      "transitions": [
-        { "when": "success", "to": "node-2" }
-      ]
-    },
-    {
-      "id": "node-2",
-      "type": "code",
-      "question": "Найдите код на колонне",
-      "answer": "12345",
-      "transitions": [
-        { "when": "success", "to": "node-3" },
-        { "when": "fail", "to": "node-2" }
-      ]
-    },
-    {
-      "id": "node-3",
-      "type": "photo",
-      "question": "Сфотографируйтесь у фонтана",
-      "transitions": []
-    }
-  ],
-  "startNodeId": "node-1"
-}
-```
-
-**Response (201):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "scenario-123",
-    "name": "Мой первый сценарий",
-    "version": 1,
-    "nodesCount": 3,
-    "valid": true,
-    "createdAt": "2025-01-01T12:00:00Z"
-  }
-}
-```
-
----
-
-### 5.2. Получить список сценариев
-
-```
-GET /scenarios
-```
-
-**Authorization:** Bearer <token>
-
-**Query Parameters:**
-
-| Параметр | Тип | Описание |
-| :--- | :--- | :--- |
-| `published` | boolean | Только опубликованные |
-| `limit` | number | 1-100, по умолчанию 20 |
-| `offset` | number | Смещение для пагинации |
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "scenario-123",
-      "name": "Мой первый сценарий",
-      "version": 1,
-      "isPublished": true,
-      "salesCount": 5,
-      "rating": 4.8,
-      "createdAt": "2025-01-01T12:00:00Z"
-    }
-  ],
-  "meta": {
-    "total": 8,
-    "limit": 20,
-    "offset": 0
-  }
-}
-```
-
----
-
-### 5.3. Получить сценарий по ID
-
-```
-GET /scenarios/:id
-```
-
-**Authorization:** Bearer <token>
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "scenario-123",
-    "name": "Мой первый сценарий",
-    "version": 1,
-    "nodes": [...],
-    "startNodeId": "node-1",
-    "isPublished": true,
-    "valid": true,
-    "validationErrors": [],
-    "createdAt": "2025-01-01T12:00:00Z"
-  }
-}
-```
-
----
-
-### 5.4. Обновить сценарий
-
-```
-PUT /scenarios/:id
-```
-
-**Authorization:** Bearer <token>
-
-**Request:** (такой же как при создании)
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "scenario-123",
-    "version": 2,
-    "updatedAt": "2025-01-01T13:00:00Z"
-  }
-}
-```
-
----
-
-### 5.5. Валидировать сценарий
-
-```
-POST /scenarios/:id/validate
-```
-
-**Authorization:** Bearer <token>
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "valid": true,
-    "errors": [],
-    "warnings": []
-  }
-}
-```
-
-**Response с ошибками:**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Сценарий не прошел валидацию",
-    "details": [
-      { "type": "error", "code": "ERR_ORPHAN_NODE", "nodeId": "node-5" },
-      { "type": "warning", "code": "ERR_NO_TIMEOUT_TRANSITION", "nodeId": "node-3" }
-    ]
-  }
-}
-```
-
----
-
-### 5.6. Опубликовать сценарий
-
-```
-POST /scenarios/:id/publish
-```
-
-**Authorization:** Bearer <token>
-
-**Request:**
-
-```json
-{
-  "price": 39,
-  "licenseType": "perpetual"
-}
-```
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "scenario-123",
-    "isPublished": true,
-    "price": 39,
-    "licenseType": "perpetual",
-    "publishedAt": "2025-01-01T14:00:00Z"
-  }
-}
-```
-
----
-
-### 5.7. Создать новую версию
-
-```
-POST /scenarios/:id/version
-```
-
-**Authorization:** Bearer <token>
-
-**Request:**
-
-```json
-{
-  "nodes": [...],
-  "versionNote": "Добавлены ветвления"
-}
-```
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "scenario-123",
-    "version": 3,
-    "createdAt": "2025-01-01T15:00:00Z"
-  }
-}
-```
-
----
-
-## 6. Sessions (Игровые сессии)
-
-### 6.1. Создать сессию (начать игру)
+### 7.1. Создать сессию (начать игру)
 
 ```
 POST /sessions
@@ -1004,7 +932,7 @@ POST /sessions
 
 ---
 
-### 6.2. Получить состояние сессии
+### 7.2. Получить состояние сессии
 
 ```
 GET /sessions/:sessionId
@@ -1036,7 +964,7 @@ GET /sessions/:sessionId
 
 ---
 
-### 6.3. Получить текущее задание
+### 7.3. Получить текущее задание
 
 ```
 GET /sessions/:sessionId/current
@@ -1058,7 +986,7 @@ GET /sessions/:sessionId/current
 
 ---
 
-### 6.4. Отправить ответ
+### 7.4. Отправить ответ
 
 ```
 POST /sessions/:sessionId/answer
@@ -1130,7 +1058,7 @@ POST /sessions/:sessionId/answer
 
 ---
 
-### 6.5. Получить историю сессии
+### 7.5. Получить историю сессии
 
 ```
 GET /sessions/:sessionId/history
@@ -1160,7 +1088,7 @@ GET /sessions/:sessionId/history
 
 ---
 
-### 6.6. Откатить состояние (Time Travel)
+### 7.6. Откатить состояние (Time Travel)
 
 ```
 POST /sessions/:sessionId/rewind
@@ -1192,7 +1120,7 @@ POST /sessions/:sessionId/rewind
 
 ---
 
-### 6.7. Отправить SOS организатору
+### 7.7. Отправить SOS организатору
 
 ```
 POST /sessions/:sessionId/sos
@@ -1221,9 +1149,292 @@ POST /sessions/:sessionId/sos
 
 ---
 
-## 7. Teams (Команды)
+## 6. Scenarios (Сценарии)
 
-### 7.1. Создать команду
+### 6.1. Создать сценарий
+
+```
+POST /scenarios
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "name": "Мой первый сценарий",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "START",
+      "question": "Начало сценария"
+    },
+    {
+      "id": "node-2",
+      "type": "TEXT",
+      "question": "Как называется главная площадь?",
+      "answer": "Красная",
+      "transitions": [
+        { "when": "success", "to": "node-3" }
+      ]
+    },
+    {
+      "id": "node-3",
+      "type": "CODE",
+      "question": "Найдите код на колонне",
+      "answer": "12345",
+      "transitions": [
+        { "when": "success", "to": "node-4" },
+        { "when": "fail", "to": "node-3" }
+      ]
+    },
+    {
+      "id": "node-4",
+      "type": "PHOTO",
+      "question": "Сфотографируйтесь у фонтана",
+      "transitions": []
+    },
+    {
+      "id": "node-5",
+      "type": "FINISH",
+      "question": "Финиш"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": "node-1", "to": "node-2", "condition": "always" },
+    { "id": "e2", "from": "node-2", "to": "node-3", "condition": "success" },
+    { "id": "e3", "from": "node-3", "to": "node-4", "condition": "success" },
+    { "id": "e4", "from": "node-4", "to": "node-5", "condition": "always" }
+  ],
+  "startNodeId": "node-1"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "scenario-123",
+    "name": "Мой первый сценарий",
+    "version": 1,
+    "nodesCount": 5,
+    "valid": true,
+    "createdAt": "2025-01-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 6.2. Получить список сценариев
+
+```
+GET /scenarios
+```
+
+**Authorization:** Bearer <token>
+
+**Query Parameters:**
+
+| Параметр | Тип | Описание |
+| :--- | :--- | :--- |
+| `published` | boolean | Только опубликованные |
+| `limit` | number | 1-100, по умолчанию 20 |
+| `offset` | number | Смещение для пагинации |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "scenario-123",
+      "name": "Мой первый сценарий",
+      "version": 1,
+      "isPublished": true,
+      "salesCount": 5,
+      "rating": 4.8,
+      "createdAt": "2025-01-01T12:00:00Z"
+    }
+  ],
+  "meta": {
+    "total": 8,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### 6.3. Получить сценарий по ID
+
+```
+GET /scenarios/:id
+```
+
+**Authorization:** Bearer <token>
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "scenario-123",
+    "name": "Мой первый сценарий",
+    "version": 1,
+    "nodes": [...],
+    "edges": [...],
+    "startNodeId": "node-1",
+    "isPublished": true,
+    "valid": true,
+    "validationErrors": [],
+    "createdAt": "2025-01-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 6.4. Обновить сценарий
+
+```
+PUT /scenarios/:id
+```
+
+**Authorization:** Bearer <token>
+
+**Request:** (такой же как при создании)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "scenario-123",
+    "version": 2,
+    "updatedAt": "2025-01-01T13:00:00Z"
+  }
+}
+```
+
+---
+
+### 6.5. Валидировать сценарий
+
+```
+POST /scenarios/:id/validate
+```
+
+**Authorization:** Bearer <token>
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "errors": [],
+    "warnings": []
+  }
+}
+```
+
+**Response с ошибками:**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Сценарий не прошел валидацию",
+    "details": [
+      { "type": "error", "code": "ERR_NO_START", "message": "Нет узла START" },
+      { "type": "error", "code": "ERR_NO_FINISH", "message": "Нет узла FINISH" }
+    ]
+  }
+}
+```
+
+---
+
+### 6.6. Опубликовать сценарий
+
+```
+POST /scenarios/:id/publish
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "price": 39,
+  "licenseType": "perpetual"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "scenario-123",
+    "isPublished": true,
+    "price": 39,
+    "licenseType": "perpetual",
+    "publishedAt": "2025-01-01T14:00:00Z"
+  }
+}
+```
+
+---
+
+### 6.7. Создать новую версию
+
+```
+POST /scenarios/:id/version
+```
+
+**Authorization:** Bearer <token>
+
+**Request:**
+
+```json
+{
+  "nodes": [...],
+  "edges": [...],
+  "versionNote": "Добавлены ветвления"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "scenario-123",
+    "version": 3,
+    "createdAt": "2025-01-01T15:00:00Z"
+  }
+}
+```
+
+---
+
+## 8. Teams (Команды)
+
+### 8.1. Создать команду
 
 ```
 POST /teams
@@ -1257,7 +1468,7 @@ POST /teams
 
 ---
 
-### 7.2. Получить список команд
+### 8.2. Получить список команд
 
 ```
 GET /teams
@@ -1293,7 +1504,7 @@ GET /teams
 
 ---
 
-### 7.3. Получить детали команды
+### 8.3. Получить детали команды
 
 ```
 GET /teams/:id
@@ -1337,7 +1548,7 @@ GET /teams/:id
 
 ---
 
-### 7.4. Пригласить в команду
+### 8.4. Пригласить в команду
 
 ```
 POST /teams/:id/invite
@@ -1368,7 +1579,7 @@ POST /teams/:id/invite
 
 ---
 
-### 7.5. Вступить в команду (по приглашению)
+### 8.5. Вступить в команду (по приглашению)
 
 ```
 POST /teams/:id/join
@@ -1399,7 +1610,7 @@ POST /teams/:id/join
 
 ---
 
-### 7.6. Покинуть команду
+### 8.6. Покинуть команду
 
 ```
 DELETE /teams/:id/members/me
@@ -1421,7 +1632,7 @@ DELETE /teams/:id/members/me
 
 ---
 
-### 7.7. Исключить участника
+### 8.7. Исключить участника
 
 ```
 DELETE /teams/:id/members/:userId
@@ -1443,44 +1654,9 @@ DELETE /teams/:id/members/:userId
 
 ---
 
-## 8. Reviews (Отзывы)
+## 9. Reviews (Отзывы)
 
-### 8.1. Создать отзыв на игру
-
-```
-POST /games/:gameId/reviews
-```
-
-**Authorization:** Bearer <token> (только прошедшие игру)
-
-**Request:**
-
-```json
-{
-  "rating": 5,
-  "text": "Отличная игра! Было очень интересно."
-}
-```
-
-**Response (201):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "review-123",
-    "gameId": "game-456",
-    "userId": "user-123",
-    "rating": 5,
-    "text": "Отличная игра! Было очень интересно.",
-    "createdAt": "2025-01-01T16:00:00Z"
-  }
-}
-```
-
----
-
-### 7.2. Получить отзывы на игру (публично)
+### 9.1. Получить отзывы на игру
 
 ```
 GET /games/:gameId/reviews
@@ -1521,7 +1697,7 @@ GET /games/:gameId/reviews
 
 ---
 
-### 7.3. Обновить отзыв
+### 9.3. Обновить отзыв
 
 ```
 PUT /reviews/:id
@@ -1554,7 +1730,7 @@ PUT /reviews/:id
 
 ---
 
-### 7.4. Удалить отзыв
+### 9.4. Удалить отзыв
 
 ```
 DELETE /reviews/:id
@@ -1573,9 +1749,9 @@ DELETE /reviews/:id
 
 ---
 
-## 9. Comments (Обсуждения)
+## 10. Comments (Обсуждения)
 
-### 8.1. Создать комментарий к игре
+### 10.1. Создать комментарий к игре
 
 ```
 POST /games/:gameId/comments
@@ -1611,7 +1787,7 @@ POST /games/:gameId/comments
 
 ---
 
-### 8.2. Получить комментарии к игре (публично)
+### 10.2. Получить комментарии к игре (публично)
 
 ```
 GET /games/:gameId/comments
@@ -1650,7 +1826,7 @@ GET /games/:gameId/comments
 
 ---
 
-### 8.3. Удалить комментарий
+### 10.3. Удалить комментарий
 
 ```
 DELETE /comments/:id
@@ -1669,9 +1845,9 @@ DELETE /comments/:id
 
 ---
 
-## 10. Marketplace (Маркетплейс)
+## 11. Marketplace (Маркетплейс)
 
-### 9.1. Получить каталог
+### 11.1. Получить каталог
 
 ```
 GET /marketplace
@@ -1725,7 +1901,7 @@ GET /marketplace
 
 ---
 
-### 9.2. Получить детали пакета
+### 11.2. Получить детали пакета
 
 ```
 GET /marketplace/:id
@@ -1785,7 +1961,7 @@ GET /marketplace/:id
 
 ---
 
-### 9.3. Купить лицензию
+### 11.3. Купить лицензию
 
 ```
 POST /marketplace/:id/purchase
@@ -1821,7 +1997,7 @@ POST /marketplace/:id/purchase
 
 ---
 
-### 9.4. Получить мои покупки
+### 11.4. Получить мои покупки
 
 ```
 GET /marketplace/purchases
@@ -1850,7 +2026,7 @@ GET /marketplace/purchases
 
 ---
 
-### 9.5. Получить мои продажи (для авторов)
+### 11.5. Получить мои продажи (для авторов)
 
 ```
 GET /marketplace/sales
@@ -1886,7 +2062,7 @@ GET /marketplace/sales
 
 ---
 
-### 9.6. Оставить отзыв на сценарий
+### 11.6. Оставить отзыв на сценарий
 
 ```
 POST /marketplace/:id/review
@@ -1919,9 +2095,9 @@ POST /marketplace/:id/review
 
 ---
 
-## 11. Admin (Администрирование)
+## 12. Admin (Администрирование)
 
-### 10.1. Получить статистику платформы
+### 12.1. Получить статистику платформы
 
 ```
 GET /admin/stats
@@ -1954,7 +2130,7 @@ GET /admin/stats
 
 ---
 
-### 10.2. Получить список игр на модерации
+### 12.2. Получить список игр на модерации
 
 ```
 GET /admin/games/pending
@@ -1997,7 +2173,7 @@ GET /admin/games/pending
 
 ---
 
-### 10.3. Одобрить игру
+### 12.3. Одобрить игру
 
 ```
 POST /admin/games/:id/approve
@@ -2029,7 +2205,7 @@ POST /admin/games/:id/approve
 
 ---
 
-### 10.4. Отклонить игру
+### 12.4. Отклонить игру
 
 ```
 POST /admin/games/:id/reject
@@ -2061,7 +2237,7 @@ POST /admin/games/:id/reject
 
 ---
 
-### 10.5. Получить список заявок организаторов
+### 12.5. Получить список заявок организаторов
 
 ```
 GET /admin/organizer-applications
@@ -2108,7 +2284,7 @@ GET /admin/organizer-applications
 
 ---
 
-### 10.6. Одобрить заявку организатора
+### 12.6. Одобрить заявку организатора
 
 ```
 POST /admin/organizer-applications/:id/approve
@@ -2135,7 +2311,7 @@ POST /admin/organizer-applications/:id/approve
 
 ---
 
-### 10.7. Отклонить заявку организатора
+### 12.7. Отклонить заявку организатора
 
 ```
 POST /admin/organizer-applications/:id/reject
@@ -2167,7 +2343,7 @@ POST /admin/organizer-applications/:id/reject
 
 ---
 
-### 10.8. Получить список пользователей
+### 12.8. Получить список пользователей
 
 ```
 GET /admin/users
@@ -2209,7 +2385,7 @@ GET /admin/users
 
 ---
 
-### 10.9. Заблокировать пользователя
+### 12.9. Заблокировать пользователя
 
 ```
 POST /admin/users/:id/block
@@ -2241,9 +2417,9 @@ POST /admin/users/:id/block
 
 ---
 
-## 12. Analytics (Аналитика)
+## 13. Analytics (Аналитика)
 
-### 11.1. Получить статистику игры
+### 13.1. Получить статистику игры
 
 ```
 GET /analytics/game/:gameId
@@ -2282,7 +2458,7 @@ GET /analytics/game/:gameId
 
 ---
 
-### 11.2. Получить общую статистику организатора
+### 13.2. Получить общую статистику организатора
 
 ```
 GET /analytics/organizer
@@ -2315,9 +2491,9 @@ GET /analytics/organizer
 
 ---
 
-## 13. System (Системные эндпоинты)
+## 14. System (Системные эндпоинты)
 
-### 12.1. Синхронизация времени
+### 14.1. Синхронизация времени
 
 ```
 GET /time
@@ -2338,9 +2514,9 @@ GET /time
 
 ---
 
-## 14. WebSocket (Realtime)
+## 15. WebSocket (Realtime)
 
-### 13.1. Подключение
+### 15.1. Подключение
 
 ```
 ws://localhost:3000/socket.io/?token=<jwt-token>

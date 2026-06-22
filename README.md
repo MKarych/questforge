@@ -1,21 +1,38 @@
-```markdown
-# 🚀 Adventure Engine
+markdown
+# 🏙️ Город Приключений (Adventure City)
 
 **Кодовое имя проекта:** Adventure Engine  
-**Статус:** Проектирование / Pre-MVP  
-**Главная цель:** Создать платформу для проведения интерактивных мероприятий (Steam для мероприятий).  
+**Статус:** Development / Pre-Release  
 **GitHub:** [github.com/mkarych/questforge](https://github.com/mkarych/questforge)  
 
 ---
 
-[![GitHub](https://img.shields.io/badge/GitHub-mkarych/questforge-blue?logo=github)](https://github.com/mkarych/questforge)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Planning](https://img.shields.io/badge/Status-Planning-ff69b4.svg)]()
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-10.x-red?logo=nestjs)](https://nestjs.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-14.x-black?logo=next.js)](https://nextjs.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-5.x-blue?logo=prisma)](https://www.prisma.io/)
-[![Docker](https://img.shields.io/badge/Docker-24.x-blue?logo=docker)](https://www.docker.com/)
+## 📖 Содержание
+
+1. [О проекте](#-о-проекте)
+2. [Миссия](#-миссия)
+3. [Стратегия](#-стратегия-от-города-к-миру)
+4. [Экосистема](#-экосистема-пять-ролей)
+5. [Лестница роста](#-лестница-роста-эволюция-пользователя)
+6. [Ключевые фичи](#-ключевые-фичи)
+7. [Быстрый старт](#-быстрый-старт-установка-и-запуск)
+8. [Полная документация](#-полная-документация-38-документов)
+9. [Технологический стек](#-технологический-стек)
+10. [Команда](#-команда)
+11. [Лицензия](#-лицензия)
+
+---
+
+## 🌍 О проекте
+
+**Город Приключений** — это платформа для создания, проведения и участия в городских играх и интерактивных мероприятиях.
+
+Мы объединяем:
+- **Игроков** — которые ищут активный досуг в своём городе
+- **Авторов** — которые создают сценарии и зарабатывают на своих идеях
+- **Организаторов** — которые проводят игры и зарабатывают на билетах
+
+**Главная метафора:** "Steam для мероприятий" / "Unreal Engine для городских приключений".
 
 ---
 
@@ -51,8 +68,6 @@
 
 ## 📈 Лестница роста (Эволюция пользователя)
 
-Мы **выращиваем** авторов и организаторов из игроков:
-
 ```text
 1. Игрок
    (Проходит 2-3 игры, влюбляется в формат)
@@ -67,168 +82,146 @@
    ↓             ↓
 4a. Чистый Автор    4b. Чистый Организатор
    (Продает сценарии)   (Масштабирует бизнес)
-```
+🎮 Ключевые фичи
+🧩 Конструктор сценариев
+Визуальный редактор как в Figma (React Flow)
 
----
+Drag-and-drop блоков
 
-## 🧠 Runtime Model (Ключевое разделение)
+11 типов заданий
 
-Платформа работает по принципу жесткого разделения слоев:
+Соединения между узлами
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      PRODUCT LAYER                         │
-│  (стратегия, роли, UX, экономика)                          │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-┌───────▼──────────┐ ┌────────▼─────────┐ ┌────────▼─────────┐
-│     BUILDER      │ │   MARKETPLACE    │ │   DASHBOARD      │
-│  (конструктор)   │ │  (продажа игр)   │ │  (аналитика)     │
-└───────┬──────────┘ └────────┬─────────┘ └────────┬─────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              │
-                    ┌─────────▼──────────┐
-                    │   GAME ENGINE      │ ← САМОЕ ВАЖНОЕ
-                    │ (FSM + Runtime)    │
-                    └─────────┬──────────┘
-                              │
-                    ┌─────────▼──────────┐
-                    │ REALTIME SERVER    │
-                    │ (WebSocket/Rooms)  │
-                    └─────────────────────┘
-```
+Валидация в реальном времени
 
-**Правило:** Никакая часть системы (фронтенд, сокеты, база данных) не должна содержать игровую логику. Только Engine.
+⏱️ Игровой процесс
+Таймер на каждое задание
 
----
+3 уровня подсказок
 
-## 📦 Что мы продаем?
+Прогресс-бар
 
-Мы продаем **Game Package (Пакет игры)** — готовый бизнес-комплект для проведения мероприятия.
+Очки и штрафы
 
-**В состав входит:**
-- 📝 Сценарий (вопросы, загадки, сюжет)
-- 🖼 Медиа (фото, видео, музыка, презентации)
-- ⏱ Настройки (таймеры, правила, подсчет очков)
-- 📋 Инструкция организатора (шаблоны рекламы, правила для игроков)
-- 🎨 Оформление (постер, баннеры для соцсетей)
+Экран финиша со статистикой
 
-**Типы лицензий:**
-- "Одно проведение" (дешево, попробовать формат)
-- "Многоразовая" (для одного города)
-- "Коммерческая" (для бизнеса)
-- "White Label" (полное брендирование)
+👥 Команды
+Создание команд
 
----
+Приглашение участников
 
-## 💰 Экономика платформы
+Рейтинг команд
 
-| Источник | Описание |
-| :--- | :--- |
-| **Комиссия Маркетплейса** | Процент с продажи Game Packages |
-| **Подписка PRO** | Расширенные инструменты, аналитика, снятие лимитов |
-| **Корпоративные лицензии** | White Label и Enterprise-решения |
-| **Комиссия с билетов** | Процент с продажи билетов игрокам |
+👤 Профили
+Публичная страница профиля
 
----
+Аватарки, статистика
 
-## 📁 Полная документация (35 документов)
+Система достижений
 
-Вся стратегия и технические требования зафиксированы в папке `/docs`:
+Рейтинг и репутация
 
-| # | Документ | Описание |
-| :--- | :--- | :--- |
-| 1 | `README.md` | Продуктовая стратегия |
-| 2 | `01-vision-and-mission.md` | Миссия, видение, принципы |
-| 3 | `02-ecosystem-growth-strategy.md` | Роли, жизненный цикл, сообщество |
-| 4 | `03-platform-ecosystem-blueprint.md` | "Steam для мероприятий" |
-| 5 | `04-execution-model.md` | Ядро системы (Engine + Orchestrator) |
-| 6 | `05-api-specification.md` | Контракты API |
-| 7 | `06-database-schema.md` | Схема БД |
-| 8 | `07-game-engine-spec.md` | Детальная спецификация движка |
-| 9 | `08-mvp-roadmap.md` | План на 30 дней |
-| 10 | `09-ux-guidelines.md` | Принципы дизайна |
-| 11 | `10-development-rules.md` | Строгие правила для агентов |
-| 12 | `11-event-contract-spec.md` | Типизированный контракт событий |
-| 13 | `12-scenario-validation-spec.md` | Валидация сценариев |
-| 14 | `13-versioning-and-migrations.md` | Версионирование и миграции |
-| 15 | `14-runtime-data-flow.md` | Полный поток данных |
-| 16 | `15-engine-determinism-contract.md` | Детерминизм как закон |
-| 17 | `16-error-model-and-recovery.md` | Ошибки и восстановление |
-| 18 | `17-state-replication-model.md` | Распределенное состояние |
-| 19 | `18-security-and-cheating-model.md` | Безопасность и античит |
-| 20 | `19-code-architecture.md` | Структура проекта и файлов |
-| 21 | `20-game-mechanics-spec.md` | Полная классификация механик |
-| 22 | `21-engine-mechanics-contracts.md` | Контракты механик для движка |
-| 23 | `22-engine-state-machine.md` | Жизненный цикл игры и команды |
-| 24 | `23-event-sourcing-spec.md` | Все события системы |
-| 25 | `24-scenario-json-schema.md` | Формат сценария |
-| 26 | `25-plugin-system-spec.md` | Механики как плагины |
-| 27 | `26-domain-model.md` | Единая доменная модель |
-| 28 | `27-permissions-rbac.md` | Права доступа |
-| 29 | `28-system-architecture.md` | Физическая архитектура |
-| 30 | `29-engine-runtime-spec.md` | Как движок исполняет сценарий |
-| 31 | `30-builder-spec.md` | Визуальный редактор сценариев |
-| 32 | `31-validation-spec.md` | Правила проверки сценариев |
-| 33 | `32-database-schema.md` | Физическая модель БД |
-| 34 | `33-api-contracts.md` | Контракты запросов/ответов |
-| 35 | `34-state-model.md` | Полный автомат состояний |
-| 36 | `35-plugin-sdk-spec.md` | SDK для разработчиков плагинов |
+🛡️ Роли и модерация
+5 ролей: PLAYER, AUTHOR, ORGANIZER, ADMIN, MODERATOR
 
----
+Заявки на организатора
 
-## 🚀 Быстрый старт (для разработчиков)
+Автоматическое повышение ролей
 
-```bash
-# Клонировать репозиторий
+🚀 Быстрый старт
+📦 Что нужно установить
+Node.js (v20+)
+
+Docker Desktop
+
+Git
+
+⚡ Быстрый запуск
+bash
+# 1. Клонировать проект
 git clone https://github.com/mkarych/questforge.git
 cd questforge
 
-# Установить зависимости
+# 2. Установить зависимости
 npm install
 
-# Запустить инфраструктуру (PostgreSQL, Redis, MinIO)
-npm run docker:up
+# 3. Настроить окружение
+cp .env.example .env
 
-# Запустить API (NestJS)
-npm run dev:api
+# 4. Запустить Docker
+docker-compose -f infrastructure/docker/docker-compose.yml up -d
 
-# Запустить веб-панель (Next.js)
-npm run dev:web
-```
+# 5. Накатить миграции
+npx prisma migrate dev --name init
 
----
+# 6. Запустить бэкенд
+cd apps/api && npm run dev
 
-## 🛠️ Технологический стек
+# 7. Запустить фронтенд (в другом терминале)
+cd apps/web && npm run dev
+После запуска:
 
+Бэкенд: http://localhost:3000
+
+Фронтенд: http://localhost:3001
+
+📖 Подробная инструкция по установке: docs/SETUP.md
+
+📁 Полная документация (38 документов)
+Вся стратегия и технические требования зафиксированы в папке /docs:
+
+#	Документ	Описание
+1	README.md	Продуктовая стратегия
+2	01-vision-and-mission.md	Миссия, видение, принципы
+3	02-ecosystem-growth-strategy.md	Роли, жизненный цикл, сообщество
+4	03-platform-ecosystem-blueprint.md	"Steam для мероприятий"
+5	04-execution-model.md	Ядро системы (Engine + Orchestrator)
+6	05-api-specification.md	Контракты API
+7	06-database-schema.md	Схема БД
+8	07-game-engine-spec.md	Детальная спецификация движка
+9	08-mvp-roadmap.md	План на 30 дней
+10	09-ux-guidelines.md	Принципы дизайна
+11	10-development-rules.md	Строгие правила для агентов
+12	11-event-contract-spec.md	Типизированный контракт событий
+13	12-scenario-validation-spec.md	Валидация сценариев
+14	13-versioning-and-migrations.md	Версионирование и миграции
+15	14-runtime-data-flow.md	Полный поток данных
+16	15-engine-determinism-contract.md	Детерминизм как закон
+17	16-error-model-and-recovery.md	Ошибки и восстановление
+18	17-state-replication-model.md	Распределенное состояние
+19	18-security-and-cheating-model.md	Безопасность и античит
+20	19-code-architecture.md	Структура проекта и файлов
+21	20-game-mechanics-spec.md	Полная классификация механик
+22	21-engine-mechanics-contracts.md	Контракты механик для движка
+23	22-engine-state-machine.md	Жизненный цикл игры и команды
+24	23-event-sourcing-spec.md	Все события системы
+25	24-scenario-json-schema.md	Формат сценария
+26	25-plugin-system-spec.md	Механики как плагины
+27	26-domain-model.md	Единая доменная модель
+28	27-permissions-rbac.md	Права доступа
+29	28-system-architecture.md	Физическая архитектура
+30	29-engine-runtime-spec.md	Как движок исполняет сценарий
+31	30-builder-spec.md	Визуальный редактор сценариев
+32	31-validation-spec.md	Правила проверки сценариев
+33	32-database-schema.md	Физическая модель БД
+34	33-api-contracts.md	Контракты запросов/ответов
+35	34-state-model.md	Полный автомат состояний
+36	35-plugin-sdk-spec.md	SDK для разработчиков плагинов
+37	36-errors-fix-report.md	Отчёт об исправлении ошибок
+38	37-frontend-api-integration.md	Подключение фронтенда к API
+🛠️ Технологический стек
 | Компонент | Технология |
-| :--- | :--- |
-| **Backend** | NestJS, TypeScript, Prisma |
-| **Frontend** | Next.js, React, Tailwind CSS |
-| **База данных** | PostgreSQL, Redis |
-| **Хранилище** | MinIO / S3 |
-| **Контейнеризация** | Docker, Docker Compose |
-| **Мониторинг** | Prometheus, Grafana (v2.0+) |
+| :--- | :--- | :--- |
+| Backend | NestJS, TypeScript, Prisma |
+| Frontend | Next.js, React, Tailwind CSS |
+| База данных | PostgreSQL, Redis |
+| Хранилище | MinIO / S3 |
+| Контейнеризация | Docker, Docker Compose |
 
----
-
-## 🤝 Команда
-
-**Karych Team** © 2026
+🤝 Команда
+Karych Team © 2026
 
 Разрабатывается с ❤️ для организаторов и авторов городских игр.
 
----
-
-## 📄 Лицензия
-
+📄 Лицензия
 MIT © 2026 Karych Team
-
----
-
-**Кодовое имя проекта:** Adventure Engine  
-**Главный принцип:** *Жесткое разделение слоев. Engine — единственный источник истины.*
-```

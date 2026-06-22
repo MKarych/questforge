@@ -43,20 +43,36 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(100) NOT NULL,
   avatar_url TEXT,
-  role VARCHAR(50) NOT NULL DEFAULT 'player', -- player, organizer, author, admin, moderator
-  status VARCHAR(50) NOT NULL DEFAULT 'active', -- active, blocked
   city VARCHAR(100),
-  phone VARCHAR(50),
+  bio TEXT,
   telegram VARCHAR(100),
-  experience TEXT,
+  vk VARCHAR(255),
+  whatsapp VARCHAR(100),
+  rating FLOAT,
+  reputation INT NOT NULL DEFAULT 0,
+  achievements JSONB NOT NULL DEFAULT '[]', -- массив достижений
+  last_seen_at TIMESTAMP,
+  role VARCHAR(50) NOT NULL DEFAULT 'PLAYER', -- PLAYER, ORGANIZER, AUTHOR, ADMIN, MODERATOR
+  status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, BANNED
+  contacts JSONB NOT NULL DEFAULT '{}',
+  organizer_status VARCHAR(50) NOT NULL DEFAULT 'NOT_APPLIED', -- NOT_APPLIED, PENDING, APPROVED, REJECTED
+  organizer_application_id UUID REFERENCES organizer_applications(id) ON DELETE SET NULL,
+  organizer_approved_at TIMESTAMP,
+  games_created INT NOT NULL DEFAULT 0,
+  games_conducted INT NOT NULL DEFAULT 0,
+  scenarios_created INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMP,
   deleted_at TIMESTAMP
 );
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX idx_users_organizer_status ON users(organizer_status);
+CREATE INDEX idx_users_city ON users(city);
+CREATE INDEX idx_users_rating ON users(rating);
 ```
 
 ### 2.2. `organizer_applications` — Заявки на статус организатора
@@ -64,12 +80,12 @@ CREATE INDEX idx_users_status ON users(status);
 ```sql
 CREATE TABLE organizer_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
   city VARCHAR(100) NOT NULL,
-  phone VARCHAR(50) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
   telegram VARCHAR(100),
   experience TEXT,
-  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending, approved, rejected
+  status VARCHAR(50) NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED
   rejection_reason TEXT,
   reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMP,
@@ -88,13 +104,23 @@ CREATE INDEX idx_organizer_applications_created_at ON organizer_applications(cre
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
-  captain_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  captain_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  current_node_id VARCHAR(50),
+  score INT NOT NULL DEFAULT 0,
+  penalties INT NOT NULL DEFAULT 0,
+  status VARCHAR(50) NOT NULL DEFAULT 'REGISTERED', -- REGISTERED, ACTIVE, WAITING_ANSWER, NODE_COMPLETED, NODE_FAILED, NEXT_NODE, FINISHED
+  started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMP,
+  last_activity_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_teams_game_id ON teams(game_id);
 CREATE INDEX idx_teams_captain_id ON teams(captain_id);
+CREATE INDEX idx_teams_status ON teams(status);
+CREATE INDEX idx_teams_current_node_id ON teams(current_node_id);
 ```
 
 ### 2.4. `team_members` — Участники команд
@@ -105,11 +131,50 @@ CREATE TABLE team_members (
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   role VARCHAR(50) NOT NULL DEFAULT 'member', -- member, captain
-  joined_at TIMESTAMP NOT NULL DEFAULT NOW()
+  status VARCHAR(50) NOT NULL DEFAULT 'active', -- active, pending, left, kicked
+  joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  left_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT team_member_unique UNIQUE (team_id, user_id)
 );
 
 CREATE INDEX idx_team_members_team_id ON team_members(team_id);
 CREATE INDEX idx_team_members_user_id ON team_members(user_id);
+```
+
+### 2.5. `inventory` — Инвентарь команды
+
+```sql
+CREATE TABLE inventory (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL UNIQUE REFERENCES teams(id) ON DELETE CASCADE,
+  items JSONB NOT NULL DEFAULT '[]',
+  capacity INT NOT NULL DEFAULT 20,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_inventory_team_id ON inventory(team_id);
+```
+
+### 2.6. `resources` — Ресурсы команды
+
+```sql
+CREATE TABLE resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL UNIQUE REFERENCES teams(id) ON DELETE CASCADE,
+  score INT NOT NULL DEFAULT 0,
+  reputation INT NOT NULL DEFAULT 0,
+  money INT NOT NULL DEFAULT 0,
+  energy INT NOT NULL DEFAULT 100,
+  lives INT NOT NULL DEFAULT 3,
+  custom JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_resources_team_id ON resources(team_id);
 ```
 
 ---
@@ -200,17 +265,20 @@ CREATE UNIQUE INDEX idx_scenario_versions_unique ON scenario_versions(scenario_i
 
 ## 4. Модели сессий (Игровой движок)
 
-### 4.1. `sessions` — Игровые сессии
+### 4.1. `teams` — Команды (состояние сессии)
+
+> В текущей реализации состояние сессии хранится непосредственно в `teams` (score, penalties, current_node_id, status).
 
 ```sql
-CREATE TABLE sessions (
+CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE RESTRICT,
-  current_node_id VARCHAR(50) NOT NULL,
+  captain_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  current_node_id VARCHAR(50),
   score INT NOT NULL DEFAULT 0,
   penalties INT NOT NULL DEFAULT 0,
-  status VARCHAR(50) NOT NULL DEFAULT 'active', -- active, paused, finished
+  status VARCHAR(50) NOT NULL DEFAULT 'REGISTERED',
   started_at TIMESTAMP NOT NULL DEFAULT NOW(),
   finished_at TIMESTAMP,
   last_activity_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -218,43 +286,34 @@ CREATE TABLE sessions (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sessions_game_id ON sessions(game_id);
-CREATE INDEX idx_sessions_team_id ON sessions(team_id);
-CREATE INDEX idx_sessions_status ON sessions(status);
-CREATE INDEX idx_sessions_current_node_id ON sessions(current_node_id);
+CREATE INDEX idx_teams_game_id ON teams(game_id);
+CREATE INDEX idx_teams_captain_id ON teams(captain_id);
+CREATE INDEX idx_teams_status ON teams(status);
+CREATE INDEX idx_teams_current_node_id ON teams(current_node_id);
 ```
 
 ### 4.2. `session_states` — Снапшоты состояния сессии
 
 ```sql
 CREATE TABLE session_states (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  id UUID NOT NULL,
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   state JSONB NOT NULL,
-  event_id UUID REFERENCES session_events(id) ON DELETE SET NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  sequence INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_session_states_session_id ON session_states(session_id);
-CREATE INDEX idx_session_states_created_at ON session_states(created_at);
+CREATE INDEX idx_session_states_team_id ON session_states(team_id);
+CREATE INDEX idx_session_states_sequence ON session_states(sequence);
 ```
 
 ### 4.3. `session_events` — Event Sourcing (история всех событий)
 
-```sql
-CREATE TABLE session_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  type VARCHAR(50) NOT NULL,
-  node_id VARCHAR(50),
-  payload JSONB NOT NULL,
-  version INT NOT NULL DEFAULT 1,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
+> В текущей реализации таблицы `session_events` нет как отдельной таблицы — события хранятся в `events` (см. ниже) и в `session_states`.
 
-CREATE INDEX idx_session_events_session_id ON session_events(session_id);
-CREATE INDEX idx_session_events_type ON session_events(type);
-CREATE INDEX idx_session_events_created_at ON session_events(created_at);
+```sql
+-- События хранятся в таблице events (см. раздел 5.3)
 ```
 
 ---
@@ -268,7 +327,6 @@ CREATE TABLE reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
   rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
   text TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -278,7 +336,6 @@ CREATE TABLE reviews (
 CREATE INDEX idx_reviews_game_id ON reviews(game_id);
 CREATE INDEX idx_reviews_user_id ON reviews(user_id);
 CREATE INDEX idx_reviews_rating ON reviews(rating);
-CREATE INDEX idx_reviews_created_at ON reviews(created_at);
 ```
 
 ### 5.2. `comments` — Комментарии к играм (обсуждения)
@@ -289,7 +346,7 @@ CREATE TABLE comments (
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   text TEXT NOT NULL,
-  parent_id UUID REFERENCES comments(id) ON DELETE CASCADE, -- для веток обсуждений
+  parent_id UUID REFERENCES comments(id) ON DELETE CASCADE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMP
@@ -298,12 +355,32 @@ CREATE TABLE comments (
 CREATE INDEX idx_comments_game_id ON comments(game_id);
 CREATE INDEX idx_comments_user_id ON comments(user_id);
 CREATE INDEX idx_comments_parent_id ON comments(parent_id);
-CREATE INDEX idx_comments_created_at ON comments(created_at);
 ```
 
----
+### 5.3. `events` — Игровые события (Event Sourcing)
 
-## 6. Модели маркетплейса
+```sql
+CREATE TABLE events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type VARCHAR(50) NOT NULL,
+  game_id UUID NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
+  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+  node_id VARCHAR(50),
+  payload JSONB NOT NULL DEFAULT '{}',
+  timestamp TIMESTAMP NOT NULL,
+  sequence INT NOT NULL DEFAULT 0,
+  version INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_events_game_id ON events(game_id);
+CREATE INDEX idx_events_team_id ON events(team_id);
+CREATE INDEX idx_events_type ON events(type);
+CREATE INDEX idx_events_sequence ON events(sequence);
+CREATE INDEX idx_events_created_at ON events(created_at);
+CREATE INDEX idx_events_game_created ON events(game_id, created_at);
+CREATE INDEX idx_events_team_created ON events(team_id, created_at);
+```
 
 ### 6.1. `licenses` — Лицензии на сценарии
 
@@ -362,47 +439,28 @@ CREATE TABLE media (
   size INT NOT NULL,
   path TEXT NOT NULL,
   url TEXT NOT NULL,
-  session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
-  event_id UUID REFERENCES session_events(id) ON DELETE SET NULL,
-  game_id UUID REFERENCES games(id) ON DELETE SET NULL, -- для обложек игр
+  game_id UUID REFERENCES games(id) ON DELETE SET NULL,
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
   uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_media_session_id ON media(session_id);
-CREATE INDEX idx_media_uploaded_by ON media(uploaded_by);
 CREATE INDEX idx_media_game_id ON media(game_id);
+CREATE INDEX idx_media_team_id ON media(team_id);
+CREATE INDEX idx_media_uploaded_by ON media(uploaded_by);
 ```
 
 ---
 
 ## 8. Модели аналитики
 
-### 8.1. `analytics_events` — События для аналитики
-
-```sql
-CREATE TABLE analytics_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type VARCHAR(50) NOT NULL,
-  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
-  game_id UUID REFERENCES games(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  payload JSONB NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_analytics_events_type ON analytics_events(type);
-CREATE INDEX idx_analytics_events_created_at ON analytics_events(created_at);
-CREATE INDEX idx_analytics_events_game_id ON analytics_events(game_id);
-```
-
-### 8.2. `heatmap_data` — Тепловые карты (геоданные)
+### 8.1. `heatmap_data` — Тепловые карты (геоданные)
 
 ```sql
 CREATE TABLE heatmap_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   lat DECIMAL(10, 8) NOT NULL,
   lng DECIMAL(11, 8) NOT NULL,
   node_id VARCHAR(50),
@@ -410,6 +468,7 @@ CREATE TABLE heatmap_data (
 );
 
 CREATE INDEX idx_heatmap_data_game_id ON heatmap_data(game_id);
+CREATE INDEX idx_heatmap_data_team_id ON heatmap_data(team_id);
 CREATE INDEX idx_heatmap_data_created_at ON heatmap_data(created_at);
 ```
 
@@ -468,105 +527,171 @@ npx prisma migrate deploy
 npx prisma generate
 ```
 
-### 10.4. Prisma Schema (пример)
+### 10.4. Prisma Schema (полная модель)
 
 ```prisma
-model User {
-  id               String   @id @default(cuid())
-  email            String   @unique
-  passwordHash     String
-  name             String
-  avatarUrl        String?
-  role             String   @default("player")
-  status           String   @default("active")
-  city             String?
-  phone            String?
-  telegram         String?
-  experience       String?
-  games            Game[]
-  scenarios        Scenario[]
-  sessions         Session[]
-  reviews          Review[]
-  comments         Comment[]
-  organizerApp     OrganizerApplication?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  deletedAt        DateTime?
+// Enums
+enum Role {
+  PLAYER
+  ORGANIZER
+  AUTHOR
+  ADMIN
+  MODERATOR
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum OrganizerStatus {
+  NOT_APPLIED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum GameStatus {
+  CREATED
+  PUBLISHED
+  WAITING_FOR_PLAYERS
+  STARTED
+  IN_PROGRESS
+  PAUSED
+  FINISHED
+  ARCHIVED
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TeamStatus {
+  REGISTERED
+  ACTIVE
+  WAITING_ANSWER
+  NODE_COMPLETED
+  NODE_FAILED
+  NEXT_NODE
+  FINISHED
+}
+
+// User model
+model User {
+  id                    String    @id @default(uuid()) @db.Uuid
+  email                 String    @unique @db.VarChar(255)
+  passwordHash          String    @map("password_hash") @db.VarChar(255)
+  name                  String    @db.VarChar(100)
+  avatarUrl             String?   @map("avatar_url") @db.Text
+  city                  String?   @db.VarChar(100)
+  bio                   String?   @db.Text
+  telegram              String?   @db.VarChar(100)
+  vk                    String?   @db.VarChar(255)
+  whatsapp              String?   @db.VarChar(100)
+  rating                Float?
+  reputation            Int       @default(0)
+  achievements          Json      @default("[]") @db.Json
+  lastSeenAt            DateTime? @map("last_seen_at")
+  role                  Role      @default(PLAYER)
+  status                UserStatus @default(ACTIVE)
+  contacts              Json      @default("{}")
+  organizerStatus       OrganizerStatus @default(NOT_APPLIED) @map("organizer_status")
+  organizerApplicationId String?  @map("organizer_application_id") @db.Uuid
+  organizerApprovedAt   DateTime? @map("organizer_approved_at")
+  gamesCreated          Int       @default(0) @map("games_created")
+  gamesConducted        Int       @default(0) @map("games_conducted")
+  scenariosCreated      Int       @default(0) @map("scenarios_created")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  lastLoginAt           DateTime? @map("last_login_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  games                 Game[]
+  scenarios             Scenario[]
+  teamMemberships       TeamMember[]
+  createdVersions       ScenarioVersion[]
+  captainTeams          Team[]
+  organizerApplication  OrganizerApplication?
+  reviewedApplications  OrganizerApplication[] @relation("ApplicationReviewer")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([organizerStatus])
+  @@index([city])
+  @@index([rating])
+}
+
+// Team model
+model Team {
+  id                    String      @id @default(uuid()) @db.Uuid
+  name                  String      @db.VarChar(100)
+  gameId                String      @map("game_id") @db.Uuid
+  game                  Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  captainId             String      @map("captain_id") @db.Uuid
+  captain               User        @relation(fields: [captainId], references: [id], onDelete: Restrict)
+  currentNodeId         String?     @map("current_node_id") @db.VarChar(50)
+  score                 Int         @default(0)
+  penalties             Int         @default(0)
+  status                TeamStatus  @default(REGISTERED)
+  startedAt             DateTime    @default(now()) @map("started_at")
+  finishedAt            DateTime?   @map("finished_at")
+  lastActivityAt        DateTime    @default(now()) @map("last_activity_at")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  members               TeamMember[]
+  inventory             Inventory?
+  resources             Resource?
+
+  @@index([gameId])
+  @@index([captainId])
+  @@index([status])
+  @@index([currentNodeId])
+}
+
+// TeamMember model
+model TeamMember {
+  id                    String    @id @default(uuid()) @db.Uuid
+  teamId                String    @map("team_id") @db.Uuid
+  team                  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId                String    @map("user_id") @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role                  String    @default("member") @db.VarChar(50)
+  status                String    @default("active") @db.VarChar(50)
+  joinedAt              DateTime  @default(now()) @map("joined_at")
+  leftAt                DateTime? @map("left_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@unique([teamId, userId], name: "team_member_unique")
+  @@index([teamId])
+  @@index([userId])
+}
+
+// OrganizerApplication model
 model OrganizerApplication {
-  id              String   @id @default(cuid())
-  userId          String
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
   user            User     @relation(fields: [userId], references: [id])
   city            String
   phone           String
   telegram        String?
   experience      String?
-  status          String   @default("pending")
-  rejectionReason String?
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
+  status          String   @default("PENDING")
+  rejectionReason String?  @map("rejection_reason")
+  reviewedBy      String?  @map("reviewed_by") @db.Uuid
+  reviewer        User?    @relation("ApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime? @map("reviewed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-model Game {
-  id               String   @id @default(cuid())
-  title            String
-  description      String?
-  city             String
-  date             DateTime
-  duration         Int
-  price            Decimal  @default(0)
-  maxTeams         Int      @default(50)
-  shareLink        String   @unique
-  status           String   @default("draft")
-  moderationComment String?
-  organizerId      String
-  organizer        User     @relation(fields: [organizerId], references: [id])
-  scenarioId       String?
-  scenario         Scenario? @relation(fields: [scenarioId], references: [id])
-  imageUrl         String?
-  publishedAt      DateTime?
-  submittedAt      DateTime?
-  moderatedAt      DateTime?
-  startedAt        DateTime?
-  finishedAt       DateTime?
-  sessions         Session[]
-  reviews          Review[]
-  comments         Comment[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  deletedAt        DateTime?
-}
-
-model Review {
-  id          String   @id @default(cuid())
-  gameId      String
-  game        Game     @relation(fields: [gameId], references: [id])
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  sessionId   String?
-  session     Session? @relation(fields: [sessionId], references: [id])
-  rating      Int      @default(5)
-  text        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Comment {
-  id          String   @id @default(cuid())
-  gameId      String
-  game        Game     @relation(fields: [gameId], references: [id])
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  text        String
-  parentId    String?
-  parent      Comment? @relation(fields: [parentId], references: [id])
-  children    Comment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 ```
 
