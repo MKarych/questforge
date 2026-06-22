@@ -150,6 +150,26 @@ export interface CreateSessionRequest {
   teamName: string;
 }
 
+export interface CreateGameRequest {
+  title: string;
+  description: string;
+  city: string;
+  date: string;
+  duration: number;
+  price: number;
+  maxTeams: number;
+  scenarioId?: string;
+}
+
+export interface CreateGameResponse {
+  id: string;
+  title: string;
+  city: string;
+  status: string;
+  shareLink: string;
+  createdAt: string;
+}
+
 // API Error
 export interface ApiError {
   success: false;
@@ -263,14 +283,47 @@ class ApiClient {
 
   // ==================== Games (Public) ====================
 
-  async getGames(params?: {
+  async getPublicGames(params?: {
     city?: string;
-    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    type?: string;
+    sort?: string;
     limit?: number;
     offset?: number;
   }): Promise<ApiResponse<{ data: Game[]; meta: { total: number; limit: number; offset: number } }>> {
     const queryParams = new URLSearchParams();
     if (params?.city) queryParams.append('city', params.city);
+    if (params?.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params?.dateTo) queryParams.append('dateTo', params.dateTo);
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.sort) queryParams.append('sort', params.sort);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request(`/games/public${query ? `?${query}` : ''}`);
+  }
+
+  async getPublicGame(id: string): Promise<ApiResponse<GameDetails>> {
+    return this.request(`/games/public/${id}`);
+  }
+
+  // ==================== Games (Organizer) ====================
+
+  async createGame(data: CreateGameRequest): Promise<ApiResponse<CreateGameResponse>> {
+    return this.request('/games', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMyGames(params?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ data: Game[]; meta: { total: number; limit: number; offset: number } }>> {
+    const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.offset) queryParams.append('offset', params.offset.toString());
@@ -328,7 +381,11 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL);
 
 // Export named methods for convenience
-export const getGames = () => apiClient.getGames();
+export const getPublicGames = (params?: { city?: string }) => apiClient.getPublicGames(params);
+export const getPublicGame = (id: string) => apiClient.getPublicGame(id);
+export const createGame = (data: CreateGameRequest) => apiClient.createGame(data);
+export const getMyGames = (params?: { status?: string }) => apiClient.getMyGames(params);
+export const getGames = () => apiClient.getMyGames();
 export const getGame = (id: string) => apiClient.getGame(id);
 export const startSession = (data: CreateSessionRequest) => apiClient.createSession(data);
 export const submitAnswer = (teamId: string, gameId: string, nodeId: string, answer: string) =>

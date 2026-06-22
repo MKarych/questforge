@@ -1,10 +1,47 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { getProfile, logout, type User } from '@/lib/api/client';
 
 export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const response = await getProfile();
+        setUser(response.data);
+      } catch {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Only load profile on auth-related pages or dashboard
+    if (pathname.startsWith('/auth') || pathname.startsWith('/organizer') || pathname.startsWith('/dashboard')) {
+      loadProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      setUser(null);
+      router.push('/');
+    }
+  };
+
+  const isAuthPage = pathname.startsWith('/auth');
 
   return (
     <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
@@ -26,12 +63,28 @@ export default function Header() {
             <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
               Организаторам
             </Link>
-            <Link href="/auth/login" className="btn-secondary">
-              Войти
-            </Link>
-            <Link href="/auth/register" className="btn-primary">
-              Регистрация
-            </Link>
+            {!loading && (
+              user ? (
+                <div className="flex items-center gap-4">
+                  <Link href="/organizer/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
+                    Панель
+                  </Link>
+                  <span className="text-text-secondary text-sm">{user.name}</span>
+                  <button onClick={handleLogout} className="btn-secondary">
+                    Выйти
+                  </button>
+                </div>
+              ) : !isAuthPage && (
+                <>
+                  <Link href="/auth/login" className="btn-secondary">
+                    Войти
+                  </Link>
+                  <Link href="/auth/register" className="btn-primary">
+                    Регистрация
+                  </Link>
+                </>
+              )
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -60,14 +113,28 @@ export default function Header() {
               <Link href="/organizer" className="text-text-secondary hover:text-text-primary transition-colors">
                 Организаторам
               </Link>
-              <div className="flex gap-3 pt-2">
-                <Link href="/auth/login" className="btn-secondary flex-1 text-center">
-                  Войти
-                </Link>
-                <Link href="/auth/register" className="btn-primary flex-1 text-center">
-                  Регистрация
-                </Link>
-              </div>
+              {!loading && (
+                user ? (
+                  <div className="flex flex-col gap-3 pt-2">
+                    <Link href="/organizer/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
+                      Панель
+                    </Link>
+                    <span className="text-text-secondary text-sm">{user.name}</span>
+                    <button onClick={handleLogout} className="btn-secondary">
+                      Выйти
+                    </button>
+                  </div>
+                ) : !isAuthPage && (
+                  <div className="flex gap-3 pt-2">
+                    <Link href="/auth/login" className="btn-secondary flex-1 text-center">
+                      Войти
+                    </Link>
+                    <Link href="/auth/register" className="btn-primary flex-1 text-center">
+                      Регистрация
+                    </Link>
+                  </div>
+                )
+              )}
             </div>
           </nav>
         )}

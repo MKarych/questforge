@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createGame, type CreateGameRequest } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 export default function CreateGamePage() {
@@ -17,6 +18,7 @@ export default function CreateGamePage() {
     price: 0,
     maxTeams: 20,
   });
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -29,17 +31,30 @@ export default function CreateGamePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      // In a real implementation, this would call the API
-      console.log('Creating game:', formData);
-      
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Format date to ISO string
+      const dateObj = new Date(formData.date);
+      const isoDate = dateObj.toISOString();
+
+      const gameData: CreateGameRequest = {
+        title: formData.title,
+        description: formData.description,
+        city: formData.city,
+        date: isoDate,
+        duration: formData.duration,
+        price: formData.price,
+        maxTeams: formData.maxTeams,
+      };
+
+      const response = await createGame(gameData);
       
       // Redirect to game management page
-      router.push('/organizer/dashboard');
+      router.push(`/organizer/games/${response.data.id}`);
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось создать игру';
+      setError(message);
       console.error('Failed to create game:', err);
     } finally {
       setLoading(false);
@@ -65,6 +80,12 @@ export default function CreateGamePage() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                  {error}
+                </div>
+              )}
+
               <div>
                 <label className="label">Название игры</label>
                 <input

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getGame, startSession, type GameDetails } from '@/lib/api/client';
+import { getPublicGame, startSession, type GameDetails } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface GamePageParams {
@@ -24,7 +24,7 @@ export default function GameDetailsPage() {
   useEffect(() => {
     async function loadGame() {
       try {
-        const response = await getGame(gameId);
+        const response = await getPublicGame(gameId);
         setGame(response.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось загрузить игру');

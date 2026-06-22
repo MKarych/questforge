@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getGames, type Game } from '@/lib/api/client';
+import { getPublicGames, type Game } from '@/lib/api/client';
 import GameCard from '@/components/ui/GameCard';
 import Header from '@/components/ui/Header';
 
@@ -10,16 +10,19 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [cities, setCities] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadGames() {
       try {
-        const response = await getGames();
+        const response = await getPublicGames();
         setGames(response.data.data);
         
         // Extract unique cities
         const uniqueCities = Array.from(new Set(response.data.data.map((g) => g.city)));
         setCities(uniqueCities);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Не удалось загрузить игры');
       } finally {
         setLoading(false);
       }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getGames, type Game } from '@/lib/api/client';
+import { getPublicGames, type Game } from '@/lib/api/client';
 import GameCard from '@/components/ui/GameCard';
 import Header from '@/components/ui/Header';
 
@@ -14,7 +14,7 @@ export default function HomePage() {
   useEffect(() => {
     async function loadGames() {
       try {
-        const response = await getGames();
+        const response = await getPublicGames({ limit: 6 });
         setGames(response.data.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось загрузить игры');
