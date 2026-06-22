@@ -34,28 +34,34 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <section className="mb-12 text-center">
-          <div className="flex justify-center mb-6">
-            <Image
-              src="/images/logo/logo.png"
-              alt="Adventure Engine"
-              width={160}
-              height={54}
-              className="h-12 w-auto"
-            />
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">
-            Городские игры нового поколения
-          </h1>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-8">
-            Присоединяйтесь к захватывающим квестам в вашем городе или создайте свою собственную игру
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/games" className="btn-primary">
-              Выбрать игру
-            </Link>
-            <Link href="/organizer" className="btn-secondary">
-              Стать организатором
-            </Link>
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-3">
+              <Image
+                src="/images/logo/logo.png"
+                alt="Adventure Engine"
+                width={40}
+                height={40}
+                className="h-10 w-auto"
+                priority
+              />
+              <span className="text-2xl font-bold text-white">
+                Adventure <span className="text-primary">Engine</span>
+              </span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">
+              Городские игры нового поколения
+            </h1>
+            <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-8">
+              Присоединяйтесь к захватывающим квестам в вашем городе или создайте свою собственную игру
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Link href="/games" className="btn-primary">
+                Выбрать игру
+              </Link>
+              <Link href="/organizer" className="btn-secondary">
+                Стать организатором
+              </Link>
+            </div>
           </div>
         </section>
 
