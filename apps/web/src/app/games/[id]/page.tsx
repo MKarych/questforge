@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getPublicGame, getMyTeams, startSession, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+import ImageModal from '@/components/ui/ImageModal';
 
 const DEFAULT_LOGO = '/images/logo/logo.png';
 
@@ -24,6 +25,7 @@ export default function GameDetailsPage() {
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [joining, setJoining] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const gameId = params.id;
 
@@ -143,15 +145,19 @@ export default function GameDetailsPage() {
           {/* Main Info */}
           <div className="lg:col-span-2">
             {game.imageUrl && (
-              <div className="relative w-full h-64 mb-6 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="relative w-full h-64 mb-6 rounded-xl overflow-hidden cursor-pointer text-left"
+              >
                 <Image
                   src={game.imageUrl}
                   alt={game.title}
                   fill
-                  className="object-cover"
+                  className="object-cover hover:scale-105 transition-transform duration-300"
                   quality={85}
                 />
-              </div>
+              </button>
             )}
             {!game.imageUrl && (
               <div className="relative w-full h-64 mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-primary/30 to-surface-elevated flex items-center justify-center">
@@ -315,6 +321,14 @@ export default function GameDetailsPage() {
           </div>
         </div>
       </div>
+
+      {modalOpen && game?.imageUrl && (
+        <ImageModal
+          src={game.imageUrl}
+          alt={game.title}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

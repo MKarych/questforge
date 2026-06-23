@@ -1,6 +1,10 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Game } from '@/lib/api/client';
+import ImageModal from './ImageModal';
 
 const DEFAULT_LOGO = '/images/logo/logo.png';
 
@@ -9,6 +13,7 @@ interface GameCardProps {
 }
 
 export default function GameCard({ game }: GameCardProps) {
+  const [modalOpen, setModalOpen] = useState(false);
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
 
@@ -27,23 +32,37 @@ export default function GameCard({ game }: GameCardProps) {
     return price === 0 ? 'Бесплатно' : `${price} ₽`;
   };
 
+  const handleImageClick = (e: React.MouseEvent) => {
+    if (!hasCustomImage) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setModalOpen(true);
+  };
+
   return (
-    <Link href={`/games/${game.id}`} className="card-hover block group">
-      <div className="overflow-hidden rounded-lg mb-4">
-        <div className="relative w-full h-48 bg-surface-elevated">
-          <Image
-            src={coverImage}
-            alt={game.title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-            quality={hasCustomImage ? 85 : 100}
-            unoptimized={!hasCustomImage}
-          />
-          {!hasCustomImage && (
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
-          )}
+    <>
+      <Link href={`/games/${game.id}`} className="card-hover block group">
+        <div className="overflow-hidden rounded-lg mb-4">
+          <div className="relative w-full h-48 bg-surface-elevated">
+            <button
+              type="button"
+              onClick={handleImageClick}
+              className="absolute inset-0 z-10 cursor-pointer"
+              aria-label="Открыть обложку"
+            />
+            <Image
+              src={coverImage}
+              alt={game.title}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+              quality={hasCustomImage ? 85 : 100}
+              unoptimized={!hasCustomImage}
+            />
+            {!hasCustomImage && (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+            )}
+          </div>
         </div>
-      </div>
 
       <div className="flex items-start justify-between mb-2">
         <h3 className="text-lg font-semibold text-text-primary group-hover:text-primary transition-colors line-clamp-1">
@@ -84,5 +103,14 @@ export default function GameCard({ game }: GameCardProps) {
         <span className="text-primary font-semibold">{formatPrice(game.price)}</span>
       </div>
     </Link>
+
+      {modalOpen && hasCustomImage && (
+        <ImageModal
+          src={coverImage}
+          alt={game.title}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+    </>
   );
 }
