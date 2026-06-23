@@ -8,10 +8,13 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
   Request,
   UploadedFile,
   UseInterceptors,
   ForbiddenException,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { GamesService } from './games.service';
@@ -20,6 +23,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+
+type FileCallback = (error: Error | null, filename: string) => void;
+type DiskStorageFile = {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+};
 
 @Controller('games')
 export class GamesController {
@@ -155,13 +167,13 @@ export class GamesController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './public/uploads/covers',
-        filename: (_req, file, callback) => {
+        filename: (_req: any, file: DiskStorageFile, callback: FileCallback) => {
           const ext = extname(file.originalname);
           const filename = `${uuidv4()}${ext}`;
           callback(null, filename);
         },
       }),
-      fileFilter: (_req, file, callback) => {
+      fileFilter: (_req: any, file: DiskStorageFile, callback: (error: Error | null, acceptFile: boolean) => void) => {
         const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
         if (allowedMimeTypes.includes(file.mimetype)) {
           callback(null, true);
@@ -175,10 +187,11 @@ export class GamesController {
     }),
   )
   async uploadCover(
-    @Request() req: any,
+    @Req() req: Request,
     @Param('id') gameId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.gamesService.uploadCover(req.user.userId, gameId, file);
+    const userId = (req as any).user?.userId;
+    return this.gamesService.uploadCover(userId, gameId, file);
   }
 }
