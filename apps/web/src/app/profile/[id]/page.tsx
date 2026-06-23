@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getMyTeam, type MyTeam } from '@/lib/api/client';
+import { getMyTeams, type MyTeam } from '@/lib/api/client';
 
 interface UserProfile {
   id: string;
@@ -41,7 +41,7 @@ interface Achievement {
 export default function PublicProfilePage() {
   const params = useParams() as { id: string };
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
+  const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,14 +58,14 @@ export default function PublicProfilePage() {
         const data = await response.json();
         setProfile(data);
 
-        // Загружаем команду для текущего пользователя
+        // Загружаем команды текущего пользователя
         try {
-          const teamResponse = await getMyTeam();
-          if (teamResponse.data) {
-            setMyTeam(teamResponse.data);
+          const teamsResponse = await getMyTeams();
+          if (teamsResponse.data && Array.isArray(teamsResponse.data)) {
+            setMyTeams(teamsResponse.data);
           }
         } catch {
-          // Игнорируем ошибки загрузки команды
+          // Игнорируем ошибки загрузки команд
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки');
@@ -221,42 +221,47 @@ export default function PublicProfilePage() {
             </div>
           </div>
 
-          {/* My Team */}
-          {myTeam && (
+          {/* My Teams */}
+          {myTeams.length > 0 && (
             <div className="card mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-text-primary">🏴 Моя команда</h2>
-                <Link href={`/teams/${myTeam.id}`} className="text-primary hover:text-primary-hover text-sm font-medium">
-                  Подробнее →
+                <h2 className="text-xl font-bold text-text-primary">🏴 Мои команды</h2>
+                <Link href="/teams" className="text-primary hover:text-primary-hover text-sm font-medium">
+                  Все команды →
                 </Link>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-lg font-semibold text-text-primary">{myTeam.name}</div>
-                <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                  {myTeam.myRole === 'captain' ? 'Капитан' : 'Участник'}
-                </span>
-              </div>
-              <div className="mt-3 flex -space-x-2">
-                {myTeam?.members?.slice(0, 5)?.map((member) => (
-                  <div
-                    key={member.id}
-                    className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border-2 border-background"
-                    title={member.name}
+              <div className="space-y-3">
+                {myTeams.map((team) => (
+                  <Link
+                    key={team.id}
+                    href={`/teams/${team.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated transition-colors"
                   >
-                    {member.avatar ? (
-                      <img src={member.avatar} alt={member.name} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <span className="text-xs text-primary font-semibold">
-                        {member.name.charAt(0).toUpperCase()}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-primary font-semibold">
+                          {team.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-text-primary">{team.name}</div>
+                        <div className="text-xs text-text-secondary">
+                          {team.membersCount} участников
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        team.myRole === 'captain'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {team.myRole === 'captain' ? '👑 Капитан' : 'Участник'}
                       </span>
-                    )}
-                  </div>
+                      <span className="text-text-secondary">→</span>
+                    </div>
+                  </Link>
                 ))}
-                {myTeam?.members?.length > 5 && (
-                  <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center border-2 border-background text-xs text-text-secondary">
-                    +{myTeam.members.length - 5}
-                  </div>
-                )}
               </div>
             </div>
           )}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getPublicGame, startSession, type GameDetails } from '@/lib/api/client';
+import { getPublicGame, getMyTeams, registerTeam, startSession, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 const DEFAULT_LOGO = '/images/logo/logo.png';
@@ -20,8 +20,10 @@ export default function GameDetailsPage() {
   const [game, setGame] = useState<GameDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [teamName, setTeamName] = useState('');
+  const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
   const [joining, setJoining] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const gameId = params.id;
 
@@ -30,6 +32,20 @@ export default function GameDetailsPage() {
       try {
         const response = await getPublicGame(gameId);
         setGame(response.data);
+
+        // Fetch user's teams (if logged in)
+        try {
+          const teamsResponse = await getMyTeams();
+          if (teamsResponse.data && Array.isArray(teamsResponse.data)) {
+            setMyTeams(teamsResponse.data);
+            const lastTeamId = localStorage.getItem('currentTeamId');
+            if (lastTeamId && teamsResponse.data.some((t: MyTeam) => t.id === lastTeamId)) {
+              setSelectedTeamId(lastTeamId);
+            }
+          }
+        } catch {
+          // User not logged in
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось загрузить игру');
       } finally {
@@ -42,15 +58,23 @@ export default function GameDetailsPage() {
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!teamName.trim() || !game) return;
+    if (!selectedTeamId || !game) return;
 
     setJoining(true);
+    setError(null);
     try {
-      const response = await startSession({
+      // Register team on the game
+      await registerTeam(game.id, selectedTeamId);
+      localStorage.setItem('currentTeamId', selectedTeamId);
+      setSuccess('Команда зарегистрирована!');
+      
+      // Start session
+      const team = myTeams.find(t => t.id === selectedTeamId);
+      const sessionResponse = await startSession({
         gameId: game.id,
-        teamName: teamName.trim(),
+        teamName: team?.name || 'Команда',
       });
-      router.push(`/play/${game.shareLink}/${response.data.sessionId}`);
+      router.push(`/play/${game.shareLink}/${sessionResponse.data.sessionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось присоединиться к игре');
       setJoining(false);
@@ -73,7 +97,7 @@ export default function GameDetailsPage() {
     );
   }
 
-  if (error || !game) {
+  if (error && !game) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -87,6 +111,10 @@ export default function GameDetailsPage() {
         </div>
       </div>
     );
+  }
+
+  if (!game) {
+    return null;
   }
 
   const formatDate = (dateString: string) => {
@@ -215,26 +243,70 @@ export default function GameDetailsPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleJoin} className="space-y-4">
-                <div>
-                  <label className="label">Название команды</label>
-                  <input
-                    type="text"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="Введите название команды"
-                    className="input-field"
-                    required
-                  />
+              {success ? (
+                <div className="text-center">
+                  <div className="p-3 rounded-lg bg-success/10 text-success text-sm mb-3">
+                    {success}
+                  </div>
+                  <p className="text-text-secondary text-xs">
+                    Перенаправление в игру...
+                  </p>
                 </div>
-                <button
-                  type="submit"
-                  disabled={joining || !teamName.trim()}
-                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {joining ? 'Присоединение...' : 'Начать игру'}
-                </button>
-              </form>
+              ) : myTeams.length > 0 ? (
+                <form onSubmit={handleJoin} className="space-y-4">
+                  <div>
+                    <label className="label">Выберите команду</label>
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">-- Выберите команду --</option>
+                      {myTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} {team.myRole === 'captain' ? '👑' : ''} ({team.membersCount} уч.)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={joining || !selectedTeamId}
+                    className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {joining ? 'Присоединение...' : 'Начать игру'}
+                  </button>
+
+                  <div className="text-center">
+                    <Link
+                      href="/teams/create"
+                      className="text-primary hover:text-primary-hover text-sm"
+                    >
+                      + Создать новую команду
+                    </Link>
+                  </div>
+                </form>
+              ) : (
+                <div className="text-center space-y-4">
+                  <p className="text-text-secondary text-sm">
+                    У вас пока нет команд. Создайте команду, чтобы участвовать в игре.
+                  </p>
+                  <Link
+                    href="/teams/create"
+                    className="btn-primary w-full inline-block"
+                  >
+                    Создать команду
+                  </Link>
+                </div>
+              )}
 
               <p className="text-xs text-text-muted text-center mt-4">
                 Нажимая кнопку, вы соглашаетесь с правилами игры

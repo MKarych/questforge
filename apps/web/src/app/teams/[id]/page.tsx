@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getTeam, leaveTeam, removeMember, type TeamDetails } from '@/lib/api/client';
+import { getTeam, getProfile, leaveTeam, removeMember, type TeamDetails, type User } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 export default function TeamDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const [team, setTeam] = useState<TeamDetails | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -17,18 +18,30 @@ export default function TeamDetailsPage() {
   const teamId = params.id as string;
 
   useEffect(() => {
-    async function loadTeam() {
+    async function loadData() {
       try {
-        const response = await getTeam(teamId);
-        setTeam(response.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Не удалось загрузить команду');
+        const [teamResponse, profileResponse] = await Promise.allSettled([
+          getTeam(teamId),
+          getProfile(),
+        ]);
+
+        if (teamResponse.status === 'fulfilled') {
+          setTeam(teamResponse.value.data);
+        } else {
+          setError('Не удалось загрузить команду');
+        }
+
+        if (profileResponse.status === 'fulfilled') {
+          setCurrentUser(profileResponse.value.data);
+        }
+      } catch {
+        setError('Не удалось загрузить данные');
       } finally {
         setLoading(false);
       }
     }
 
-    loadTeam();
+    loadData();
   }, [teamId]);
 
   const handleLeave = async () => {
@@ -92,7 +105,8 @@ export default function TeamDetailsPage() {
     );
   }
 
-  const isCaptain = team.captain.id === 'me'; // TODO: проверить текущего пользователя
+  const isCaptain = currentUser?.id === team.captain.id;
+  const isMember = team.members.some((m) => m.id === currentUser?.id);
 
   return (
     <div className="min-h-screen">
@@ -112,13 +126,15 @@ export default function TeamDetailsPage() {
               )}
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={handleLeave}
-                disabled={actionLoading}
-                className="btn-secondary disabled:opacity-50"
-              >
-                {actionLoading ? '...' : 'Покинуть команду'}
-              </button>
+              {isMember && !isCaptain && (
+                <button
+                  onClick={handleLeave}
+                  disabled={actionLoading}
+                  className="btn-secondary disabled:opacity-50"
+                >
+                  {actionLoading ? '...' : 'Покинуть команду'}
+                </button>
+              )}
             </div>
           </div>
         </div>
