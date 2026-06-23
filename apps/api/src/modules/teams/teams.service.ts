@@ -25,12 +25,16 @@ export class TeamsService {
       }
     }
 
+    const teamData: Record<string, unknown> = {
+      name: dto.name,
+      captainId: userId,
+    };
+    if (gameId) {
+      (teamData as any).gameId = gameId;
+    }
+
     const team = await this.prisma.team.create({
-      data: {
-        name: dto.name,
-        ...(gameId ? { gameId } : {}),
-        captainId: userId,
-      },
+      data: teamData as any,
       include: {
         captain: {
           select: {
