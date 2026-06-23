@@ -10,4 +10,8 @@ export class CreateSessionDto {
   @IsString()
   @IsOptional()
   playerName?: string;
+
+  @IsUUID()
+  @IsOptional()
+  teamId?: string;
 }

@@ -34,6 +34,15 @@ export interface GameDetails extends Game {
   } | null;
   reviews: Review[];
   comments: Comment[];
+  organizer: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+  averageRating: number;
+  reviewsCount: number;
+  teamsCount: number;
+  commentsCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +178,7 @@ export interface RegisterRequest {
 export interface CreateSessionRequest {
   gameId: string;
   teamName: string;
+  teamId?: string;
 }
 
 export interface CreateGameRequest {
@@ -348,6 +358,34 @@ class ApiClient {
     }
 
     return data as T;
+  }
+
+  /**
+   * Public request method for custom endpoints not covered by named methods.
+   * Returns the raw API response (wrapped in TransformInterceptor format).
+   */
+  async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint);
+  }
+
+  async post<T>(endpoint: string, body?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async patch<T>(endpoint: string, body?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
   }
 
   // ==================== Auth ====================

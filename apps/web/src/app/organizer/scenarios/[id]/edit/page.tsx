@@ -26,63 +26,64 @@ export default function EditScenarioPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const hasNavigatedRef = useRef(false);
 
-  // Loaded data for ScenarioEditor
-  const [initialName, setInitialName] = useState('');
-  const [initialNodes, setInitialNodes] = useState<Node<ScenarioNodeData>[]>([]);
-  const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
-  const [initialSettings, setInitialSettings] = useState<GameSettings | undefined>(undefined);
+  // Loaded data for ScenarioEditor — starts as undefined (not loaded yet)
+  const [loadedData, setLoadedData] = useState<{
+    name: string;
+    nodes: Node<ScenarioNodeData>[];
+    edges: Edge[];
+    settings: GameSettings | undefined;
+  } | null>(null);
+
+  // Key to force ScenarioEditor remount when data changes
+  const [editorKey, setEditorKey] = useState(0);
 
   useEffect(() => {
     async function loadScenario() {
       try {
         const response = await getScenario(scenarioId);
         const data = response.data as any;
-        console.log('[EditPage] API response.data:', data);
-        console.log('[EditPage] nodes from API:', data?.nodes);
-        console.log('[EditPage] edges from API:', data?.edges);
         setScenario(data);
-        setInitialName(data.name || '');
 
         // Restore nodes from backend JSON — ensure each node has required React Flow fields
+        let restoredNodes: Node<ScenarioNodeData>[] = [];
         if (data.nodes && Array.isArray(data.nodes)) {
-          console.log('[EditPage] Restoring nodes:', data.nodes.length);
-          const restoredNodes = data.nodes.map((node: any) => ({
+          restoredNodes = data.nodes.map((node: any) => ({
             ...node,
-            // Ensure position exists (React Flow requires position.x and position.y)
             position: node.position || { x: 0, y: 0 },
-            // Ensure type exists (React Flow uses it for nodeTypes lookup)
             type: node.type || 'TEXT',
-            // Ensure data exists (ScenarioNode reads data.validationStatus, data.icon, data.label, etc.)
             data: node.data || { label: 'Узел', icon: '📄' },
           }));
-          console.log('[EditPage] Restored nodes:', restoredNodes);
-          setInitialNodes(restoredNodes);
-        } else {
-          console.log('[EditPage] No nodes in API response, data.nodes:', data?.nodes);
         }
 
         // Restore edges from backend JSON
+        let restoredEdges: Edge[] = [];
         if (data.edges && Array.isArray(data.edges)) {
-          console.log('[EditPage] Restoring edges:', data.edges.length);
-          setInitialEdges(data.edges);
-        } else {
-          console.log('[EditPage] No edges in API response');
+          restoredEdges = data.edges;
         }
 
         // Restore settings from backend JSON (stored in metadata)
+        let restoredSettings: GameSettings | undefined;
         if (data.metadata) {
           let metadata = data.metadata;
           if (typeof metadata === 'string') {
             try { metadata = JSON.parse(metadata); } catch {}
           }
           if (metadata?.settings) {
-            console.log('[EditPage] Restoring settings:', metadata.settings);
-            setInitialSettings(metadata.settings);
+            restoredSettings = metadata.settings;
           }
         }
+
+        // Set all loaded data at once — ScenarioEditor will mount with complete data
+        setLoadedData({
+          name: data.name || '',
+          nodes: restoredNodes,
+          edges: restoredEdges,
+          settings: restoredSettings,
+        });
+        // Force ScenarioEditor to remount with new data (useNodesState only reads initial value once)
+        setEditorKey(prev => prev + 1);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарий';
-        console.error('[EditPage] Load error:', err);
         setError(message);
         if (err instanceof Error && err.message.includes('401')) {
           router.push('/auth/login');
@@ -267,17 +268,21 @@ export default function EditScenarioPage() {
       )}
 
       <div className={saving ? 'opacity-50 pointer-events-none' : ''}>
-        <ScenarioEditor
-          scenarioName={initialName}
-          initialNodes={initialNodes}
-          initialEdges={initialEdges}
-          initialSettings={initialSettings}
-          isPublished={scenario?.isPublished ?? false}
-          onSave={handleSave}
-          onPublish={handlePublish}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-        />
+        {/* key={editorKey} forces ScenarioEditor to remount when data loads (useNodesState only reads initial value once) */}
+        {loadedData && (
+          <ScenarioEditor
+            key={editorKey}
+            scenarioName={loadedData.name}
+            initialNodes={loadedData.nodes}
+            initialEdges={loadedData.edges}
+            initialSettings={loadedData.settings}
+            isPublished={scenario?.isPublished ?? false}
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+          />
+        )}
       </div>
       {saving && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">

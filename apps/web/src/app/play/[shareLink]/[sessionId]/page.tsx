@@ -125,7 +125,7 @@ export default function PlaySessionPage() {
     try {
       const response = await submitAnswer(
         sessionState.teamId,
-        '', // gameId
+        sessionState.sessionId, // gameId — sessionId is used as gameId reference
         sessionState.currentNodeId,
         answerText,
       );

@@ -63,17 +63,14 @@ export default function GameDetailsPage() {
     setJoining(true);
     setError(null);
     try {
-      // Register team on the game
-      await registerTeam(game.id, selectedTeamId);
-      localStorage.setItem('currentTeamId', selectedTeamId);
-      setSuccess('Команда зарегистрирована!');
-      
-      // Start session
+      // Start session with existing team — backend will register team on game if needed
       const team = myTeams.find(t => t.id === selectedTeamId);
       const sessionResponse = await startSession({
         gameId: game.id,
         teamName: team?.name || 'Команда',
+        teamId: selectedTeamId,
       });
+      localStorage.setItem('currentTeamId', selectedTeamId);
       router.push(`/play/${game.shareLink}/${sessionResponse.data.sessionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось присоединиться к игре');

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getProfile, type User } from '@/lib/api/client';
+import { apiClient, getProfile, type User } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -57,10 +57,7 @@ export default function EditProfilePage() {
     setMessage(null);
 
     try {
-      const token = localStorage.getItem('auth_token');
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-      // Update profile
+      // Update profile via API client
       const profileData = {
         name: formData.name,
         city: formData.city,
@@ -70,33 +67,11 @@ export default function EditProfilePage() {
         whatsapp: formData.whatsapp,
       };
 
-      const profileResponse = await fetch(`${API_URL}/users/me`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(profileData),
-      });
-
-      if (!profileResponse.ok) {
-        throw new Error('Ошибка обновления профиля');
-      }
+      await apiClient.patch('/users/me', profileData);
 
       // Update avatar if provided
       if (formData.avatarUrl) {
-        const avatarResponse = await fetch(`${API_URL}/users/me/avatar`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ avatarUrl: formData.avatarUrl }),
-        });
-
-        if (!avatarResponse.ok) {
-          throw new Error('Ошибка обновления аватара');
-        }
+        await apiClient.post('/users/me/avatar', { avatarUrl: formData.avatarUrl });
       }
 
       setMessage({ type: 'success', text: 'Профиль успешно обновлён!' });

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getMyTeams, type MyTeam } from '@/lib/api/client';
+import { apiClient, getMyTeams, type MyTeam } from '@/lib/api/client';
 
 interface UserProfile {
   id: string;
@@ -48,15 +48,8 @@ export default function PublicProfilePage() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-        const response = await fetch(`${API_URL}/users/${params.id}`);
-        
-        if (!response.ok) {
-          throw new Error('Профиль не найден');
-        }
-
-        const data = await response.json();
-        setProfile(data);
+        const response = await apiClient.get<any>(`/users/${params.id}`);
+        setProfile(response.data);
 
         // Загружаем команды текущего пользователя
         try {

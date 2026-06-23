@@ -411,9 +411,9 @@ export class EngineOrchestrator {
     sessionId: string,
     teamId: string,
   ): Promise<SessionState | null> {
-    // Try to load from database snapshot
+    // Try to load from database snapshot by teamId (most recent)
     const snapshot = await this.prisma.sessionState.findFirst({
-      where: { id: sessionId },
+      where: { teamId },
       orderBy: { sequence: 'desc' },
     });
 
@@ -695,14 +695,30 @@ export class EngineOrchestrator {
     sessionId: string,
     state: SessionState,
   ): Promise<void> {
-    await this.prisma.sessionState.create({
-      data: {
-        id: sessionId,
-        teamId: state.teamId,
-        state: JSON.parse(JSON.stringify(state)),
-        sequence: state.history.length,
-      },
+    // Use upsert to handle both first save and subsequent saves
+    const existing = await this.prisma.sessionState.findFirst({
+      where: { teamId: state.teamId },
+      orderBy: { sequence: 'desc' },
     });
+
+    if (existing) {
+      await this.prisma.sessionState.create({
+        data: {
+          teamId: state.teamId,
+          state: JSON.parse(JSON.stringify(state)),
+          sequence: state.history.length,
+        },
+      });
+    } else {
+      await this.prisma.sessionState.create({
+        data: {
+          id: sessionId,
+          teamId: state.teamId,
+          state: JSON.parse(JSON.stringify(state)),
+          sequence: state.history.length,
+        },
+      });
+    }
   }
 
   private toPlainRecord(obj: unknown): Record<string, unknown> {

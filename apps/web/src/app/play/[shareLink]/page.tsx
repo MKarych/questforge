@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getPublicGame, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { apiClient, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface PlayLobbyPageParams {
@@ -26,9 +26,9 @@ export default function PlayLobbyPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        // Fetch game by shareLink
-        const gameResponse = await getPublicGame(shareLink);
-        setGame(gameResponse.data);
+        // Fetch game by shareLink — use the dedicated endpoint
+        const gameResponse = await apiClient.get<any>(`/games/public/share/${shareLink}`);
+        setGame((gameResponse as any).data);
 
         // Fetch user's teams (if logged in)
         try {

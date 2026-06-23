@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { ScenarioNodeData } from '@/types/scenario';
 
-const ScenarioNode = ({ data, selected }: NodeProps<ScenarioNodeData>) => {
+const ScenarioNode = ({ id, data, selected }: NodeProps<ScenarioNodeData>) => {
   const hasError = data.validationStatus === 'error';
   const isBlocked = data.validationStatus === 'blocked';
 
@@ -52,11 +52,13 @@ const ScenarioNode = ({ data, selected }: NodeProps<ScenarioNodeData>) => {
       <Handle
         type="target"
         position={Position.Top}
+        id={`${id}-target`}
         className="!bg-primary !w-3 !h-3 !border-2 !border-white"
       />
       <Handle
         type="source"
         position={Position.Bottom}
+        id={`${id}-source`}
         className="!bg-primary !w-3 !h-3 !border-2 !border-white"
       />
     </div>

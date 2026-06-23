@@ -184,9 +184,6 @@ function ScenarioEditorInner({
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
   const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes || []);
   const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges || []);
-
-  console.log('[ScenarioEditor] initialNodes:', initialNodes?.length, initialNodes);
-  console.log('[ScenarioEditor] initialEdges:', initialEdges?.length, initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
