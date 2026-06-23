@@ -55,12 +55,14 @@ interface HistoryState {
 interface ScenarioEditorProps {
   scenarioName?: string;
   onSave?: (data: any) => void;
+  onNodesChange?: () => void;
+  onEdgesChange?: () => void;
 }
 
-export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorProps) {
+export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: onNodesChangeCallback, onEdgesChange: onEdgesChangeCallback }: ScenarioEditorProps) {
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, handleNodesChange] = useNodesState([]);
+  const [edges, setEdges, handleEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
   const [showPreview, setShowPreview] = useState(false);
@@ -811,8 +813,14 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onNodesChange={(changes) => {
+              handleNodesChange(changes);
+              onNodesChangeCallback?.();
+            }}
+            onEdgesChange={(changes) => {
+              handleEdgesChange(changes);
+              onEdgesChangeCallback?.();
+            }}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}

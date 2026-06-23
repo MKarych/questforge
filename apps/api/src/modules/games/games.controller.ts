@@ -64,9 +64,14 @@ export class GamesController {
     });
   }
 
-  @Get('public/:shareLink')
+  @Get('public/share/:shareLink')
   async findOneByShareLink(@Param('shareLink') shareLink: string) {
     return this.gamesService.findOneByShareLink(shareLink);
+  }
+
+  @Get('public/:id')
+  async findOnePublic(@Param('id') id: string) {
+    return this.gamesService.findOnePublic(id);
   }
 
   @Get()

@@ -182,6 +182,81 @@ _count: {
     };
   }
 
+  async findOnePublic(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId, deletedAt: null },
+      include: {
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        scenario: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            version: true,
+          },
+        },
+        reviews: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            rating: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+        comments: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            user: {
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+        _count: {
+          select: {
+            gameTeams: true,
+            reviews: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    // Calculate average rating
+    const avgRating =
+      game.reviews?.length > 0
+        ? game.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / game.reviews.length
+        : 0;
+
+    const count = game._count || { gameTeams: 0, reviews: 0, comments: 0 };
+
+    return {
+      ...game,
+      averageRating: Math.round(avgRating * 100) / 100,
+      reviewsCount: count.reviews,
+      teamsCount: count.gameTeams,
+      commentsCount: count.comments,
+    };
+  }
+
   async findAll(params: {
     status?: string;
     city?: string;

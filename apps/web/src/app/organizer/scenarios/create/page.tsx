@@ -1,15 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
 import ScenarioEditor from '@/components/scenario-editor/ScenarioEditor';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function CreateScenarioPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const hasNavigatedRef = useRef(false);
+
+  // Track changes in the editor
+  const handleNodesChange = useCallback(() => {
+    if (!hasNavigatedRef.current) {
+      setIsDirty(true);
+    }
+  }, []);
+
+  const handleEdgesChange = useCallback(() => {
+    if (!hasNavigatedRef.current) {
+      setIsDirty(true);
+    }
+  }, []);
 
   const handleSave = async (data: any) => {
+    hasNavigatedRef.current = true;
     setSaving(true);
 
     try {
@@ -45,7 +63,6 @@ export default function CreateScenarioPage() {
       }
 
       await response.json();
-      alert('✅ Сценарий успешно сохранён!');
       router.push('/organizer/scenarios');
     } catch (err) {
       console.error('Failed to create scenario:', err);
@@ -55,11 +72,46 @@ export default function CreateScenarioPage() {
     }
   };
 
+  const handleExit = () => {
+    if (isDirty) {
+      setShowExitModal(true);
+    } else {
+      router.push('/organizer/scenarios');
+    }
+  };
+
+  const handleConfirmExit = () => {
+    router.push('/organizer/scenarios');
+  };
+
+  const handleCancelExit = () => {
+    setShowExitModal(false);
+  };
+
   return (
     <div className="min-h-screen">
       <Header />
+      
+      {/* Top Bar with Exit Button */}
+      <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
+        <button
+          onClick={handleExit}
+          className="btn-secondary text-sm flex items-center gap-1"
+          title="Выйти в список сценариев"
+        >
+          ← Выйти
+        </button>
+        <span className="text-xs text-text-secondary">
+          {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
+        </span>
+      </div>
+
       <div className={saving ? 'opacity-50 pointer-events-none' : ''}>
-        <ScenarioEditor onSave={handleSave} />
+        <ScenarioEditor
+          onSave={handleSave}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+        />
       </div>
       {saving && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
@@ -71,6 +123,18 @@ export default function CreateScenarioPage() {
           </div>
         </div>
       )}
+
+      {/* Exit Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showExitModal}
+        onClose={handleCancelExit}
+        onConfirm={handleConfirmExit}
+        title="Выйти из конструктора"
+        message="Вы уверены, что хотите выйти? Все несохранённые изменения будут потеряны."
+        confirmText="Выйти"
+        cancelText="Отмена"
+        variant="danger"
+      />
     </div>
   );
 }

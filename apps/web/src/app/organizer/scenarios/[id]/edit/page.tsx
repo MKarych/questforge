@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getScenario, updateScenario, publishScenario, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function EditScenarioPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function EditScenarioPage() {
   const [error, setError] = useState<string | null>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [name, setName] = useState('');
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     async function loadScenario() {
@@ -41,6 +44,31 @@ export default function EditScenarioPage() {
     }
   }, [scenarioId, router]);
 
+  // Track name changes
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setName(newName);
+    if (scenario && newName !== scenario.name) {
+      setIsDirty(true);
+    }
+  }, [scenario]);
+
+  const handleExit = () => {
+    if (isDirty) {
+      setShowExitModal(true);
+    } else {
+      router.push('/organizer/scenarios');
+    }
+  };
+
+  const handleConfirmExit = () => {
+    router.push('/organizer/scenarios');
+  };
+
+  const handleCancelExit = () => {
+    setShowExitModal(false);
+  };
+
   const handleSave = async () => {
     if (!scenario) return;
     setSaving(true);
@@ -48,6 +76,7 @@ export default function EditScenarioPage() {
     try {
       await updateScenario(scenarioId, { name });
       setScenario(prev => prev ? { ...prev, name } : null);
+      setIsDirty(false);
       router.push('/organizer/scenarios');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось сохранить сценарий';
@@ -103,6 +132,20 @@ export default function EditScenarioPage() {
     <div className="min-h-screen">
       <Header />
       
+      {/* Top Bar with Exit Button */}
+      <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
+        <button
+          onClick={handleExit}
+          className="btn-secondary text-sm flex items-center gap-1"
+          title="Выйти в список сценариев"
+        >
+          ← Выйти
+        </button>
+        <span className="text-xs text-text-secondary">
+          {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
+        </span>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary text-sm">
@@ -129,7 +172,7 @@ export default function EditScenarioPage() {
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={handleNameChange}
                   className="input-field"
                   required
                 />
@@ -172,6 +215,18 @@ export default function EditScenarioPage() {
           </div>
         </div>
       </div>
+
+      {/* Exit Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showExitModal}
+        onClose={handleCancelExit}
+        onConfirm={handleConfirmExit}
+        title="Выйти из редактора"
+        message="Вы уверены, что хотите выйти? Все несохранённые изменения будут потеряны."
+        confirmText="Выйти"
+        cancelText="Отмена"
+        variant="danger"
+      />
     </div>
   );
 }
