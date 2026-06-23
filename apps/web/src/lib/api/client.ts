@@ -648,6 +648,85 @@ class ApiClient {
       body: JSON.stringify({ teamId }),
     });
   }
+
+  // ==================== Admin ====================
+
+  async getAdminStats(): Promise<ApiResponse<{
+    totalUsers: number;
+    totalOrganizers: number;
+    totalGames: number;
+    activeGames: number;
+    totalScenarios: number;
+    pendingGames: number;
+    pendingApplications: number;
+  }>> {
+    return this.request('/admin/stats');
+  }
+
+  async getPendingGamesAdmin(params?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ items: any[]; total: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const query = queryParams.toString();
+    return this.request(`/admin/games/pending${query ? `?${query}` : ''}`);
+  }
+
+  async approveGame(gameId: string): Promise<ApiResponse<any>> {
+    return this.request(`/admin/games/${gameId}/approve`, { method: 'POST' });
+  }
+
+  async rejectGame(gameId: string, reason: string): Promise<ApiResponse<any>> {
+    return this.request(`/admin/games/${gameId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getPendingApplications(): Promise<ApiResponse<any[]>> {
+    return this.request('/admin/organizer-applications');
+  }
+
+  async approveApplication(applicationId: string): Promise<ApiResponse<any>> {
+    return this.request(`/admin/organizer-applications/${applicationId}/approve`, { method: 'POST' });
+  }
+
+  async rejectApplication(applicationId: string, reason: string): Promise<ApiResponse<any>> {
+    return this.request(`/admin/organizer-applications/${applicationId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getUsersAdmin(params?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ items: any[]; total: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const query = queryParams.toString();
+    return this.request(`/admin/users${query ? `?${query}` : ''}`);
+  }
+
+  async blockUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/admin/users/${userId}/block`, { method: 'PATCH' });
+  }
+
+  async unblockUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/admin/users/${userId}/unblock`, { method: 'PATCH' });
+  }
+
+  async changeUserRole(userId: string, role: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  }
 }
 
 // Export singleton instance

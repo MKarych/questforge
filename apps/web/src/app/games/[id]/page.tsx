@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getPublicGame, getMyTeams, registerTeam, startSession, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { getPublicGame, getMyTeams, startSession, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 const DEFAULT_LOGO = '/images/logo/logo.png';
@@ -71,7 +71,10 @@ export default function GameDetailsPage() {
         teamId: selectedTeamId,
       });
       localStorage.setItem('currentTeamId', selectedTeamId);
-      router.push(`/play/${game.shareLink}/${sessionResponse.data.sessionId}`);
+      setSuccess('Команда зарегистрирована! Перенаправляем...');
+      setTimeout(() => {
+        router.push(`/play/${game.shareLink}/${sessionResponse.data.sessionId}`);
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось присоединиться к игре');
       setJoining(false);

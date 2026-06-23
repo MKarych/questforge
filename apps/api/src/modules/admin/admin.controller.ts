@@ -1,0 +1,132 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
+import { AdminService } from './admin.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+
+@Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class AdminController {
+  constructor(private readonly adminService: AdminService) {}
+
+  // ============================================================
+  // Dashboard
+  // ============================================================
+
+  @Get('stats')
+  @Roles('ADMIN', 'MODERATOR')
+  async getStats() {
+    return this.adminService.getStats();
+  }
+
+  // ============================================================
+  // Games Moderation
+  // ============================================================
+
+  @Get('games/pending')
+  @Roles('ADMIN', 'MODERATOR')
+  async getPendingGames(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.adminService.getPendingGames({
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Post('games/:id/approve')
+  @Roles('ADMIN', 'MODERATOR')
+  async approveGame(@Param('id') gameId: string, @Request() req: any) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.adminService.approveGame(gameId, moderatorId);
+  }
+
+  @Post('games/:id/reject')
+  @Roles('ADMIN', 'MODERATOR')
+  async rejectGame(
+    @Param('id') gameId: string,
+    @Body('reason') reason: string,
+    @Request() req: any,
+  ) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.adminService.rejectGame(gameId, reason, moderatorId);
+  }
+
+  // ============================================================
+  // Organizer Applications
+  // ============================================================
+
+  @Get('organizer-applications')
+  @Roles('ADMIN', 'MODERATOR')
+  async getPendingApplications() {
+    return this.adminService.getPendingApplications();
+  }
+
+  @Post('organizer-applications/:id/approve')
+  @Roles('ADMIN', 'MODERATOR')
+  async approveApplication(@Param('id') applicationId: string, @Request() req: any) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.adminService.approveApplication(applicationId, moderatorId);
+  }
+
+  @Post('organizer-applications/:id/reject')
+  @Roles('ADMIN', 'MODERATOR')
+  async rejectApplication(
+    @Param('id') applicationId: string,
+    @Body('reason') reason: string,
+    @Request() req: any,
+  ) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.adminService.rejectApplication(applicationId, reason, moderatorId);
+  }
+
+  // ============================================================
+  // Users Management (ADMIN only)
+  // ============================================================
+
+  @Get('users')
+  @Roles('ADMIN')
+  async getUsers(
+    @Query('search') search?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.adminService.getUsers({
+      search,
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Patch('users/:id/block')
+  @Roles('ADMIN')
+  async blockUser(@Param('id') userId: string) {
+    return this.adminService.blockUser(userId);
+  }
+
+  @Patch('users/:id/unblock')
+  @Roles('ADMIN')
+  async unblockUser(@Param('id') userId: string) {
+    return this.adminService.unblockUser(userId);
+  }
+
+  @Patch('users/:id/role')
+  @Roles('ADMIN')
+  async changeUserRole(
+    @Param('id') userId: string,
+    @Body('role') role: string,
+  ) {
+    return this.adminService.changeUserRole(userId, role);
+  }
+}

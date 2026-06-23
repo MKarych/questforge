@@ -32,8 +32,8 @@ export default function Header() {
       loadProfile();
     }
     
-    // Загружаем профиль на страницах авторизации и в дашборде
-    if (pathname.startsWith('/auth') || pathname.startsWith('/organizer') || pathname.startsWith('/dashboard') || pathname.startsWith('/profile')) {
+    // Загружаем профиль на страницах авторизации, админки, дашборда и профиля
+    if (pathname.startsWith('/auth') || pathname.startsWith('/organizer') || pathname.startsWith('/dashboard') || pathname.startsWith('/profile') || pathname.startsWith('/admin')) {
       loadProfile();
     } else {
       setLoading(false);
@@ -85,6 +85,11 @@ export default function Header() {
             {!loading && (
               user ? (
                 <div className="flex items-center gap-4">
+                  {(user.role === 'ADMIN' || user.role === 'MODERATOR') && (
+                    <Link href="/admin/dashboard" className="text-primary hover:text-primary-hover transition-colors font-medium">
+                      Админка
+                    </Link>
+                  )}
                   <Link href="/organizer/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
                     Панель
                   </Link>
