@@ -841,6 +841,7 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
         {selectedNode && (
           <NodeSettings
             node={selectedNode}
+            allNodes={nodes}
             onUpdate={updateNodeData}
             onDelete={deleteNode}
             onClose={() => setSelectedNode(null)}
