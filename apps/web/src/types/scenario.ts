@@ -11,7 +11,8 @@ export type NodeType =
   | 'CHOICE'
   | 'TIMER'
   | 'BRANCH'
-  | 'NPC';
+  | 'NPC'
+  | 'AR';
 
 export type EdgeConditionType = 'success' | 'fail' | 'timeout' | 'always' | 'custom';
 
@@ -112,6 +113,36 @@ export const BLOCK_TYPES: BlockType[] = [
   { type: 'TIMER', label: 'Таймер', icon: '⏱', description: 'Ограничение по времени', color: 'bg-red-400' },
   { type: 'BRANCH', label: 'Ветвление', icon: '🔀', description: 'Ветвление сценария', color: 'bg-teal-500' },
   { type: 'NPC', label: 'NPC', icon: '🗣', description: 'Взаимодействие с персонажем', color: 'bg-cyan-500' },
+  { type: 'AR', label: 'AR', icon: '🧩', description: 'Дополненная реальность', color: 'bg-gray-500' },
+];
+
+// Block categories for palette grouping
+export interface BlockCategory {
+  name: string;
+  blocks: NodeType[];
+}
+
+export const BLOCK_CATEGORIES: BlockCategory[] = [
+  {
+    name: 'Базовые',
+    blocks: ['START', 'FINISH'],
+  },
+  {
+    name: 'Задания',
+    blocks: ['TEXT', 'CODE', 'PHOTO', 'GPS', 'QR', 'CHOICE'],
+  },
+  {
+    name: 'Логика',
+    blocks: ['TIMER', 'BRANCH'],
+  },
+  {
+    name: 'Персонажи',
+    blocks: ['NPC'],
+  },
+  {
+    name: 'Экспериментальные',
+    blocks: ['AR'],
+  },
 ];
 
 export interface ValidationError {

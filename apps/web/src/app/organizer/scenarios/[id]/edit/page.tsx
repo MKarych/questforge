@@ -249,7 +249,9 @@ export default function EditScenarioPage() {
           initialNodes={initialNodes}
           initialEdges={initialEdges}
           initialSettings={initialSettings}
+          isPublished={scenario?.isPublished ?? false}
           onSave={handleSave}
+          onPublish={handlePublish}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
         />

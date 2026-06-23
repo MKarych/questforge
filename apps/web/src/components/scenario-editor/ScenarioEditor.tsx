@@ -161,12 +161,24 @@ interface ScenarioEditorProps {
   initialNodes?: Node<ScenarioNodeData>[];
   initialEdges?: Edge[];
   initialSettings?: GameSettings;
+  isPublished?: boolean;
   onSave?: (data: any) => void;
+  onPublish?: () => void;
   onNodesChange?: () => void;
   onEdgesChange?: () => void;
 }
 
-export default function ScenarioEditor({ scenarioName, initialNodes, initialEdges, initialSettings, onSave, onNodesChange: onNodesChangeCallback, onEdgesChange: onEdgesChangeCallback }: ScenarioEditorProps) {
+export default function ScenarioEditor({
+  scenarioName,
+  initialNodes,
+  initialEdges,
+  initialSettings,
+  isPublished = false,
+  onSave,
+  onPublish,
+  onNodesChange: onNodesChangeCallback,
+  onEdgesChange: onEdgesChangeCallback,
+}: ScenarioEditorProps) {
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
   const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes || []);
   const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges || []);
@@ -180,6 +192,9 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
   const [copiedNode, setCopiedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [currentPreviewNode, setCurrentPreviewNode] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const reactFlowInstance = useReactFlow();
+  const isEmpty = useMemo(() => nodes.length === 0, [nodes]);
 
   // Game settings
   const [gameSettings, setGameSettings] = useState<GameSettings>(
@@ -272,6 +287,11 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
     [setEdges, saveHistory]
   );
 
+  // Mark dirty on changes
+  const markDirty = useCallback(() => {
+    setIsDirty(true);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const isModKey = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
@@ -332,11 +352,21 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
           pasteNode(copiedNode);
         }
       }
+
+      // Cmd/Ctrl+A - Select all nodes
+      if (isModKey(e) && e.key === 'a') {
+        e.preventDefault();
+        if (nodes.length > 0) {
+          reactFlowInstance.setNodes((nds) =>
+            nds.map((n) => ({ ...n, selected: true }))
+          );
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNode, selectedEdge, historyIndex, history, copiedNode, undo, redo, deleteEdge]);
+  }, [selectedNode, selectedEdge, historyIndex, history, copiedNode, undo, redo, deleteEdge, nodes, reactFlowInstance]);
 
   const onDragStart = (event: React.DragEvent, blockType: BlockType) => {
     event.dataTransfer.setData('application/reactflow', blockType.type);
@@ -395,8 +425,9 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
 
       saveHistory('add', newNode.id);
       setNodes((nds) => [...nds, newNode]);
+      markDirty();
     },
-    [setNodes, saveHistory, gameSettings]
+    [setNodes, saveHistory, gameSettings, markDirty]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -431,8 +462,9 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
           eds
         )
       );
+      markDirty();
     },
-    [setEdges, saveHistory, nodes]
+    [setEdges, saveHistory, nodes, markDirty]
   );
 
   const onNodeClick = useCallback(
@@ -690,6 +722,43 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
     };
   }, [nodes, edges]);
 
+  // Wire validation errors to node validationStatus
+  useEffect(() => {
+    const errorNodeIds = new Set(
+      validationErrors.errors
+        .filter((e) => e.nodeId && e.severity === 'error')
+        .map((e) => e.nodeId as string)
+    );
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        const isStartOrFinish = node.type === 'START' || node.type === 'FINISH';
+        let validationStatus: 'error' | 'blocked' | 'ok' | undefined;
+
+        if (errorNodeIds.has(node.id)) {
+          validationStatus = 'error';
+        } else if (isStartOrFinish) {
+          validationStatus = 'blocked';
+        } else {
+          validationStatus = 'ok';
+        }
+
+        const errorMsg = validationErrors.errors.find(
+          (e) => e.nodeId === node.id
+        )?.message;
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            validationStatus,
+            validationMessage: errorMsg,
+          },
+        };
+      })
+    );
+  }, [validationErrors, setNodes]);
+
   const handleSave = useCallback(() => {
     const validation = validateScenario();
     setValidationErrors(validation);
@@ -702,6 +771,7 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
         startNodeId: nodes.find((n) => n.type === 'START')?.id,
         settings: gameSettings,
       });
+      setIsDirty(false);
     }
   }, [name, nodes, edges, onSave, validateScenario, gameSettings]);
 
@@ -872,10 +942,23 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              markDirty();
+            }}
             className="text-lg font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/30 rounded px-2 py-1"
             placeholder="Название сценария"
           />
+          {/* Status indicator */}
+          <span
+            className={`text-xs font-semibold px-2 py-1 rounded ${
+              isPublished
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+            }`}
+          >
+            {isPublished ? 'PUBLISHED' : 'DRAFT'}
+          </span>
           {startNodeId && (
             <span className="text-xs text-text-secondary bg-primary/10 px-2 py-1 rounded">
               ID: {startNodeId.slice(0, 8)}...
@@ -895,8 +978,8 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
           >
             ✅ Проверить
           </button>
-          <button 
-            onClick={() => handlePreviewNode(startNodeId)} 
+          <button
+            onClick={() => handlePreviewNode(startNodeId)}
             className="btn-secondary text-sm"
             title="Превью игры (Ctrl+P)"
           >
@@ -932,7 +1015,19 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
           >
             ↪️ Повторить
           </button>
-          <button onClick={handleSave} className="btn-primary text-sm">
+          {/* Publish button — only if not published */}
+          {!isPublished && onPublish && (
+            <button onClick={onPublish} className="btn-primary text-sm bg-green-600 hover:bg-green-700">
+              📢 Опубликовать
+            </button>
+          )}
+          {/* Save button — disabled if no changes */}
+          <button
+            onClick={handleSave}
+            disabled={!isDirty}
+            className={`btn-primary text-sm ${!isDirty ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={!isDirty ? 'Нет изменений для сохранения' : 'Сохранить (Ctrl+S)'}
+          >
             💾 Сохранить
           </button>
         </div>
@@ -957,7 +1052,19 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
         <BlockPalette onDragStart={onDragStart} />
 
         {/* Canvas */}
-        <div className="flex-1" onDrop={onDrop} onDragOver={onDragOver}>
+        <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
+          {/* Empty state */}
+          {isEmpty && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+              <div className="text-center p-8 rounded-lg bg-background/80 backdrop-blur-sm border border-dashed border-border max-w-md">
+                <div className="text-5xl mb-4">🎨</div>
+                <h3 className="text-xl font-semibold text-text-primary mb-2">Холст пуст</h3>
+                <p className="text-text-secondary">
+                  Перетащите блок из палитры, чтобы начать
+                </p>
+              </div>
+            </div>
+          )}
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -1013,53 +1120,108 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
         )}
       </div>
 
-      {/* Preview Modal */}
+      {/* Preview Modal — Phone 375x812 */}
       {showPreview && currentPreviewNode && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-lg shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+          <div className="bg-background rounded-lg shadow-2xl overflow-hidden flex flex-col">
+            {/* Modal Header */}
             <div className="bg-gray-800 p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
-              <div className="text-xs text-gray-400">Preview Mode</div>
-              <button 
+              <div className="text-xs text-gray-400">👁 Превью сценария</div>
+              <button
                 onClick={() => setShowPreview(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white text-xl"
               >
-                ×
+                ✕
               </button>
             </div>
-            <div className="p-4 bg-gray-900 flex-1 flex flex-col items-center">
-              <div className="text-white text-2xl mb-4">📱 Телефон игрока</div>
-              <div className="w-80 h-160 bg-white rounded-xl overflow-hidden shadow-lg flex flex-col">
-                {/* Phone Header */}
-                <div className="bg-gray-100 p-4 border-b">
-                  <div className="text-lg font-bold text-gray-800">{name}</div>
-                  <div className="text-sm text-gray-500">Задание {nodes.findIndex(n => n.id === currentPreviewNode) + 1}</div>
+            {/* Phone Container */}
+            <div className="p-6 bg-gray-900 flex flex-col items-center">
+              {/* Phone frame — 375x812 iPhone */}
+              <div
+                className="bg-white rounded-[2rem] overflow-hidden shadow-2xl flex flex-col border-4 border-gray-700"
+                style={{ width: 375, height: 812, maxWidth: '100%' }}
+              >
+                {/* Phone Notch */}
+                <div className="bg-gray-900 h-8 flex items-center justify-center relative">
+                  <div className="w-32 h-5 bg-gray-800 rounded-full"></div>
+                  <div className="absolute right-4 top-2 text-[10px] text-white font-semibold">
+                    {String(nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH').indexOf(
+                      nodes.find((n) => n.id === currentPreviewNode)!
+                    ) + 1)}
+                    /{nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH').length}
+                  </div>
                 </div>
-                {/* Phone Content */}
-                <div className="p-6 flex-1 flex flex-col">
+                {/* Phone Header */}
+                <div className="bg-gray-100 px-5 py-3 border-b border-gray-200">
+                  <div className="text-sm font-bold text-gray-800 truncate">{name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {(() => {
+                      const node = nodes.find((n) => n.id === currentPreviewNode);
+                      if (!node) return '';
+                      const taskNodes = nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH');
+                      const taskIndex = taskNodes.indexOf(node as any);
+                      return taskIndex >= 0 ? `Задание ${taskIndex + 1} из ${taskNodes.length}` : '';
+                    })()}
+                  </div>
+                </div>
+                {/* Phone Content — scrollable */}
+                <div className="flex-1 overflow-y-auto p-5">
                   {(() => {
-                    const node = nodes.find(n => n.id === currentPreviewNode);
+                    const node = nodes.find((n) => n.id === currentPreviewNode);
                     if (!node) return null;
                     return (
-                      <div className="space-y-4">
-                        <div className="text-xl font-semibold text-gray-800">
-                          {node.data.icon} {node.data.label}
+                      <div className="space-y-5">
+                        {/* Node title */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{node.data.icon}</span>
+                          <span className="text-lg font-semibold text-gray-800">{node.data.label}</span>
                         </div>
+                        {/* Question */}
                         {node.data.question && (
-                          <div className="text-gray-700">
+                          <div className="text-gray-700 text-sm leading-relaxed">
                             {node.data.question}
                           </div>
                         )}
+                        {/* Hint */}
                         {node.data.hint && (
-                          <div className="bg-yellow-50 p-3 rounded text-sm text-yellow-800">
-                            💡 Подсказка: {node.data.hint}
+                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-sm text-yellow-800">
+                            <span className="font-semibold">💡 Подсказка:</span> {node.data.hint}
                           </div>
                         )}
-                        <div className="text-sm text-gray-500 mt-auto pt-4">
+                        {/* Answer input placeholder */}
+                        {(node.type === 'TEXT' || node.type === 'CODE') && (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder={node.type === 'CODE' ? 'Введите код...' : 'Введите ответ...'}
+                              className="w-full p-3 border border-gray-300 rounded-lg text-sm text-gray-800 bg-gray-50"
+                              readOnly
+                            />
+                            <button className="mt-2 w-full py-2.5 bg-blue-500 text-white rounded-lg text-sm font-semibold">
+                              Отправить
+                            </button>
+                          </div>
+                        )}
+                        {/* Choice options placeholder */}
+                        {node.type === 'CHOICE' && node.data.options && (
+                          <div className="space-y-2">
+                            {node.data.options.map((opt, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50"
+                              >
+                                {opt}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Points */}
+                        <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
                           Очки: {node.data.points || 0} | Штраф: {node.data.penalty || 0}
                         </div>
                       </div>
@@ -1067,31 +1229,46 @@ export default function ScenarioEditor({ scenarioName, initialNodes, initialEdge
                   })()}
                 </div>
               </div>
-              <div className="mt-4 flex gap-2">
-                <button 
+              {/* Navigation */}
+              <div className="mt-4 flex items-center gap-4">
+                <button
                   onClick={() => {
-                    const nodeIdx = nodes.findIndex(n => n.id === currentPreviewNode);
-                    if (nodeIdx > 0) {
-                      setCurrentPreviewNode(nodes[nodeIdx - 1].id);
+                    const taskNodes = nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH');
+                    const currentIdx = taskNodes.findIndex((n) => n.id === currentPreviewNode);
+                    if (currentIdx > 0) {
+                      setCurrentPreviewNode(taskNodes[currentIdx - 1].id);
                     }
                   }}
-                  className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+                  disabled={
+                    nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH').findIndex(
+                      (n) => n.id === currentPreviewNode
+                    ) <= 0
+                  }
+                  className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
                 >
                   ← Предыдущее
                 </button>
-                <button 
+                <span className="text-xs text-gray-400">
+                  {(() => {
+                    const taskNodes = nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH');
+                    const idx = taskNodes.findIndex((n) => n.id === currentPreviewNode);
+                    return idx >= 0 ? `${idx + 1} / ${taskNodes.length}` : '';
+                  })()}
+                </span>
+                <button
                   onClick={() => {
-                    const nodeIdx = nodes.findIndex(n => n.id === currentPreviewNode);
-                    if (nodeIdx < nodes.length - 1) {
-                      const nextNode = nodes[nodeIdx + 1];
-                      if (nextNode.type !== 'START' && nextNode.type !== 'FINISH') {
-                        setCurrentPreviewNode(nextNode.id);
-                      } else if (nodeIdx < nodes.length - 2) {
-                        setCurrentPreviewNode(nodes[nodeIdx + 2].id);
-                      }
+                    const taskNodes = nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH');
+                    const currentIdx = taskNodes.findIndex((n) => n.id === currentPreviewNode);
+                    if (currentIdx < taskNodes.length - 1) {
+                      setCurrentPreviewNode(taskNodes[currentIdx + 1].id);
                     }
                   }}
-                  className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+                  disabled={
+                    nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH').findIndex(
+                      (n) => n.id === currentPreviewNode
+                    ) >= nodes.filter((n) => n.type !== 'START' && n.type !== 'FINISH').length - 1
+                  }
+                  className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
                 >
                   Следующее →
                 </button>
