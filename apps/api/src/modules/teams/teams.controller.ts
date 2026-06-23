@@ -15,7 +15,7 @@ export class TeamsController {
    */
   @Post()
   async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto) {
-    const result = await this.teamsService.create(req.user.userId, dto, dto.gameId);
+    const result = await this.teamsService.create(req.user.userId, dto);
     return result;
   }
 

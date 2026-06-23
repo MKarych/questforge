@@ -78,9 +78,9 @@ export class GamesService {
               avatarUrl: true,
             },
           },
-          _count: {
+_count: {
             select: {
-              teams: true,
+              gameTeams: true,
               reviews: true,
             },
           },
@@ -96,7 +96,7 @@ export class GamesService {
           ? g._count.reviews // Placeholder — would need a separate query for actual avg
           : 0,
         reviewsCount: g._count.reviews,
-        teamsCount: g._count.teams,
+        teamsCount: g._count.gameTeams,
       })),
       meta: {
         total,
@@ -150,9 +150,9 @@ export class GamesService {
             },
           },
         },
-        _count: {
+_count: {
           select: {
-            teams: true,
+            gameTeams: true,
             reviews: true,
             comments: true,
           },
@@ -171,13 +171,13 @@ export class GamesService {
         ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length
         : 0;
 
-    const count = game._count || { teams: 0, reviews: 0, comments: 0 };
+    const count = game._count || { gameTeams: 0, reviews: 0, comments: 0 };
 
     return {
       ...game,
       averageRating: Math.round(avgRating * 100) / 100,
       reviewsCount: count.reviews,
-      teamsCount: count.teams,
+      teamsCount: count.gameTeams,
       commentsCount: count.comments,
     };
   }
@@ -225,9 +225,9 @@ export class GamesService {
               avatarUrl: true,
             },
           },
-          _count: {
+_count: {
             select: {
-              teams: true,
+              gameTeams: true,
               reviews: true,
             },
           },
@@ -283,9 +283,9 @@ export class GamesService {
             },
           },
         },
-        _count: {
+_count: {
           select: {
-            teams: true,
+            gameTeams: true,
             reviews: true,
             comments: true,
           },
@@ -299,8 +299,8 @@ export class GamesService {
 
     // Calculate average rating
     const avgRating =
-      game.reviews.length > 0
-        ? game.reviews.reduce((sum, r) => sum + r.rating, 0) / game.reviews.length
+      game.reviews?.length > 0
+        ? game.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / game.reviews.length
         : 0;
 
     return {
@@ -353,9 +353,28 @@ export class GamesService {
       throw new NotFoundException('Game not found');
     }
 
+    // Получаем команды через связь GameTeam
+    const gameTeams = await this.prisma.gameTeam.findMany({
+      where: { gameId },
+      select: {
+        teamId: true,
+      },
+    });
+
+    const teamIds = gameTeams.map(gt => gt.teamId);
+
+    if (teamIds.length === 0) {
+      return {
+        data: [],
+        meta: { total: 0, limit: params.limit || 20, offset: params.offset || 0 },
+      };
+    }
+
     const [teams, total] = await Promise.all([
       this.prisma.team.findMany({
-        where: { gameId },
+        where: {
+          id: { in: teamIds },
+        },
         take: params.limit || 20,
         skip: params.offset || 0,
         orderBy: { score: 'desc' },
@@ -369,7 +388,11 @@ export class GamesService {
           captain: { select: { name: true } },
         },
       }),
-      this.prisma.team.count({ where: { gameId } }),
+      this.prisma.team.count({
+        where: {
+          id: { in: teamIds },
+        },
+      }),
     ]);
 
     return {
@@ -431,7 +454,7 @@ export class GamesService {
           moderationStatus: true,
           shareLink: true,
           publishedAt: true,
-          _count: { select: { teams: true, reviews: true } },
+_count: { select: { gameTeams: true, reviews: true } },
         },
       }),
       this.prisma.game.count({ where }),
@@ -452,7 +475,7 @@ export class GamesService {
           take: 5,
           orderBy: { createdAt: 'desc' },
         },
-        _count: { select: { teams: true, reviews: true } },
+        _count: { select: { gameTeams: true, reviews: true } },
       },
     });
 

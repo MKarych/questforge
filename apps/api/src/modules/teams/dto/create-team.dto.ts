@@ -1,18 +1,13 @@
 import { IsNotEmpty, IsString, MaxLength, MinLength, IsOptional } from 'class-validator';
 
 export class CreateTeamDto {
-  @IsNotEmpty()
   @IsString()
-  @MinLength(2)
+  @IsNotEmpty()
   @MaxLength(100)
+  @MinLength(2)
   name!: string;
 
-  @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @IsOptional()
   description?: string;
-
-  @IsOptional()
-  @IsString()
-  gameId?: string;
 }

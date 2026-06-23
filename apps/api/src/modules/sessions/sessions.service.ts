@@ -35,15 +35,17 @@ export class SessionsService {
     }
 
     // Check if team already exists for this game
-    const existingTeam = await this.prisma.team.findFirst({
+    const existingGameTeam = await this.prisma.gameTeam.findFirst({
       where: {
         gameId: dto.gameId,
-        name: dto.teamName,
+        team: {
+          name: dto.teamName,
+        },
       },
     });
 
-    if (existingTeam) {
-      throw new ConflictException('Team with this name already exists');
+    if (existingGameTeam) {
+      throw new ConflictException('Team with this name already exists in this game');
     }
 
     // Get start node from scenario
@@ -61,8 +63,24 @@ export class SessionsService {
     const team = await this.prisma.team.create({
       data: {
         name: dto.teamName,
-        gameId: dto.gameId,
         captainId: userId,
+      },
+    });
+
+    // Create inventory and resources for team
+    await this.prisma.inventory.create({
+      data: { teamId: team.id },
+    });
+
+    await this.prisma.resource.create({
+      data: { teamId: team.id },
+    });
+
+    // Link team to game
+    await this.prisma.gameTeam.create({
+      data: {
+        teamId: team.id,
+        gameId: dto.gameId,
       },
     });
 
