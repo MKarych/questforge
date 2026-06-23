@@ -143,7 +143,7 @@ export class AuthService {
     const gamesPlayed = await this.prisma.team.count({
       where: {
         members: {
-          some: { userId, status: 'active' },
+          some: { userId, status: 'ACTIVE' },
         },
       },
     });

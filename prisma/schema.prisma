@@ -93,6 +93,12 @@ model User {
   followers              Follow[]               @relation("FollowTarget")
   following              Follow[]               @relation("FollowSource")
   activityLogs           ActivityLog[]
+  teamInvitesReceived    TeamInvite[]           @relation("InvitedUser")
+  teamInvitesSent        TeamInvite[]           @relation("InvitedByUser")
+  joinRequests           JoinRequest[]
+  joinRequestsResolved   JoinRequest[]          @relation("JoinRequestResolver")
+  transfersFrom          OwnershipTransfer[]    @relation("TransferFrom")
+  transfersTo            OwnershipTransfer[]    @relation("TransferTo")
 
   @@index([email])
   @@index([username])
@@ -257,20 +263,45 @@ model ScenarioVersion {
 }
 
 // ============================================================
-// TEAM
+// TEAM — Aggregate Root
 // ============================================================
 
 model Team {
   id            String         @id @default(uuid()) @db.Uuid
   name          String         @db.VarChar(100)
+  slug          String         @unique @db.VarChar(150)
+  description   String?        @db.Text
+  avatar        String?        @db.VarChar(500)
+  banner        String?        @db.VarChar(500)
+  city          String?        @db.VarChar(100)
+  country       String?        @db.VarChar(100)
+  website       String?        @db.VarChar(500)
+  socials       Json           @default("{}") @map("socials") // { discord, vk, telegram, youtube }
   captainId     String         @map("captain_id") @db.Uuid
+  status        TeamStatus     @default(ACTIVE) @map("status")
+  privacy       TeamVisibility @default(PUBLIC) @map("privacy")
+  joinPolicy    JoinPolicy     @default(INVITE_ONLY) @map("join_policy")
+  tags          String[]       @default([]) @map("tags")
+  version       Int            @default(1) // Optimistic locking
   score         Int            @default(0)
   penalties     Int            @default(0)
   finishedAt    DateTime?      @map("finished_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
-  description   String?
-  status        String         @default("active") @db.VarChar(50)
+  deletedAt     DateTime?      @map("deleted_at") // Soft Delete
+
+  // Limits (JSON)
+  maxMembers           Int  @default(20) @map("max_members")
+  maxInvitesPerDay     Int  @default(10) @map("max_invites_per_day")
+  maxPendingRequests   Int  @default(5) @map("max_pending_requests")
+  maxChatMessagesPerMinute Int @default(30) @map("max_chat_messages_per_minute")
+
+  // Relations
+  captain       User           @relation("TeamCaptain", fields: [captainId], references: [id])
+  members       TeamMember[]
+  invites       TeamInvite[]
+  joinRequests  JoinRequest[]
+  transfers     OwnershipTransfer[]
   events        Event[]
   games         GameTeam[]
   heatmapData   HeatmapData[]
@@ -278,29 +309,106 @@ model Team {
   media         Media[]
   resources     Resource?
   sessionStates SessionState[]
-  captain       User           @relation("TeamCaptain", fields: [captainId], references: [id])
-  members       TeamMember[]
 
   @@index([captainId])
   @@index([status])
+  @@index([slug])
+  @@index([city])
+  @@index([deletedAt])
 }
 
 model TeamMember {
-  id        String    @id @default(uuid()) @db.Uuid
-  teamId    String    @map("team_id") @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  role      String    @default("member") @db.VarChar(50)
-  status    String    @default("active") @db.VarChar(50)
-  joinedAt  DateTime  @default(now()) @map("joined_at")
-  leftAt    DateTime? @map("left_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id])
+  id        String      @id @default(uuid()) @db.Uuid
+  teamId    String      @map("team_id") @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  role      TeamRole    @default(MEMBER) @map("role")
+  status    MemberStatus @default(ACTIVE) @map("status")
+  joinedAt  DateTime    @default(now()) @map("joined_at")
+  leftAt    DateTime?   @map("left_at")
+  lastActiveAt DateTime? @map("last_active_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  team      Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
 
   @@unique([teamId, userId], name: "team_member_unique")
   @@index([teamId])
   @@index([userId])
+  @@index([role])
+  @@index([status])
+}
+
+// ============================================================
+// TEAM INVITE
+// ============================================================
+
+model TeamInvite {
+  id            String       @id @default(uuid()) @db.Uuid
+  teamId        String       @map("team_id") @db.Uuid
+  invitedUserId String       @map("invited_user_id") @db.Uuid
+  invitedBy     String       @map("invited_by") @db.Uuid
+  token         String       @unique @db.VarChar(255)
+  message       String?      @db.Text
+  status        InviteStatus @default(PENDING) @map("status")
+  expiresAt     DateTime     @map("expires_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  team          Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser   User         @relation("InvitedUser", fields: [invitedUserId], references: [id])
+  invitedByUser User         @relation("InvitedByUser", fields: [invitedBy], references: [id])
+
+  @@index([teamId])
+  @@index([invitedUserId])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// JOIN REQUEST
+// ============================================================
+
+model JoinRequest {
+  id         String            @id @default(uuid()) @db.Uuid
+  teamId     String            @map("team_id") @db.Uuid
+  userId     String            @map("user_id") @db.Uuid
+  message    String?           @db.Text
+  status     JoinRequestStatus @default(PENDING) @map("status")
+  resolvedBy String?           @map("resolved_by") @db.Uuid
+  createdAt  DateTime          @default(now()) @map("created_at")
+  resolvedAt DateTime?         @map("resolved_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  team       Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id])
+  resolver   User?             @relation("JoinRequestResolver", fields: [resolvedBy], references: [id])
+
+  @@unique([teamId, userId, status], name: "join_request_unique")
+  @@index([teamId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================================
+// OWNERSHIP TRANSFER
+// ============================================================
+
+model OwnershipTransfer {
+  id          String          @id @default(uuid()) @db.Uuid
+  teamId      String          @map("team_id") @db.Uuid
+  fromUserId  String          @map("from_user_id") @db.Uuid
+  toUserId    String          @map("to_user_id") @db.Uuid
+  status      TransferStatus  @default(PENDING) @map("status")
+  expiresAt   DateTime        @map("expires_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  resolvedAt  DateTime?       @map("resolved_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  team        Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  fromUser    User            @relation("TransferFrom", fields: [fromUserId], references: [id])
+  toUser      User            @relation("TransferTo", fields: [toUserId], references: [id])
+
+  @@index([teamId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model GameTeam {
@@ -588,13 +696,61 @@ enum ModerationStatus {
 }
 
 enum TeamStatus {
-  REGISTERED
   ACTIVE
-  WAITING_ANSWER
-  NODE_COMPLETED
-  NODE_FAILED
-  NEXT_NODE
-  FINISHED
+  RECRUITING
+  INACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum TeamVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+  ARCHIVED
+}
+
+enum JoinPolicy {
+  OPEN
+  APPROVAL
+  INVITE_ONLY
+}
+
+enum TeamRole {
+  CAPTAIN
+  VICE_CAPTAIN
+  MEMBER
+  RECRUIT
+}
+
+enum MemberStatus {
+  ACTIVE
+  PENDING
+  LEFT
+  KICKED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
 }
 
 enum NodeStatus {

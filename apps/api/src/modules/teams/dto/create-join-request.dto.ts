@@ -1,10 +1,6 @@
 import { IsNotEmpty, IsString, IsOptional, MaxLength } from 'class-validator';
 
-export class InviteUserDto {
-  @IsNotEmpty()
-  @IsString()
-  userId!: string;
-
+export class CreateJoinRequestDto {
   @IsString()
   @IsOptional()
   @MaxLength(500)

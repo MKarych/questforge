@@ -93,6 +93,7 @@ export class SessionsService {
       const team = await this.prisma.team.create({
         data: {
           name: dto.teamName,
+          slug: dto.teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
           captainId: userId,
         },
       });
@@ -237,7 +238,7 @@ export class SessionsService {
     return this.prisma.team.update({
       where: { id: teamId },
       data: {
-        status: 'FINISHED',
+        status: 'ACTIVE',
         finishedAt: new Date(),
       },
     });

@@ -6,7 +6,7 @@ import { UsersModule } from '../users/users.module';
 @Module({
   imports: [
     MulterModule.register({
-      dest: './public/uploads/avatars',
+      limits: { fileSize: 5 * 1024 * 1024 },
     }),
     UsersModule,
   ],

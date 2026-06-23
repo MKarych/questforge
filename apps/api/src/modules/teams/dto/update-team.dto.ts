@@ -1,15 +1,13 @@
 import {
-  IsNotEmpty, IsString, MaxLength, MinLength, IsOptional,
-  IsUUID, IsEnum, IsArray, IsNumber, Min, Max,
+  IsOptional, IsString, MaxLength, IsEnum, IsArray, IsNumber, Min, Max,
 } from 'class-validator';
 import { TeamVisibility, JoinPolicy } from '../types/team-types';
 
-export class CreateTeamDto {
+export class UpdateTeamDto {
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  @MinLength(2)
-  name!: string;
+  name?: string;
 
   @IsString()
   @IsOptional()
@@ -18,8 +16,13 @@ export class CreateTeamDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(150)
-  slug?: string;
+  @MaxLength(500)
+  avatar?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  banner?: string;
 
   @IsString()
   @IsOptional()
@@ -51,4 +54,10 @@ export class CreateTeamDto {
   @IsString({ each: true })
   @IsOptional()
   tags?: string[];
+
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  @Max(100)
+  maxMembers?: number;
 }

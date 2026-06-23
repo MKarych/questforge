@@ -13,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { OrganizerModule } from './modules/organizer/organizer.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -43,6 +44,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     OrganizerModule,
     TeamsModule,
     AdminModule,
+    UploadModule,
     EngineModule,
   ],
   controllers: [AppController],

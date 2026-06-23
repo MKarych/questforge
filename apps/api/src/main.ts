@@ -20,6 +20,14 @@ async function bootstrap() {
     prefix: '/',
   });
 
+  // Serve uploaded files with cache control for avatars
+  app.useStaticAssets(join(process.cwd(), 'public', 'uploads'), {
+    prefix: '/uploads',
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    },
+  });
+
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({

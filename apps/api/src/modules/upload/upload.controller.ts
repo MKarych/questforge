@@ -1,6 +1,6 @@
 import {
   Controller, Post, UseGuards, UseInterceptors,
-  UploadedFile, Request, BadRequestException,
+  UploadedFile, Request, BadRequestException, HttpCode, HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -18,6 +18,7 @@ export class UploadController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post('avatar')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
@@ -56,6 +57,9 @@ export class UploadController {
     // Сохраняем URL аватара в профиле пользователя
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    return this.usersService.updateAvatar(req.user.userId, avatarUrl, ip, userAgent);
+    const result = await this.usersService.updateAvatar(req.user.userId, avatarUrl, ip, userAgent);
+
+    // Возвращаем avatarUrl в формате, который ожидает фронтенд
+    return { avatarUrl: result.avatarUrl };
   }
 }

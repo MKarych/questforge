@@ -666,7 +666,7 @@ export class UsersService {
       where: {
         OR: [
           { captainId: userId },
-          { members: { some: { userId, status: 'active' } } },
+          { members: { some: { userId, status: 'ACTIVE' } } },
         ],
       },
       include: {

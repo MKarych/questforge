@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, uploadAvatar } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import AvatarUpload from '@/components/ui/AvatarUpload';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -50,7 +50,7 @@ const PRIVACY_OPTIONS: { value: 'everyone' | 'friends' | 'nobody'; label: string
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const { user, loading, refresh, updateAvatar, deleteAvatar } = useUser();
+  const { user, loading, refresh, deleteAvatar } = useUser();
   const [submitting, setSubmitting] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -134,14 +134,16 @@ export default function EditProfilePage() {
   const handleAvatarUpload = async (file: File) => {
     setAvatarUploading(true);
     try {
-      // Загружаем файл через FormData на отдельный эндпоинт upload
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploadRes = await apiClient.post<{ url: string }>('/upload/avatar', formData as any);
-      await updateAvatar(uploadRes.url);
+      // Используем uploadAvatar из client.ts — он шлёт напрямую на localhost:3000,
+      // минуя Next.js rewrite (который ломает multipart/form-data)
+      await uploadAvatar(file);
+      // UploadController сам вызвал usersService.updateAvatar(),
+      // но нам нужно обновить состояние пользователя через хук
+      await refresh();
       setMessage({ type: 'success', text: 'Аватар обновлён' });
     } catch (err) {
-      setMessage({ type: 'error', text: 'Ошибка загрузки аватара' });
+      const msg = err instanceof Error ? err.message : 'Ошибка загрузки аватара';
+      setMessage({ type: 'error', text: msg });
     } finally {
       setAvatarUploading(false);
     }

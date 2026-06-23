@@ -255,47 +255,142 @@ export interface CreateScenarioResponse {
 export interface Team {
   id: string;
   name: string;
+  slug: string;
+  avatar: string | null;
   description: string | null;
+  city: string | null;
   captain: {
     id: string;
     name: string;
-    avatar: string | null;
+    avatarUrl: string | null;
   };
   membersCount: number;
-  rating: number;
+  status: string;
+  tags: string[];
   createdAt: string;
 }
 
-export interface TeamDetails extends Team {
-  members: Array<{
+export interface TeamMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  role: string;
+  joinedAt: string;
+  lastActiveAt?: string | null;
+}
+
+export interface TeamDetails {
+  id: string;
+  name: string;
+  slug: string;
+  avatar: string | null;
+  banner: string | null;
+  description: string | null;
+  city: string | null;
+  country: string | null;
+  website: string | null;
+  socials: Record<string, string>;
+  captain: {
     id: string;
     name: string;
-    avatar: string | null;
-    role: 'captain' | 'member';
-    joinedAt: string;
+    avatarUrl: string | null;
+  };
+  members: TeamMember[];
+  membersCount: number;
+  status: string;
+  privacy: string;
+  joinPolicy: string;
+  tags: string[];
+  createdAt: string;
+}
+
+export interface TeamPrivateDetails extends TeamDetails {
+  settings: {
+    privacy: string;
+    joinPolicy: string;
+    limits: {
+      maxMembers: number;
+      maxInvitesPerDay: number;
+      maxPendingRequests: number;
+      maxChatMessagesPerMinute: number;
+    };
+  };
+  invites: Array<{
+    id: string;
+    invitedUser: { id: string; name: string; avatarUrl: string | null };
+    status: string;
+    createdAt: string;
+    expiresAt: string;
   }>;
-  gamesPlayed: number;
-  gamesWon: number;
+  joinRequests: Array<{
+    id: string;
+    user: { id: string; name: string; avatarUrl: string | null };
+    message: string | null;
+    status: string;
+    createdAt: string;
+  }>;
 }
 
 export interface CreateTeamRequest {
   name: string;
   description?: string;
+  slug?: string;
+  city?: string;
+  country?: string;
+  website?: string;
+  socials?: Record<string, string>;
+  privacy?: string;
+  joinPolicy?: string;
+  tags?: string[];
+}
+
+export interface UpdateTeamRequest {
+  name?: string;
+  description?: string;
+  avatar?: string;
+  banner?: string;
+  city?: string;
+  country?: string;
+  website?: string;
+  socials?: Record<string, string>;
+  privacy?: string;
+  joinPolicy?: string;
+  tags?: string[];
+  maxMembers?: number;
 }
 
 export interface InviteUserRequest {
   userId: string;
+  message?: string;
 }
 
-export interface MyTeam extends Team {
-  myRole: 'captain' | 'member';
-  joinedAt: string;
-  members: Array<{
+export interface CreateJoinRequest {
+  message?: string;
+}
+
+export interface TransferOwnershipRequest {
+  toUserId: string;
+}
+
+export interface UpdateMemberRoleRequest {
+  role: string;
+}
+
+export interface MyTeam {
+  id: string;
+  name: string;
+  slug: string;
+  avatar: string | null;
+  description: string | null;
+  captain: {
     id: string;
     name: string;
-    avatar: string | null;
-    role: 'captain' | 'member';
-  }>;
+    avatarUrl: string | null;
+  };
+  members: TeamMember[];
+  membersCount: number;
+  myRole: string;
+  joinedAt: string;
 }
 
 // API Error
@@ -677,6 +772,82 @@ class ApiClient {
     });
   }
 
+  async getTeamPrivate(id: string): Promise<ApiResponse<TeamPrivateDetails>> {
+    return this.request(`/teams/${id}/private`);
+  }
+
+  async updateTeam(id: string, data: UpdateTeamRequest): Promise<ApiResponse<TeamDetails>> {
+    return this.request(`/teams/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTeam(id: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getTeamMembers(id: string): Promise<ApiResponse<TeamMember[]>> {
+    return this.request(`/teams/${id}/members`);
+  }
+
+  async updateMemberRole(teamId: string, userId: string, data: UpdateMemberRoleRequest): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/members/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createJoinRequest(teamId: string, data: CreateJoinRequest): Promise<ApiResponse<{ status: string; requestId: string; message: string }>> {
+    return this.request(`/teams/${teamId}/join-request`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approveJoinRequest(teamId: string, requestId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/join-request/${requestId}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  async rejectJoinRequest(teamId: string, requestId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/join-request/${requestId}/reject`, {
+      method: 'POST',
+    });
+  }
+
+  async acceptInvite(teamId: string, inviteId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/invite/${inviteId}/accept`, {
+      method: 'POST',
+    });
+  }
+
+  async declineInvite(teamId: string, inviteId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/invite/${inviteId}/decline`, {
+      method: 'POST',
+    });
+  }
+
+  async transferOwnership(teamId: string, data: TransferOwnershipRequest): Promise<ApiResponse<{ status: string; transferId: string; message: string }>> {
+    return this.request(`/teams/${teamId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async acceptTransfer(teamId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/teams/${teamId}/transfer/accept`, {
+      method: 'POST',
+    });
+  }
+
+  async getTeamHistory(id: string): Promise<ApiResponse<Array<{ id: string; action: string; actorName: string; details: Record<string, unknown>; createdAt: string }>>> {
+    return this.request(`/teams/${id}/history`);
+  }
+
   async getMyTeam(): Promise<ApiResponse<MyTeam | null>> {
     return this.request('/teams/me/team');
   }
@@ -775,6 +946,33 @@ class ApiClient {
 // Export singleton instance
 export const apiClient = new ApiClient(API_BASE_URL);
 
+// Upload avatar — используем абсолютный URL, минуя Next.js rewrite,
+// так как Next.js не умеет корректно проксировать multipart/form-data
+export async function uploadAvatar(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const res = await fetch('http://localhost:3000/api/upload/avatar', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Ошибка загрузки аватара');
+  }
+
+  const json = await res.json();
+  // TransformInterceptor оборачивает в { success: true, data: { avatarUrl }, meta }
+  const avatarUrl = json?.data?.avatarUrl;
+  if (!avatarUrl) {
+    throw new Error('Сервер не вернул URL аватара');
+  }
+  return avatarUrl;
+}
+
 // Export named methods for convenience
 export const getPublicGames = (params?: {
   city?: string;
@@ -823,3 +1021,16 @@ export const removeMember = (teamId: string, userId: string) => apiClient.remove
 export const getMyTeam = () => apiClient.getMyTeam();
 export const getMyTeams = () => apiClient.getMyTeams();
 export const registerTeam = (gameId: string, teamId: string) => apiClient.registerTeam(gameId, teamId);
+export const getTeamPrivate = (id: string) => apiClient.getTeamPrivate(id);
+export const updateTeam = (id: string, data: UpdateTeamRequest) => apiClient.updateTeam(id, data);
+export const deleteTeam = (id: string) => apiClient.deleteTeam(id);
+export const getTeamMembers = (id: string) => apiClient.getTeamMembers(id);
+export const updateMemberRole = (teamId: string, userId: string, data: UpdateMemberRoleRequest) => apiClient.updateMemberRole(teamId, userId, data);
+export const createJoinRequest = (teamId: string, data: CreateJoinRequest) => apiClient.createJoinRequest(teamId, data);
+export const approveJoinRequest = (teamId: string, requestId: string) => apiClient.approveJoinRequest(teamId, requestId);
+export const rejectJoinRequest = (teamId: string, requestId: string) => apiClient.rejectJoinRequest(teamId, requestId);
+export const acceptInvite = (teamId: string, inviteId: string) => apiClient.acceptInvite(teamId, inviteId);
+export const declineInvite = (teamId: string, inviteId: string) => apiClient.declineInvite(teamId, inviteId);
+export const transferOwnership = (teamId: string, data: TransferOwnershipRequest) => apiClient.transferOwnership(teamId, data);
+export const acceptTransfer = (teamId: string) => apiClient.acceptTransfer(teamId);
+export const getTeamHistory = (id: string) => apiClient.getTeamHistory(id);
