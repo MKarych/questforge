@@ -9,6 +9,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   Connection,
+  Edge,
   Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -32,6 +33,15 @@ const nodeTypes = {
   NPC: ScenarioNode,
 };
 
+interface HistoryState {
+  nodes: Node<ScenarioNodeData>[];
+  edges: Edge[];
+  action: string;
+  nodeId?: string;
+  edgeId?: string;
+  timestamp: number;
+}
+
 interface ScenarioEditorProps {
   scenarioName?: string;
   onSave?: (data: any) => void;
@@ -45,7 +55,7 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
   const [showPreview, setShowPreview] = useState(false);
   const [showTest, setShowTest] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [copiedNode, setCopiedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [currentPreviewNode, setCurrentPreviewNode] = useState<string | null>(null);
@@ -534,6 +544,22 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
             title="Тестирование сценария"
           >
             🎮 Тест
+          </button>
+          <button
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            className="btn-secondary text-sm disabled:opacity-30"
+            title="Отменить (Ctrl+Z)"
+          >
+            ↩️ Отменить
+          </button>
+          <button
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            className="btn-secondary text-sm disabled:opacity-30"
+            title="Повторить (Ctrl+Shift+Z)"
+          >
+            ↪️ Повторить
           </button>
           <button onClick={handleSave} className="btn-primary text-sm">
             💾 Сохранить
