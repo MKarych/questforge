@@ -7,34 +7,76 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// USER — Aggregate Root
+// Одна таблица с JSON-полями для MVP.
+// Потом разделим на отдельные сущности.
+// ============================================================
+
 model User {
-  id                     String                 @id @default(uuid()) @db.Uuid
-  email                  String                 @unique @db.VarChar(255)
-  passwordHash           String                 @map("password_hash") @db.VarChar(255)
-  name                   String                 @db.VarChar(100)
-  avatarUrl              String?                @map("avatar_url")
-  role                   Role                   @default(PLAYER)
-  status                 UserStatus             @default(ACTIVE)
-  contacts               Json                   @default("{}")
-  organizerStatus        OrganizerStatus        @default(NOT_APPLIED) @map("organizer_status")
-  organizerApprovedAt    DateTime?              @map("organizer_approved_at")
-  createdAt              DateTime               @default(now()) @map("created_at")
-  updatedAt              DateTime               @updatedAt @map("updated_at")
-  lastLoginAt            DateTime?              @map("last_login_at")
-  deletedAt              DateTime?              @map("deleted_at")
-  gamesConducted         Int                    @default(0) @map("games_conducted")
-  gamesCreated           Int                    @default(0) @map("games_created")
-  organizerApplicationId String?                @map("organizer_application_id") @db.Uuid
-  scenariosCreated       Int                    @default(0) @map("scenarios_created")
-  achievements           Json                   @default("[]") @db.Json
-  bio                    String?
-  city                   String?                @db.VarChar(100)
-  lastSeenAt             DateTime?              @map("last_seen_at")
-  rating                 Float?                 @default(0)
-  reputation             Int                    @default(0)
-  telegram               String?                @db.VarChar(100)
-  vk                     String?                @db.VarChar(255)
-  whatsapp               String?                @db.VarChar(100)
+  // === IDENTITY ===
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique @db.VarChar(255)
+  username  String   @unique @db.VarChar(100)
+  slug      String   @unique @db.VarChar(150)
+  roles     Role[]   @default([PLAYER])
+  status    UserStatus @default(ACTIVE)
+  verified  Json     @default("{}") @map("verified") // { email: bool, phone: bool, telegram: bool }
+  version   Int      @default(1) // Optimistic locking
+
+  // === PROFILE (JSON) ===
+  // { avatar, bio, city, socialLinks: { tg, vk, discord, youtube, github }, favorites: { games, scenarios, authors }, metadata }
+  profile   Json     @default("{}") @map("profile")
+
+  // === SETTINGS (JSON) ===
+  // { language, timezone, theme, notifications: { email, telegram, push }, privacy: { showCity, showContacts, showStats, showAchievements } }
+  settings  Json     @default("{}") @map("settings")
+
+  // === SECURITY (JSON) — управляется Auth Service ===
+  // { lastLoginAt, failedLoginAttempts, passwordChangedAt, trustedDevices: [] }
+  security  Json     @default("{}") @map("security")
+
+  // === REPUTATION (JSON) — вычисляется системой ===
+  // { rating, trustScore, reviewsCount, violations, completedGames, achievements: [] }
+  reputationData Json @default("{}") @map("reputation_data")
+
+  // === AI PROFILE (JSON) — принадлежит AI Service ===
+  // { preferences: { genres, averageTeamSize, averageGameDuration, favoriteDifficulty }, memory: { knownFacts, lastConversation, memoryVersion }, history: { recommendedScenarios, previousActions, feedback }, context: { lastAgentAction, activeGoals, personality }, embeddings: [] }
+  aiProfile  Json    @default("{}") @map("ai_profile")
+
+  // === CAPABILITIES (JSON) — вычисляются системой ===
+  capabilities Json  @default("[]") @map("capabilities")
+  featureFlags Json  @default("{}") @map("feature_flags")
+
+  // === AUDIT ===
+  lastSeenAt DateTime? @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at") // Soft Delete
+
+  // === СТАРЫЕ ПОЛЯ (обратная совместимость) ===
+  name             String           @db.VarChar(100)
+  passwordHash     String           @map("password_hash") @db.VarChar(255)
+  avatarUrl        String?          @map("avatar_url")
+  role             Role             @default(PLAYER)
+  contacts         Json             @default("{}")
+  organizerStatus  OrganizerStatus  @default(NOT_APPLIED) @map("organizer_status")
+  organizerApprovedAt DateTime?     @map("organizer_approved_at")
+  gamesConducted   Int              @default(0) @map("games_conducted")
+  gamesCreated     Int              @default(0) @map("games_created")
+  organizerApplicationId String?    @map("organizer_application_id") @db.Uuid
+  scenariosCreated Int              @default(0) @map("scenarios_created")
+  rating           Float            @default(0)
+  reputation       Int              @default(0)
+  achievements     Json             @default("[]") @db.Json
+  lastLoginAt      DateTime?        @map("last_login_at")
+  bio              String?
+  city             String?          @db.VarChar(100)
+  telegram         String?          @db.VarChar(100)
+  vk               String?          @db.VarChar(255)
+  whatsapp         String?          @db.VarChar(100)
+
+  // === RELATIONS ===
   comments               Comment[]
   games                  Game[]
   licenses               License[]
@@ -47,14 +89,79 @@ model User {
   createdVersions        ScenarioVersion[]
   captainTeams           Team[]                 @relation("TeamCaptain")
   teamMemberships        TeamMember[]
+  auditLogs              AuditLog[]
+  followers              Follow[]               @relation("FollowTarget")
+  following              Follow[]               @relation("FollowSource")
+  activityLogs           ActivityLog[]
 
   @@index([email])
-  @@index([role])
+  @@index([username])
+  @@index([slug])
   @@index([status])
-  @@index([organizerStatus])
   @@index([city])
   @@index([rating])
 }
+
+// ============================================================
+// FOLLOW SYSTEM
+// ============================================================
+
+model Follow {
+  id          String   @id @default(uuid()) @db.Uuid
+  followerId  String   @map("follower_id") @db.Uuid
+  followingId String   @map("following_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  follower    User     @relation("FollowSource", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowTarget", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  String   @map("entity_id") @db.VarChar(100)
+  oldValue  Json?
+  newValue  Json?
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+// ============================================================
+// ACTIVITY LOG (лента действий пользователя)
+// ============================================================
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(50)
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// ============================================================
+// GAME
+// ============================================================
 
 model Game {
   id                String           @id @default(uuid()) @db.Uuid
@@ -97,6 +204,10 @@ model Game {
   @@index([scenarioId])
   @@index([moderationStatus])
 }
+
+// ============================================================
+// SCENARIO
+// ============================================================
 
 model Scenario {
   id               String            @id @default(uuid()) @db.Uuid
@@ -144,6 +255,10 @@ model ScenarioVersion {
   @@unique([scenarioId, version])
   @@index([scenarioId])
 }
+
+// ============================================================
+// TEAM
+// ============================================================
 
 model Team {
   id            String         @id @default(uuid()) @db.Uuid
@@ -201,6 +316,10 @@ model GameTeam {
   @@index([gameId])
 }
 
+// ============================================================
+// INVENTORY & RESOURCES
+// ============================================================
+
 model Inventory {
   id        String   @id @default(uuid()) @db.Uuid
   teamId    String   @unique @map("team_id") @db.Uuid
@@ -229,6 +348,10 @@ model Resource {
   @@index([teamId])
 }
 
+// ============================================================
+// SESSION STATE
+// ============================================================
+
 model SessionState {
   id        String   @id @default(uuid()) @db.Uuid
   teamId    String   @map("team_id") @db.Uuid
@@ -240,6 +363,10 @@ model SessionState {
   @@index([teamId])
   @@index([sequence])
 }
+
+// ============================================================
+// EVENT (Game Engine Events)
+// ============================================================
 
 model Event {
   id        String   @id @default(uuid()) @db.Uuid
@@ -263,6 +390,10 @@ model Event {
   @@index([gameId, createdAt])
   @@index([teamId, createdAt])
 }
+
+// ============================================================
+// PURCHASE & LICENSE
+// ============================================================
 
 model Purchase {
   id          String    @id @default(uuid()) @db.Uuid
@@ -302,6 +433,10 @@ model License {
   @@index([status])
 }
 
+// ============================================================
+// MEDIA
+// ============================================================
+
 model Media {
   id           String   @id @default(uuid()) @db.Uuid
   filename     String   @db.VarChar(255)
@@ -323,6 +458,10 @@ model Media {
   @@index([uploadedById])
 }
 
+// ============================================================
+// REVIEW
+// ============================================================
+
 model Review {
   id        String   @id @default(uuid()) @db.Uuid
   gameId    String   @map("game_id") @db.Uuid
@@ -338,6 +477,10 @@ model Review {
   @@index([userId])
   @@index([rating])
 }
+
+// ============================================================
+// COMMENT
+// ============================================================
 
 model Comment {
   id        String    @id @default(uuid()) @db.Uuid
@@ -358,6 +501,10 @@ model Comment {
   @@index([parentId])
 }
 
+// ============================================================
+// HEATMAP DATA
+// ============================================================
+
 model HeatmapData {
   id        String   @id @default(uuid()) @db.Uuid
   gameId    String   @map("game_id") @db.Uuid
@@ -373,6 +520,10 @@ model HeatmapData {
   @@index([teamId])
   @@index([createdAt])
 }
+
+// ============================================================
+// ORGANIZER APPLICATION
+// ============================================================
 
 model OrganizerApplication {
   id              String    @id @default(uuid()) @db.Uuid
@@ -394,6 +545,10 @@ model OrganizerApplication {
   @@index([status])
   @@index([createdAt])
 }
+
+// ============================================================
+// ENUMS
+// ============================================================
 
 enum Role {
   PLAYER

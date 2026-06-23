@@ -5,28 +5,28 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { useUser } from '@/hooks/useUser';
 import { apiClient, getMyTeams, type MyTeam } from '@/lib/api/client';
 
-interface UserProfile {
-  id: string;
-  name: string;
-  avatarUrl: string | null;
-  city: string | null;
-  bio: string | null;
-  telegram: string | null;
-  vk: string | null;
-  whatsapp: string | null;
-  role: string;
-  rating: number | null;
-  reputation: number | null;
+interface PublicProfile {
+  uuid: string;
+  username: string;
+  slug: string;
+  avatar: string | null;
+  bio: string;
+  city: string;
+  rating: number;
+  trustScore: number;
   gamesPlayed: number;
   gamesCreated: number;
   gamesConducted: number;
   scenariosCreated: number;
   reviewsCount: number;
-  createdAt: string;
-  lastSeenAt: string | null;
+  followersCount: number;
+  followingCount: number;
   achievements: Achievement[];
+  lastSeenAt: string | null;
+  createdAt: string;
 }
 
 interface Achievement {
@@ -40,7 +40,8 @@ interface Achievement {
 
 export default function PublicProfilePage() {
   const params = useParams() as { id: string };
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { user } = useUser();
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,6 @@ export default function PublicProfilePage() {
         const response = await apiClient.get<any>(`/users/${params.id}`);
         setProfile(response.data);
 
-        // Загружаем команды текущего пользователя
         try {
           const teamsResponse = await getMyTeams();
           if (teamsResponse.data && Array.isArray(teamsResponse.data)) {
@@ -100,14 +100,6 @@ export default function PublicProfilePage() {
     );
   }
 
-  const roleColors: Record<string, string> = {
-    PLAYER: 'bg-blue-100 text-blue-800',
-    AUTHOR: 'bg-purple-100 text-purple-800',
-    ORGANIZER: 'bg-green-100 text-green-800',
-    ADMIN: 'bg-red-100 text-red-800',
-    MODERATOR: 'bg-yellow-100 text-yellow-800',
-  };
-
   return (
     <div className="min-h-screen">
       <Header />
@@ -118,25 +110,37 @@ export default function PublicProfilePage() {
           <div className="card mb-6">
             <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
               <div className="w-32 h-32 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
-                {profile.avatarUrl ? (
+                {profile.avatar ? (
                   <img
-                    src={profile.avatarUrl}
-                    alt={profile.name}
+                    src={profile.avatar}
+                    alt={profile.username}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <span className="text-5xl text-primary">
-                    {profile.name?.charAt(0)?.toUpperCase() || '?'}
+                    {profile.username?.charAt(0)?.toUpperCase() || '?'}
                   </span>
                 )}
               </div>
 
               <div className="flex-1 text-center md:text-left">
                 <div className="flex flex-col md:flex-row gap-3 items-center md:items-start mb-2">
-                  <h1 className="text-3xl font-bold text-text-primary">{profile.name}</h1>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColors[profile.role] || 'bg-gray-100 text-gray-800'}`}>
-                    {profile.role}
-                  </span>
+                  <h1 className="text-3xl font-bold text-text-primary">
+                    @{profile.username}
+                  </h1>
+                  {user?.uuid === profile.uuid && (
+                    <Link
+                      href="/profile/edit"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                      Редактировать
+                    </Link>
+                  )}
                 </div>
 
                 {profile.city && (
@@ -146,39 +150,6 @@ export default function PublicProfilePage() {
                 {profile.bio && (
                   <p className="text-text-secondary mb-4 max-w-xl">{profile.bio}</p>
                 )}
-
-                <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                  {profile.telegram && (
-                    <a
-                      href={`https://t.me/${profile.telegram.replace('@', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline"
-                    >
-                      Telegram: {profile.telegram}
-                    </a>
-                  )}
-                  {profile.vk && (
-                    <a
-                      href={profile.vk}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      VK
-                    </a>
-                  )}
-                  {profile.whatsapp && (
-                    <a
-                      href={`https://wa.me/${profile.whatsapp.replace('+', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-500 hover:underline"
-                    >
-                      WhatsApp
-                    </a>
-                  )}
-                </div>
               </div>
 
               <div className="text-center">
@@ -187,9 +158,9 @@ export default function PublicProfilePage() {
                 </div>
                 <div className="text-sm text-text-secondary">рейтинг</div>
                 <div className="text-lg font-semibold text-text-primary mt-2">
-                  ⭐ {profile.reputation || 0}
+                  🤝 {profile.trustScore || 0}%
                 </div>
-                <div className="text-sm text-text-secondary">репутация</div>
+                <div className="text-sm text-text-secondary">доверие</div>
               </div>
             </div>
           </div>
@@ -211,6 +182,18 @@ export default function PublicProfilePage() {
             <div className="card text-center p-4">
               <div className="text-3xl font-bold text-primary">{profile.scenariosCreated}</div>
               <div className="text-sm text-text-secondary">Сценариев</div>
+            </div>
+          </div>
+
+          {/* Followers info */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="card text-center p-4">
+              <div className="text-2xl font-bold text-primary">{profile.followersCount}</div>
+              <div className="text-sm text-text-secondary">Подписчиков</div>
+            </div>
+            <div className="card text-center p-4">
+              <div className="text-2xl font-bold text-primary">{profile.followingCount}</div>
+              <div className="text-sm text-text-secondary">Подписок</div>
             </div>
           </div>
 

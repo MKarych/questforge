@@ -29,12 +29,18 @@ export class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    // Generate username and slug from name
+    const username = dto.name.toLowerCase().replace(/[^\w]/g, '_').substring(0, 100);
+    const slug = username.replace(/[_\s]+/g, '-').substring(0, 150);
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash,
         name: dto.name,
+        username,
+        slug,
       },
       select: {
         id: true,
@@ -120,39 +126,57 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatarUrl: true,
-        role: true,
-        contacts: true,
-        organizerStatus: true,
-        createdAt: true,
-        lastLoginAt: true,
-      },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
+    const u: any = user;
+    const profile = u.profile || {};
+    const settings = u.settings || {};
+    const rep = u.reputationData || {};
+
     // Get user stats
     const gamesPlayed = await this.prisma.team.count({
       where: {
         members: {
-          some: {
-            userId,
-            status: 'active',
-          },
+          some: { userId, status: 'active' },
         },
       },
     });
 
     return {
-      ...user,
+      id: u.id,
+      uuid: u.id,
+      email: u.email,
+      username: u.username,
+      name: u.username,
+      slug: u.slug,
+      avatarUrl: profile.avatar || u.avatarUrl || null,
+      avatar: profile.avatar || u.avatarUrl || null,
+      city: profile.city || u.city || '',
+      bio: profile.bio || u.bio || '',
+      role: u.role,
+      roles: u.roles,
+      status: u.status,
+      organizerStatus: u.organizerStatus,
+      rating: rep.rating || u.rating || 0,
+      trustScore: rep.trustScore || 0,
+      reputation: u.reputation || 0,
+      achievements: rep.achievements || u.achievements || [],
+      gamesCreated: u.gamesCreated,
+      scenariosCreated: u.scenariosCreated,
+      gamesConducted: u.gamesConducted,
+      language: settings.language || 'ru',
+      timezone: settings.timezone || 'Europe/Moscow',
+      theme: settings.theme || 'dark',
+      socialLinks: profile.socialLinks || {},
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+      lastSeenAt: u.lastSeenAt,
       stats: {
         gamesPlayed,
         gamesCompleted: 0,

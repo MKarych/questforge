@@ -227,6 +227,192 @@ export interface Game {
   updatedAt: Date;
 }
 
+// ============================================================
+// USER TYPES (обновлено по контракту v2.0)
+// ============================================================
+
+export interface SocialLinks {
+  tg?: string;
+  vk?: string;
+  discord?: string;
+  youtube?: string;
+  github?: string;
+}
+
+export interface Favorites {
+  games: string[];
+  scenarios: string[];
+  authors: string[];
+}
+
+export interface UserProfile {
+  avatar: string | null;
+  bio: string;
+  city: string;
+  socialLinks: SocialLinks;
+  favorites: Favorites;
+  lastSeenAt: Date | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface NotificationSettings {
+  email: boolean;
+  telegram: boolean;
+  push: boolean;
+}
+
+export interface PrivacySettings {
+  showCity: 'everyone' | 'friends' | 'nobody';
+  showContacts: 'everyone' | 'friends' | 'nobody';
+  showStats: 'everyone' | 'friends' | 'nobody';
+  showAchievements: 'everyone' | 'friends' | 'nobody';
+}
+
+export interface UserSettings {
+  language: 'ru' | 'en';
+  timezone: string;
+  theme: 'dark' | 'light';
+  notifications: NotificationSettings;
+  privacy: PrivacySettings;
+}
+
+export interface UserSecurity {
+  lastLoginAt: Date | null;
+  failedLoginAttempts: number;
+  passwordChangedAt: Date | null;
+  trustedDevices: Device[];
+}
+
+export interface Device {
+  id: string;
+  name: string;
+  lastIp: string;
+  lastUsedAt: Date;
+  trusted: boolean;
+}
+
+export interface UserReputation {
+  rating: number;
+  trustScore: number;
+  reviewsCount: number;
+  violations: number;
+  completedGames: number;
+  achievements: Achievement[];
+}
+
+export interface Achievement {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlockedAt: string;
+}
+
+export interface AIProfile {
+  preferences: AIPreferences;
+  memory: AIMemory;
+  history: AIHistory;
+  context: AIContext;
+  embeddings: number[];
+}
+
+export interface AIPreferences {
+  genres: string[];
+  averageTeamSize: number;
+  averageGameDuration: number;
+  favoriteDifficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface AIMemory {
+  knownFacts: string[];
+  lastConversation: string;
+  memoryVersion: number;
+}
+
+export interface AIHistory {
+  recommendedScenarios: string[];
+  previousActions: string[];
+  feedback: string[];
+}
+
+export interface AIContext {
+  lastAgentAction: string;
+  activeGoals: string[];
+  personality: string;
+}
+
+export enum Capability {
+  HOST_EVENTS = 'HOST_EVENTS',
+  CREATE_SCENARIOS = 'CREATE_SCENARIOS',
+  SELL_SCENARIOS = 'SELL_SCENARIOS',
+  CREATE_TEAM = 'CREATE_TEAM',
+  STREAM_GAME = 'STREAM_GAME',
+  MODERATE_CONTENT = 'MODERATE_CONTENT',
+}
+
+export interface FeatureFlags {
+  aiBeta: boolean;
+  marketplace: boolean;
+  premium: boolean;
+  experimentalUI: boolean;
+}
+
+// ============================================================
+// USER DTO (Public / Private / Admin)
+// ============================================================
+
+export interface PublicUser {
+  uuid: string;
+  username: string;
+  slug: string;
+  avatar: string | null;
+  bio: string;
+  city: string;
+  rating: number;
+  trustScore: number;
+  achievements: Achievement[];
+  gamesPlayed: number;
+  gamesCreated: number;
+  gamesConducted: number;
+  scenariosCreated: number;
+  reviewsCount: number;
+  followersCount: number;
+  followingCount: number;
+  lastSeenAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PrivateUser extends PublicUser {
+  email: string;
+  roles: UserRole[];
+  status: UserStatus;
+  verified: Record<string, boolean>;
+  version: number;
+  language: string;
+  timezone: string;
+  theme: string;
+  notificationSettings: NotificationSettings;
+  privacySettings: PrivacySettings;
+  socialLinks: SocialLinks;
+  favorites: Favorites;
+  lastLoginAt: Date | null;
+  failedLoginAttempts: number;
+  passwordChangedAt: Date | null;
+  trustedDevices: Device[];
+  featureFlags: FeatureFlags;
+  metadata: Record<string, unknown>;
+  aiProfile: AIProfile;
+}
+
+export interface AdminUser extends PrivateUser {
+  capabilities: Capability[];
+  violations: number;
+  deletedAt: Date | null;
+  auditLog: unknown[];
+}
+
+// Legacy types (обратная совместимость)
 export interface User {
   id: string;
   email: string;

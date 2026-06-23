@@ -129,20 +129,23 @@ export interface SubmitAnswerResponse {
 
 export interface User {
   id: string;
+  uuid: string;
   email: string;
+  username: string;
   name: string;
+  slug: string;
   avatarUrl: string | null;
-  city: string | null;
-  bio: string | null;
-  telegram: string | null;
-  vk: string | null;
-  whatsapp: string | null;
-  role: 'PLAYER' | 'ORGANIZER' | 'ADMIN' | 'MODERATOR' | 'AUTHOR';
+  avatar: string | null;
+  city: string;
+  bio: string;
+  role: 'PLAYER' | 'ORGANIZER' | 'ADMIN' | 'MODERATOR';
+  roles: string[];
+  status: string;
   organizerStatus: 'NOT_APPLIED' | 'PENDING' | 'APPROVED' | 'REJECTED';
-  organizerApprovedAt?: string;
-  rating?: number;
-  reputation?: number;
-  achievements?: Array<{
+  rating: number;
+  trustScore: number;
+  reputation: number;
+  achievements: Array<{
     id: string;
     type: string;
     name: string;
@@ -150,9 +153,22 @@ export interface User {
     icon: string;
     unlockedAt: string;
   }>;
-  gamesCreated?: number;
-  scenariosCreated?: number;
-  gamesConducted?: number;
+  gamesCreated: number;
+  scenariosCreated: number;
+  gamesConducted: number;
+  language: string;
+  timezone: string;
+  theme: string;
+  socialLinks: {
+    tg?: string;
+    vk?: string;
+    discord?: string;
+    youtube?: string;
+    github?: string;
+  };
+  createdAt: string;
+  lastLoginAt: string | null;
+  lastSeenAt: string | null;
   stats: {
     gamesPlayed: number;
     gamesCompleted: number;
