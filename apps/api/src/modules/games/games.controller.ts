@@ -228,4 +228,18 @@ export class GamesController {
   ) {
     return this.gamesService.moderateGame(gameId, body.status, body.comment, req.user.userId);
   }
+
+  // ============================================================
+  // Team registration
+  // ============================================================
+
+  @Post(':id/register-team')
+  @UseGuards(JwtAuthGuard)
+  async registerTeam(
+    @Param('id') gameId: string,
+    @Body() body: { teamId: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.registerTeam(gameId, body.teamId, req.user.userId);
+  }
 }

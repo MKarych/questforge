@@ -19,8 +19,10 @@ function CreateTeamContent() {
     setError(null);
 
     try {
-      await createTeam({ name, description: description || undefined });
-      router.push('/teams');
+      const response = await createTeam({ name, description: description || undefined });
+      // Save teamId to localStorage for use in lobby
+      localStorage.setItem('currentTeamId', response.data.id);
+      router.push(`/teams/${response.data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания команды');
     } finally {

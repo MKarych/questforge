@@ -850,4 +850,69 @@ _count: { select: { gameTeams: true, reviews: true } },
       },
     });
   }
+
+  // ============================================================
+  // Team registration on game
+  // ============================================================
+
+  async registerTeam(gameId: string, teamId: string, userId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId, deletedAt: null },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
+    // Check if team is already registered
+    const existing = await this.prisma.gameTeam.findUnique({
+      where: { teamId_gameId: { teamId, gameId } },
+    });
+
+    if (existing) {
+      throw new ForbiddenException('Команда уже зарегистрирована на эту игру');
+    }
+
+    // Check if user is captain of the team
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Команда не найдена');
+    }
+
+    if (team.captainId !== userId) {
+      throw new ForbiddenException('Только капитан может зарегистрировать команду на игру');
+    }
+
+    // Check max teams
+    if (game.maxTeams) {
+      const registeredCount = await this.prisma.gameTeam.count({
+        where: { gameId },
+      });
+      if (registeredCount >= game.maxTeams) {
+        throw new ForbiddenException('Достигнуто максимальное количество команд');
+      }
+    }
+
+    const gameTeam = await this.prisma.gameTeam.create({
+      data: { gameId, teamId },
+      include: {
+        team: {
+          select: { id: true, name: true, captainId: true },
+        },
+      },
+    });
+
+    this.logger.log(`Team ${teamId} registered for game ${gameId}`);
+
+    return {
+      id: gameTeam.id,
+      teamId: gameTeam.teamId,
+      gameId: gameTeam.gameId,
+      team: gameTeam.team,
+      joinedAt: gameTeam.joinedAt,
+    };
+  }
 }

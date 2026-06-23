@@ -96,11 +96,23 @@ export class TeamsController {
   }
 
   /**
-   * Получить мою команду
+   * Получить мою команду (первую активную)
    */
   @Get('me/team')
   async getMyTeam(@Request() req: UserRequest) {
     const result = await this.teamsService.getMyTeam(req.user.userId);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * Получить все мои команды
+   */
+  @Get('my')
+  async getMyTeams(@Request() req: UserRequest) {
+    const result = await this.teamsService.getMyTeams(req.user.userId);
     return {
       success: true,
       data: result,

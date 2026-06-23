@@ -593,6 +593,17 @@ class ApiClient {
   async getMyTeam(): Promise<ApiResponse<MyTeam | null>> {
     return this.request('/teams/me/team');
   }
+
+  async getMyTeams(): Promise<ApiResponse<MyTeam[]>> {
+    return this.request('/teams/my');
+  }
+
+  async registerTeam(gameId: string, teamId: string): Promise<ApiResponse<{ id: string; teamId: string; gameId: string; team: { id: string; name: string; captainId: string }; joinedAt: string }>> {
+    return this.request(`/games/${gameId}/register-team`, {
+      method: 'POST',
+      body: JSON.stringify({ teamId }),
+    });
+  }
 }
 
 // Export singleton instance
@@ -643,3 +654,5 @@ export const joinTeam = (teamId: string, inviteToken?: string) => apiClient.join
 export const leaveTeam = (teamId: string) => apiClient.leaveTeam(teamId);
 export const removeMember = (teamId: string, userId: string) => apiClient.removeMember(teamId, userId);
 export const getMyTeam = () => apiClient.getMyTeam();
+export const getMyTeams = () => apiClient.getMyTeams();
+export const registerTeam = (gameId: string, teamId: string) => apiClient.registerTeam(gameId, teamId);
