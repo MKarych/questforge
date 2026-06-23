@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getGame, type GameDetails } from '@/lib/api/client';
+import { getGame, publishGame, removeGame, updateGame, type GameDetails } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -15,6 +15,7 @@ export default function GamePage() {
   const [game, setGame] = useState<GameDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadGame() {
@@ -49,6 +50,47 @@ export default function GamePage() {
         return 'bg-surface-elevated text-text-muted';
       default:
         return 'bg-surface-elevated text-text-muted';
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!game) return;
+    if (!confirm('Вы уверены, что хотите опубликовать игру?')) return;
+    setActionLoading('publish');
+    try {
+      const updated = await publishGame(gameId);
+      setGame(updated.data);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ошибка публикации');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!game) return;
+    if (!confirm('Вы уверены, что хотите удалить игру? Это действие нельзя отменить.')) return;
+    setActionLoading('delete');
+    try {
+      await removeGame(gameId);
+      router.push('/organizer/games');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ошибка удаления');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!game) return;
+    setActionLoading('save');
+    try {
+      const updated = await updateGame(gameId, { status: 'CREATED' });
+      setGame(updated.data);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -246,19 +288,30 @@ export default function GamePage() {
                 {game.status === 'CREATED' && (
                   <button
                     className="btn-primary text-center"
-                    disabled
-                    title="В разработке"
+                    onClick={handlePublish}
+                    disabled={actionLoading === 'publish'}
                   >
-                    Опубликовать
+                    {actionLoading === 'publish' ? '...' : 'Опубликовать'}
                   </button>
                 )}
-                <button
-                  className="btn-secondary text-center text-error hover:border-error"
-                  disabled
-                  title="В разработке"
-                >
-                  Удалить
-                </button>
+                {game.status !== 'PUBLISHED' && game.status !== 'FINISHED' && (
+                  <button
+                    className="btn-secondary text-center text-error hover:border-error"
+                    onClick={handleDelete}
+                    disabled={actionLoading === 'delete'}
+                  >
+                    {actionLoading === 'delete' ? '...' : 'Удалить'}
+                  </button>
+                )}
+                {game.status !== 'PUBLISHED' && (
+                  <button
+                    className="btn-secondary text-center"
+                    onClick={handleSaveDraft}
+                    disabled={actionLoading === 'save'}
+                  >
+                    {actionLoading === 'save' ? 'Сохранение...' : 'Сохранить черновик'}
+                  </button>
+                )}
               </div>
             </div>
 

@@ -4,7 +4,395 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-   url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  email                  String                 @unique @db.VarChar(255)
+  passwordHash           String                 @map("password_hash") @db.VarChar(255)
+  name                   String                 @db.VarChar(100)
+  avatarUrl              String?                @map("avatar_url")
+  role                   Role                   @default(PLAYER)
+  status                 UserStatus             @default(ACTIVE)
+  contacts               Json                   @default("{}")
+  organizerStatus        OrganizerStatus        @default(NOT_APPLIED) @map("organizer_status")
+  organizerApprovedAt    DateTime?              @map("organizer_approved_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  lastLoginAt            DateTime?              @map("last_login_at")
+  deletedAt              DateTime?              @map("deleted_at")
+  gamesConducted         Int                    @default(0) @map("games_conducted")
+  gamesCreated           Int                    @default(0) @map("games_created")
+  organizerApplicationId String?                @map("organizer_application_id") @db.Uuid
+  scenariosCreated       Int                    @default(0) @map("scenarios_created")
+  achievements           Json                   @default("[]") @db.Json
+  bio                    String?
+  city                   String?                @db.VarChar(100)
+  lastSeenAt             DateTime?              @map("last_seen_at")
+  rating                 Float?                 @default(0)
+  reputation             Int                    @default(0)
+  telegram               String?                @db.VarChar(100)
+  vk                     String?                @db.VarChar(255)
+  whatsapp               String?                @db.VarChar(100)
+  comments               Comment[]
+  games                  Game[]
+  licenses               License[]
+  mediaUploads           Media[]                @relation("MediaUploader")
+  reviewedApplications   OrganizerApplication[] @relation("ApplicationReviewer")
+  organizerApplication   OrganizerApplication?
+  purchases              Purchase[]
+  reviews                Review[]
+  scenarios              Scenario[]
+  createdVersions        ScenarioVersion[]
+  captainTeams           Team[]                 @relation("TeamCaptain")
+  teamMemberships        TeamMember[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([organizerStatus])
+  @@index([city])
+  @@index([rating])
+}
+
+model Game {
+  id                String           @id @default(uuid()) @db.Uuid
+  title             String           @db.VarChar(255)
+  description       String?
+  city              String           @db.VarChar(100)
+  date              DateTime
+  duration          Int              @map("duration")
+  price             Decimal          @default(0) @db.Decimal(10, 2)
+  maxTeams          Int              @default(50) @map("max_teams")
+  shareLink         String           @unique @map("share_link") @db.VarChar(50)
+  status            GameStatus       @default(CREATED)
+  moderationStatus  ModerationStatus @default(PENDING) @map("moderation_status")
+  moderationComment String?          @map("moderation_comment")
+  organizerId       String           @map("organizer_id") @db.Uuid
+  scenarioId        String?          @map("scenario_id") @db.Uuid
+  imageUrl          String?          @map("image_url")
+  publishedAt       DateTime?        @map("published_at")
+  submittedAt       DateTime?        @map("submitted_at")
+  moderatedAt       DateTime?        @map("moderated_at")
+  startedAt         DateTime?        @map("started_at")
+  finishedAt        DateTime?        @map("finished_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  deletedAt         DateTime?        @map("deleted_at")
+  comments          Comment[]
+  events            Event[]
+  organizer         User             @relation(fields: [organizerId], references: [id])
+  scenario          Scenario?        @relation(fields: [scenarioId], references: [id])
+  gameTeams         GameTeam[]
+  heatmapData       HeatmapData[]
+  media             Media[]
+  reviews           Review[]
+
+  @@index([shareLink])
+  @@index([organizerId])
+  @@index([status])
+  @@index([city])
+  @@index([date])
+  @@index([scenarioId])
+  @@index([moderationStatus])
+}
+
+model Scenario {
+  id               String            @id @default(uuid()) @db.Uuid
+  name             String            @db.VarChar(255)
+  description      String?
+  authorId         String            @map("author_id") @db.Uuid
+  version          Int               @default(1)
+  isPublished      Boolean           @default(false) @map("is_published")
+  price            Decimal?          @db.Decimal(10, 2)
+  licenseType      String?           @map("license_type") @db.VarChar(50)
+  nodes            Json              @default("[]")
+  edges            Json              @default("[]")
+  startNodeId      String            @map("start_node_id") @db.VarChar(50)
+  metadata         Json              @default("{}")
+  validationStatus String?           @map("validation_status") @db.VarChar(50)
+  validationErrors Json?             @map("validation_errors")
+  publishedAt      DateTime?         @map("published_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  deletedAt        DateTime?         @map("deleted_at")
+  games            Game[]
+  licenses         License[]
+  purchases        Purchase[]
+  author           User              @relation(fields: [authorId], references: [id])
+  versions         ScenarioVersion[]
+
+  @@index([authorId])
+  @@index([isPublished])
+  @@index([price])
+  @@index([validationStatus])
+}
+
+model ScenarioVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  scenarioId  String   @map("scenario_id") @db.Uuid
+  version     Int
+  nodes       Json     @default("[]")
+  edges       Json     @default("[]")
+  startNodeId String   @map("start_node_id") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, version])
+  @@index([scenarioId])
+}
+
+model Team {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @db.VarChar(100)
+  captainId     String         @map("captain_id") @db.Uuid
+  score         Int            @default(0)
+  penalties     Int            @default(0)
+  finishedAt    DateTime?      @map("finished_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  description   String?
+  status        String         @default("active") @db.VarChar(50)
+  events        Event[]
+  games         GameTeam[]
+  heatmapData   HeatmapData[]
+  inventory     Inventory?
+  media         Media[]
+  resources     Resource?
+  sessionStates SessionState[]
+  captain       User           @relation("TeamCaptain", fields: [captainId], references: [id])
+  members       TeamMember[]
+
+  @@index([captainId])
+  @@index([status])
+}
+
+model TeamMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  teamId    String    @map("team_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      String    @default("member") @db.VarChar(50)
+  status    String    @default("active") @db.VarChar(50)
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  leftAt    DateTime? @map("left_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId], name: "team_member_unique")
+  @@index([teamId])
+  @@index([userId])
+}
+
+model GameTeam {
+  id       String   @id @default(uuid()) @db.Uuid
+  teamId   String   @map("team_id") @db.Uuid
+  gameId   String   @map("game_id") @db.Uuid
+  joinedAt DateTime @default(now()) @map("joined_at")
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, gameId])
+  @@index([teamId])
+  @@index([gameId])
+}
+
+model Inventory {
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @unique @map("team_id") @db.Uuid
+  items     Json     @default("[]")
+  capacity  Int      @default(20)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+}
+
+model Resource {
+  id         String   @id @default(uuid()) @db.Uuid
+  teamId     String   @unique @map("team_id") @db.Uuid
+  score      Int      @default(0)
+  reputation Int      @default(0)
+  money      Int      @default(0)
+  energy     Int      @default(100)
+  lives      Int      @default(3)
+  custom     Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+}
+
+model SessionState {
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  state     Json
+  sequence  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([sequence])
+}
+
+model Event {
+  id        String   @id @default(uuid()) @db.Uuid
+  type      String   @db.VarChar(50)
+  gameId    String   @map("game_id") @db.Uuid
+  teamId    String?  @map("team_id") @db.Uuid
+  nodeId    String?  @map("node_id") @db.VarChar(50)
+  payload   Json     @default("{}")
+  timestamp DateTime
+  sequence  Int
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  game      Game     @relation(fields: [gameId], references: [id])
+  team      Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@index([teamId])
+  @@index([type])
+  @@index([sequence])
+  @@index([createdAt])
+  @@index([gameId, createdAt])
+  @@index([teamId, createdAt])
+}
+
+model Purchase {
+  id          String    @id @default(uuid()) @db.Uuid
+  scenarioId  String    @map("scenario_id") @db.Uuid
+  buyerId     String    @map("buyer_id") @db.Uuid
+  licenseType String    @map("license_type") @db.VarChar(50)
+  amount      Decimal   @db.Decimal(10, 2)
+  commission  Decimal   @db.Decimal(10, 2)
+  royalty     Decimal   @db.Decimal(10, 2)
+  status      String    @default("pending") @db.VarChar(50)
+  paymentId   String?   @map("payment_id") @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  buyer       User      @relation(fields: [buyerId], references: [id])
+  scenario    Scenario  @relation(fields: [scenarioId], references: [id])
+
+  @@index([scenarioId])
+  @@index([buyerId])
+  @@index([status])
+}
+
+model License {
+  id          String    @id @default(uuid()) @db.Uuid
+  scenarioId  String    @map("scenario_id") @db.Uuid
+  buyerId     String    @map("buyer_id") @db.Uuid
+  licenseType String    @map("license_type") @db.VarChar(50)
+  city        String?   @db.VarChar(100)
+  price       Decimal   @db.Decimal(10, 2)
+  status      String    @default("active") @db.VarChar(50)
+  expiresAt   DateTime? @map("expires_at")
+  purchasedAt DateTime  @default(now()) @map("purchased_at")
+  buyer       User      @relation(fields: [buyerId], references: [id])
+  scenario    Scenario  @relation(fields: [scenarioId], references: [id])
+
+  @@index([scenarioId])
+  @@index([buyerId])
+  @@index([status])
+}
+
+model Media {
+  id           String   @id @default(uuid()) @db.Uuid
+  filename     String   @db.VarChar(255)
+  originalName String   @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  size         Int
+  path         String
+  url          String
+  gameId       String?  @map("game_id") @db.Uuid
+  teamId       String?  @map("team_id") @db.Uuid
+  uploadedById String?  @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  game         Game?    @relation(fields: [gameId], references: [id])
+  team         Team?    @relation(fields: [teamId], references: [id])
+  uploadedBy   User?    @relation("MediaUploader", fields: [uploadedById], references: [id])
+
+  @@index([gameId])
+  @@index([teamId])
+  @@index([uploadedById])
+}
+
+model Review {
+  id        String   @id @default(uuid()) @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([gameId])
+  @@index([userId])
+  @@index([rating])
+}
+
+model Comment {
+  id        String    @id @default(uuid()) @db.Uuid
+  gameId    String    @map("game_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  text      String
+  parentId  String?   @map("parent_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  game      Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([gameId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model HeatmapData {
+  id        String   @id @default(uuid()) @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  lat       Decimal  @db.Decimal(10, 8)
+  lng       Decimal  @db.Decimal(11, 8)
+  nodeId    String?  @map("node_id") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@index([teamId])
+  @@index([createdAt])
+}
+
+model OrganizerApplication {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  city            String    @db.VarChar(100)
+  phone           String    @db.VarChar(20)
+  telegram        String?   @db.VarChar(100)
+  experience      String?
+  status          String    @default("PENDING") @db.VarChar(50)
+  rejectionReason String?   @map("rejection_reason")
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  reviewer        User?     @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum Role {
@@ -81,396 +469,4 @@ enum EventType {
   TIMER_END
   ERROR_OCCURRED
   LEADERBOARD_UPDATE
-}
-
-model User {
-  id                    String    @id @default(uuid()) @db.Uuid
-  email                 String    @unique @db.VarChar(255)
-  passwordHash          String    @map("password_hash") @db.VarChar(255)
-  name                  String    @db.VarChar(100)
-  avatarUrl             String?   @map("avatar_url") @db.Text
-  city                  String?   @db.VarChar(100)
-  bio                   String?   @db.Text
-  telegram              String?   @db.VarChar(100)
-  vk                    String?   @db.VarChar(255)
-  whatsapp              String?   @db.VarChar(100)
-  rating                Float?    @default(0)
-  reputation            Int       @default(0)
-  achievements          Json      @default("[]") @db.Json
-  lastSeenAt            DateTime? @map("last_seen_at")
-  role                  Role      @default(PLAYER)
-  status                UserStatus @default(ACTIVE)
-  contacts              Json      @default("{}")
-  organizerStatus       OrganizerStatus @default(NOT_APPLIED) @map("organizer_status")
-  organizerApplicationId String?  @map("organizer_application_id") @db.Uuid
-  organizerApprovedAt   DateTime? @map("organizer_approved_at")
-  gamesCreated          Int       @default(0) @map("games_created")
-  gamesConducted        Int       @default(0) @map("games_conducted")
-  scenariosCreated      Int       @default(0) @map("scenarios_created")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-  lastLoginAt           DateTime? @map("last_login_at")
-  deletedAt             DateTime? @map("deleted_at")
-
-  games                 Game[]
-  scenarios             Scenario[]
-  teamMemberships       TeamMember[]
-  purchases             Purchase[]
-  reviews               Review[]
-  comments              Comment[]
-  createdVersions       ScenarioVersion[]
-  licenses              License[]
-  captainTeams          Team[] @relation("TeamCaptain")
-  mediaUploads          Media[] @relation("MediaUploader")
-  organizerApplication  OrganizerApplication?
-  reviewedApplications  OrganizerApplication[] @relation("ApplicationReviewer")
-
-  @@index([email])
-  @@index([role])
-  @@index([status])
-  @@index([organizerStatus])
-  @@index([city])
-  @@index([rating])
-}
-
-model Game {
-  id                    String      @id @default(uuid()) @db.Uuid
-  title                 String      @db.VarChar(255)
-  description           String?     @db.Text
-  city                  String      @db.VarChar(100)
-  date                  DateTime
-  duration              Int         @map("duration") // in minutes
-  price                 Decimal     @default(0) @db.Decimal(10, 2)
-  maxTeams              Int         @default(50) @map("max_teams")
-  shareLink             String      @map("share_link") @unique @db.VarChar(50)
-  status                GameStatus  @default(CREATED)
-  moderationStatus      ModerationStatus @default(PENDING) @map("moderation_status")
-  moderationComment     String?     @map("moderation_comment") @db.Text
-  organizerId           String      @map("organizer_id") @db.Uuid
-  organizer             User        @relation(fields: [organizerId], references: [id], onDelete: Restrict)
-  scenarioId            String?     @map("scenario_id") @db.Uuid
-  scenario              Scenario?   @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
-  imageUrl              String?     @map("image_url") @db.Text
-  publishedAt           DateTime?   @map("published_at")
-  submittedAt           DateTime?   @map("submitted_at")
-  moderatedAt           DateTime?   @map("moderated_at")
-  startedAt             DateTime?   @map("started_at")
-  finishedAt            DateTime?   @map("finished_at")
-  createdAt             DateTime    @default(now()) @map("created_at")
-  updatedAt             DateTime    @updatedAt @map("updated_at")
-  deletedAt             DateTime?   @map("deleted_at")
-
-  gameTeams             GameTeam[]
-  reviews               Review[]
-  comments              Comment[]
-  heatmapData           HeatmapData[]
-  events                Event[]
-  media                 Media[]
-
-  @@index([shareLink])
-  @@index([organizerId])
-  @@index([status])
-  @@index([city])
-  @@index([date])
-  @@index([scenarioId])
-  @@index([moderationStatus])
-}
-
-model Scenario {
-  id                    String    @id @default(uuid()) @db.Uuid
-  name                  String    @db.VarChar(255)
-  description           String?   @db.Text
-  authorId              String    @map("author_id") @db.Uuid
-  author                User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  version               Int       @default(1)
-  isPublished           Boolean   @default(false) @map("is_published")
-  price                 Decimal?  @db.Decimal(10, 2)
-  licenseType           String?   @map("license_type") @db.VarChar(50)
-  nodes                 Json      @default("[]")
-  edges                 Json      @default("[]")
-  startNodeId           String    @map("start_node_id") @db.VarChar(50)
-  metadata              Json      @default("{}")
-  validationStatus      String?   @map("validation_status") @db.VarChar(50)
-  validationErrors      Json?     @map("validation_errors")
-  publishedAt           DateTime? @map("published_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-  deletedAt             DateTime? @map("deleted_at")
-
-  games                 Game[]
-  versions              ScenarioVersion[]
-  purchases             Purchase[]
-  licenses              License[]
-
-  @@index([authorId])
-  @@index([isPublished])
-  @@index([price])
-  @@index([validationStatus])
-}
-
-model ScenarioVersion {
-  id                    String    @id @default(uuid()) @db.Uuid
-  scenarioId            String    @map("scenario_id") @db.Uuid
-  scenario              Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  version               Int
-  nodes                 Json      @default("[]")
-  edges                 Json      @default("[]")
-  startNodeId           String    @map("start_node_id") @db.VarChar(50)
-  createdAt             DateTime  @default(now()) @map("created_at")
-  createdById           String?   @map("created_by_id") @db.Uuid
-  createdBy             User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
-
-  @@unique([scenarioId, version])
-  @@index([scenarioId])
-}
-
-model Team {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  captainId   String   @map("captain_id") @db.Uuid
-  captain     User     @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: Restrict)
-  status      String   @default("active") @db.VarChar(50)
-  score       Int      @default(0)
-  penalties   Int      @default(0)
-  finishedAt  DateTime? @map("finished_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  members     TeamMember[]
-  games       GameTeam[]
-  inventory   Inventory?
-  resources   Resource?
-  sessionStates SessionState[]
-  events      Event[]
-  media       Media[]
-  heatmapData HeatmapData[]
-
-  @@index([captainId])
-  @@index([status])
-}
-
-model TeamMember {
-  id                    String    @id @default(uuid()) @db.Uuid
-  teamId                String    @map("team_id") @db.Uuid
-  team                  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId                String    @map("user_id") @db.Uuid
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  role                  String    @default("member") @db.VarChar(50)
-  status                String    @default("active") @db.VarChar(50)
-  joinedAt              DateTime  @default(now()) @map("joined_at")
-  leftAt                DateTime? @map("left_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  @@unique([teamId, userId], name: "team_member_unique")
-  @@index([teamId])
-  @@index([userId])
-}
-
-model GameTeam {
-  id     String   @id @default(uuid()) @db.Uuid
-  teamId String   @map("team_id") @db.Uuid
-  team   Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  gameId String   @map("game_id") @db.Uuid
-  game   Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  joinedAt DateTime @default(now()) @map("joined_at")
-
-  @@unique([teamId, gameId])
-  @@index([teamId])
-  @@index([gameId])
-}
-
-model Inventory {
-  id                    String   @id @default(uuid()) @db.Uuid
-  teamId                String   @unique @map("team_id") @db.Uuid
-  team                  Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  items                 Json     @default("[]")
-  capacity              Int      @default(20)
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  @@index([teamId])
-}
-
-model Resource {
-  id                    String   @id @default(uuid()) @db.Uuid
-  teamId                String   @unique @map("team_id") @db.Uuid
-  team                  Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  score                 Int      @default(0)
-  reputation            Int      @default(0)
-  money                 Int      @default(0)
-  energy                Int      @default(100)
-  lives                 Int      @default(3)
-  custom                Json     @default("{}")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  @@index([teamId])
-}
-
-model SessionState {
-  id                    String  @id @default(uuid()) @db.Uuid
-  teamId                String  @map("team_id") @db.Uuid
-  team                  Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  state                 Json
-  sequence              Int
-  createdAt             DateTime @default(now()) @map("created_at")
-
-  @@index([teamId])
-  @@index([sequence])
-}
-
-model Event {
-  id                    String  @id @default(uuid()) @db.Uuid
-  type                  String  @db.VarChar(50)
-  gameId                String  @map("game_id") @db.Uuid
-  game                  Game    @relation(fields: [gameId], references: [id], onDelete: Restrict)
-  teamId                String? @map("team_id") @db.Uuid
-  team                  Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  nodeId                String? @map("node_id") @db.VarChar(50)
-  payload               Json    @default("{}")
-  timestamp             DateTime
-  sequence              Int
-  version               Int     @default(1)
-  createdAt             DateTime @default(now()) @map("created_at")
-
-  @@index([gameId])
-  @@index([teamId])
-  @@index([type])
-  @@index([sequence])
-  @@index([createdAt])
-  @@index([gameId, createdAt])
-  @@index([teamId, createdAt])
-}
-
-model Purchase {
-  id                    String    @id @default(uuid()) @db.Uuid
-  scenarioId            String    @map("scenario_id") @db.Uuid
-  scenario              Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
-  buyerId               String    @map("buyer_id") @db.Uuid
-  buyer                 User      @relation(fields: [buyerId], references: [id], onDelete: Restrict)
-  licenseType           String    @map("license_type") @db.VarChar(50)
-  amount                Decimal   @db.Decimal(10, 2)
-  commission            Decimal   @db.Decimal(10, 2)
-  royalty               Decimal   @db.Decimal(10, 2)
-  status                String    @default("pending") @db.VarChar(50)
-  paymentId             String?   @map("payment_id") @db.VarChar(255)
-  createdAt             DateTime  @default(now()) @map("created_at")
-  completedAt           DateTime? @map("completed_at")
-
-  @@index([scenarioId])
-  @@index([buyerId])
-  @@index([status])
-}
-
-model License {
-  id                    String    @id @default(uuid()) @db.Uuid
-  scenarioId            String    @map("scenario_id") @db.Uuid
-  scenario              Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
-  buyerId               String    @map("buyer_id") @db.Uuid
-  buyer                 User      @relation(fields: [buyerId], references: [id], onDelete: Restrict)
-  licenseType           String    @map("license_type") @db.VarChar(50)
-  city                  String?   @db.VarChar(100)
-  price                 Decimal   @db.Decimal(10, 2)
-  status                String    @default("active") @db.VarChar(50)
-  expiresAt             DateTime? @map("expires_at")
-  purchasedAt           DateTime  @default(now()) @map("purchased_at")
-
-  @@index([scenarioId])
-  @@index([buyerId])
-  @@index([status])
-}
-
-model Media {
-  id                    String   @id @default(uuid()) @db.Uuid
-  filename              String   @db.VarChar(255)
-  originalName          String   @map("original_name") @db.VarChar(255)
-  mimeType              String   @map("mime_type") @db.VarChar(100)
-  size                  Int
-  path                  String   @db.Text
-  url                   String   @db.Text
-  gameId                String?  @map("game_id") @db.Uuid
-  game                  Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
-  teamId                String?  @map("team_id") @db.Uuid
-  team                  Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  uploadedById          String?  @map("uploaded_by_id") @db.Uuid
-  uploadedBy            User?    @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
-  createdAt             DateTime @default(now()) @map("created_at")
-
-  @@index([gameId])
-  @@index([teamId])
-  @@index([uploadedById])
-}
-
-model Review {
-  id                    String   @id @default(uuid()) @db.Uuid
-  gameId                String   @map("game_id") @db.Uuid
-  game                  Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  userId                String   @map("user_id") @db.Uuid
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  rating                Int
-  text                  String?  @db.Text
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  @@index([gameId])
-  @@index([userId])
-  @@index([rating])
-}
-
-model Comment {
-  id                    String   @id @default(uuid()) @db.Uuid
-  gameId                String   @map("game_id") @db.Uuid
-  game                  Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  userId                String   @map("user_id") @db.Uuid
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  text                  String   @db.Text
-  parentId              String?  @map("parent_id") @db.Uuid
-  parent                Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies               Comment[] @relation("CommentReplies")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-  deletedAt             DateTime? @map("deleted_at")
-
-  @@index([gameId])
-  @@index([userId])
-  @@index([parentId])
-}
-
-model HeatmapData {
-  id                    String   @id @default(uuid()) @db.Uuid
-  gameId                String   @map("game_id") @db.Uuid
-  game                  Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  teamId                String   @map("team_id") @db.Uuid
-  team                  Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  lat                   Decimal  @db.Decimal(10, 8)
-  lng                   Decimal  @db.Decimal(11, 8)
-  nodeId                String?  @map("node_id") @db.VarChar(50)
-  createdAt             DateTime @default(now()) @map("created_at")
-
-  @@index([gameId])
-  @@index([teamId])
-  @@index([createdAt])
-}
-
-model OrganizerApplication {
-  id                    String    @id @default(uuid()) @db.Uuid
-  userId                String    @unique @map("user_id") @db.Uuid
-  user                  User      @relation(fields: [userId], references: [id])
-  city                  String    @db.VarChar(100)
-  phone                 String    @db.VarChar(20)
-  telegram              String?   @db.VarChar(100)
-  experience            String?   @db.Text
-  status                String    @default("PENDING") @db.VarChar(50) // PENDING | APPROVED | REJECTED
-  rejectionReason       String?   @map("rejection_reason") @db.Text
-  reviewedBy            String?   @map("reviewed_by") @db.Uuid
-  reviewer              User?     @relation("ApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  reviewedAt            DateTime? @map("reviewed_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
 }

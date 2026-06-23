@@ -180,6 +180,7 @@ export interface CreateGameRequest {
   price: number;
   maxTeams: number;
   scenarioId?: string;
+  status?: string;
 }
 
 export interface CreateGameResponse {
@@ -463,6 +464,12 @@ class ApiClient {
     return this.request(`/games/${gameId}/teams${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
   }
 
+  async removeGame(id: string): Promise<ApiResponse<GameDetails>> {
+    return this.request(`/games/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ==================== Scenarios ====================
 
   async getScenarios(params?: {
@@ -608,6 +615,7 @@ export const getGames = () => apiClient.getMyGames();
 export const getGame = (id: string) => apiClient.getGame(id);
 export const updateGame = (id: string, data: Partial<CreateGameRequest>) =>
   apiClient.updateGame(id, data);
+export const removeGame = (id: string) => apiClient.removeGame(id);
 export const publishGame = (id: string) => apiClient.publishGame(id);
 export const getScenarios = (params?: { published?: boolean }) => apiClient.getScenarios(params);
 export const getScenario = (id: string) => apiClient.getScenario(id);
