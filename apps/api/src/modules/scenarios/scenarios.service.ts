@@ -9,10 +9,33 @@ export class ScenariosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, dto: CreateScenarioDto) {
+    // Debug: log raw dto
+    console.log('DEBUG create dto:', JSON.stringify(dto));
+    console.log('DEBUG nodes:', JSON.stringify(dto.nodes));
+    // Ensure nodes are properly parsed
+    let nodes = dto.nodes || [];
+    const edges: any[] = [];
+    let startNodeId = dto.startNodeId;
+
+    // If dto has extra fields not in Scenario model, extract them
+    const { description, price, licenseType, ...scenarioData } = dto;
+
+    // Handle the case where startNodeId is embedded in nodes data
+    if (!startNodeId && nodes.length > 0) {
+      const startNode = nodes.find((n: any) => n.type === 'START' || n.id === 'start');
+      if (startNode) startNodeId = startNode.id;
+    }
+
     const scenario = await this.prisma.scenario.create({
       data: {
-        ...dto,
+        name: dto.name,
+        description: dto.description,
         authorId: userId,
+        nodes,
+        edges,
+        startNodeId: startNodeId || 'node-1',
+        price,
+        licenseType,
       },
     });
 

@@ -1,14 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createGame, getScenariosForGame, type CreateGameRequest, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
 export default function CreateGamePage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [scenariosLoading, setScenariosLoading] = useState(false);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [formData, setFormData] = useState({
@@ -21,7 +25,85 @@ export default function CreateGamePage() {
     maxTeams: 20,
     scenarioId: '',
   });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCoverChange = (file: File) => {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Разрешены только изображения: JPG, PNG, WebP');
+      return;
+    }
+
+    // Validate file size (5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Максимальный размер файла — 5 MB');
+      return;
+    }
+
+    setCoverFile(file);
+    setError(null);
+
+    // Generate preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleCoverChange(file);
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleCoverChange(file);
+  }, []);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    setCoverPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadCover = async (gameId: string, file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_URL}/games/${gameId}/upload-cover`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Не удалось загрузить обложку');
+      }
+
+      const data = await response.json();
+      return data.data?.url || null;
+    } catch (err) {
+      console.error('Upload error:', err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     async function loadScenarios() {
@@ -69,6 +151,17 @@ export default function CreateGamePage() {
       };
 
       const response = await createGame(gameData);
+      const gameId = response.data.id;
+      
+      // Upload cover if file is selected
+      if (coverFile) {
+        setUploading(true);
+        const coverUrl = await uploadCover(gameId, coverFile);
+        if (!coverUrl) {
+          console.warn('Cover upload failed, but game was created successfully');
+        }
+        setUploading(false);
+      }
       
       // Redirect to game management page
       router.push(`/organizer/games/${response.data.id}`);
@@ -78,6 +171,7 @@ export default function CreateGamePage() {
       console.error('Failed to create game:', err);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -224,6 +318,64 @@ export default function CreateGamePage() {
                 <p className="text-xs text-text-secondary mt-1">
                   Сценарий можно привязать позже в настройках игры
                 </p>
+              </div>
+
+              {/* Cover Upload */}
+              <div>
+                <label className="label">Обложка игры</label>
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`
+                    relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
+                    ${coverPreview 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border hover:border-primary/50 hover:bg-surface-elevated'
+                    }
+                  `}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFileInput}
+                    className="hidden"
+                  />
+
+                  {coverPreview ? (
+                    <div className="relative">
+                      <img
+                        src={coverPreview}
+                        alt="Preview"
+                        className="max-h-48 mx-auto rounded-lg shadow-lg mb-3"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveCover();
+                        }}
+                        className="mx-auto btn-secondary text-sm py-1 px-3"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-4xl mb-2">📸</div>
+                      <p className="text-text-primary font-medium mb-1">
+                        Перетащите изображение сюда
+                      </p>
+                      <p className="text-text-secondary text-sm">
+                        или нажмите для выбора файла
+                      </p>
+                      <p className="text-text-muted text-xs mt-2">
+                        JPG, PNG, WebP • до 5 MB
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-border">

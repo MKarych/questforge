@@ -37,6 +37,9 @@ Desktop.ini
 coverage/
 uploads/
 
+# Uploaded files
+public/uploads/
+
 # Misc
 *.sqlite
 *.sqlite-journal

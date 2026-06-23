@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsArray, IsNumber, ValidateIf } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateScenarioDto {
   @IsString()
@@ -8,11 +9,20 @@ export class CreateScenarioDto {
   @IsOptional()
   description?: string;
 
-  @IsArray()
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  })
   nodes?: any[];
 
-  @ValidateIf((o: CreateScenarioDto) => !o.nodes || o.nodes.length === 0)
+  @ValidateIf((o: CreateScenarioDto) => !o.nodes || (Array.isArray(o.nodes) && o.nodes.length === 0))
   @IsString()
   startNodeId!: string;
 

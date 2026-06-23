@@ -9,10 +9,17 @@ import {
   Query,
   UseGuards,
   Request,
+  UploadedFile,
+  UseInterceptors,
+  ForbiddenException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { GamesService } from './games.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 @Controller('games')
 export class GamesController {
@@ -140,5 +147,38 @@ export class GamesController {
   @UseGuards(JwtAuthGuard)
   async publishGame(@Request() req: any, @Param('id') gameId: string) {
     return this.gamesService.publishGame(req.user.userId, gameId);
+  }
+
+  @Post(':id/upload-cover')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './public/uploads/covers',
+        filename: (_req, file, callback) => {
+          const ext = extname(file.originalname);
+          const filename = `${uuidv4()}${ext}`;
+          callback(null, filename);
+        },
+      }),
+      fileFilter: (_req, file, callback) => {
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedMimeTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(new ForbiddenException('Разрешены только изображения: jpg, png, webp'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB
+      },
+    }),
+  )
+  async uploadCover(
+    @Request() req: any,
+    @Param('id') gameId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.gamesService.uploadCover(req.user.userId, gameId, file);
   }
 }

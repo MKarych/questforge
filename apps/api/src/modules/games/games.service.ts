@@ -8,6 +8,9 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { GameStateMachine } from '../../engine/state-machine/state-machine';
 import { GameStatus } from '../../engine/types/engine.types';
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class GamesService {
@@ -602,6 +605,50 @@ export class GamesService {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+  }
+
+  async uploadCover(userId: string, gameId: string, file: Express.Multer.File): Promise<{ url: string }> {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('У вас нет доступа к этой игре');
+    }
+
+    // Generate unique filename with UUID
+    const ext = path.extname(file.originalname) || this.getExtension(file.mimetype);
+    const filename = `${uuidv4()}${ext}`;
+    const destPath = path.join(process.cwd(), 'public', 'uploads', 'covers', filename);
+
+    // Move file from multer temp location to final destination
+    fs.renameSync(file.path, destPath);
+
+    // Generate URL
+    const url = `/uploads/covers/${filename}`;
+
+    // Update game with image URL
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: { imageUrl: url },
+    });
+
+    this.logger.log(`Cover uploaded for game ${gameId}: ${url}`);
+
+    return { url };
+  }
+
+  private getExtension(mimeType: string): string {
+    const extensions: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+    };
+    return extensions[mimeType] || '.jpg';
   }
 
   async publishGame(userId: string, gameId: string) {

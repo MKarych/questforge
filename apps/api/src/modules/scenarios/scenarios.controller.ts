@@ -8,6 +8,8 @@ import {
   Query,
   UseGuards,
   Request,
+  ValidationPipe,
+  Logger,
 } from '@nestjs/common';
 import { ScenariosService } from './scenarios.service';
 import { CreateScenarioDto } from './dto/create-scenario.dto';
@@ -16,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('scenarios')
 @UseGuards(JwtAuthGuard)
 export class ScenariosController {
+  private readonly logger = new Logger(ScenariosController.name);
   constructor(private readonly scenariosService: ScenariosService) {}
 
   @Post()
@@ -76,3 +79,4 @@ export class ScenariosController {
     return this.scenariosService.createVersion(req.user.userId, scenarioId, nodes, versionNote);
   }
 }
+

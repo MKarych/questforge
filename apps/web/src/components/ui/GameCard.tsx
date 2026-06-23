@@ -1,9 +1,16 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Game } from '@/lib/api/client';
+
+const DEFAULT_LOGO = '/images/logo/logo.png';
 
 interface GameCardProps {
   game: Game;
 }
+
+export default function GameCard({ game }: GameCardProps) {
+  const coverImage = game.imageUrl || DEFAULT_LOGO;
+  const hasCustomImage = !!game.imageUrl;
 
 export default function GameCard({ game }: GameCardProps) {
   const formatDate = (dateString: string) => {
@@ -24,17 +31,19 @@ export default function GameCard({ game }: GameCardProps) {
   return (
     <Link href={`/games/${game.id}`} className="card-hover block group">
       <div className="overflow-hidden rounded-lg mb-4">
-        {game.imageUrl ? (
-          <img
-            src={game.imageUrl}
+        <div className="relative w-full h-48 bg-surface-elevated">
+          <Image
+            src={coverImage}
             alt={game.title}
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            quality={hasCustomImage ? 85 : 100}
+            unoptimized={!hasCustomImage}
           />
-        ) : (
-          <div className="w-full h-48 bg-surface-elevated flex items-center justify-center">
-            <span className="text-6xl">🎮</span>
-          </div>
-        )}
+          {!hasCustomImage && (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+          )}
+        </div>
       </div>
 
       <div className="flex items-start justify-between mb-2">

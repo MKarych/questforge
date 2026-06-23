@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getPublicGame, startSession, type GameDetails } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+
+const DEFAULT_LOGO = '/images/logo/logo.png';
 
 interface GamePageParams {
   [key: string]: string;
@@ -112,13 +115,29 @@ export default function GameDetailsPage() {
           {/* Main Info */}
           <div className="lg:col-span-2">
             {game.imageUrl && (
-              <img
-                src={game.imageUrl}
-                alt={game.title}
-                className="w-full h-64 object-cover rounded-xl mb-6"
-              />
+              <div className="relative w-full h-64 mb-6 rounded-xl overflow-hidden">
+                <Image
+                  src={game.imageUrl}
+                  alt={game.title}
+                  fill
+                  className="object-cover"
+                  quality={85}
+                />
+              </div>
             )}
-            
+            {!game.imageUrl && (
+              <div className="relative w-full h-64 mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-primary/30 to-surface-elevated flex items-center justify-center">
+                <Image
+                  src={DEFAULT_LOGO}
+                  alt={game.title}
+                  fill
+                  className="object-contain p-8"
+                  quality={100}
+                  unoptimized
+                />
+              </div>
+            )}
+
             <h1 className="text-3xl font-bold mb-4 text-text-primary">{game.title}</h1>
             
             <div className="flex flex-wrap gap-4 mb-6">
