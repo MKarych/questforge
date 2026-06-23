@@ -183,6 +183,12 @@ _count: {
   }
 
   async findOnePublic(gameId: string) {
+    // Validate UUID format to prevent Prisma errors
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(gameId)) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
     const game = await this.prisma.game.findUnique({
       where: { id: gameId, deletedAt: null },
       include: {

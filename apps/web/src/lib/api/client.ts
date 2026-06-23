@@ -1,5 +1,6 @@
-// API Base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+// API Base URL — используем относительный путь, чтобы запросы шли через Next.js rewrite
+// на тот же origin (localhost:3001), избегая CORS-проблем
+const API_BASE_URL = '/api';
 
 // Shared types from backend
 export interface Game {

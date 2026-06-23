@@ -220,5 +220,16 @@
 
 ---
 
+## 14. Аккаунты для тестов 
+
+**Аккаунты:**
+
+- **ORGANIZER:** testplayer1@test.com / 123123
+- **ADMIN:** testplayer2@test.com / 123123
+- **MODERATOR:** testplayer3@test.com / 123123
+- **PLAYER:** testplayer4@test.com / 123123
+
+---
+
 **Дата:** 23.06.2026  
 **Статус:** Утвержден. Нарушение = переработка кода.
