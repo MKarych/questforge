@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getScenarios, publishScenario, type Scenario } from '@/lib/api/client';
+import { getScenarios, publishScenario, deleteScenario, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function ScenariosPage() {
   const router = useRouter();
@@ -13,16 +14,19 @@ export default function ScenariosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadScenarios() {
       try {
+        // No published filter — show ALL user scenarios (drafts + published)
         const response = await getScenarios();
         setScenarios(response.data.data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарии';
         setError(message);
-        // If unauthorized, redirect to login
         if (err instanceof Error && err.message.includes('401')) {
           router.push('/auth/login');
         }
@@ -45,6 +49,32 @@ export default function ScenariosPage() {
     } finally {
       setPublishingId(null);
     }
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteTargetId(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTargetId) return;
+    setDeletingId(deleteTargetId);
+    setShowDeleteModal(false);
+    try {
+      await deleteScenario(deleteTargetId);
+      setScenarios(prev => prev.filter(s => s.id !== deleteTargetId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось удалить сценарий';
+      setError(message);
+    } finally {
+      setDeletingId(null);
+      setDeleteTargetId(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setDeleteTargetId(null);
   };
 
   if (loading) {
@@ -112,15 +142,17 @@ export default function ScenariosPage() {
                   <h3 className="text-lg font-semibold text-text-primary">
                     {scenario.name}
                   </h3>
-                  {scenario.isPublished ? (
-                    <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-success/10 text-success">
-                      Опубликован
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-surface-elevated text-text-muted">
-                      Черновик
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {scenario.isPublished ? (
+                      <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-success/10 text-success">
+                        Опубликован
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-surface-elevated text-text-muted">
+                        Черновик
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2 text-sm text-text-secondary mb-4">
                   <div className="flex items-center justify-between">
@@ -162,12 +194,32 @@ export default function ScenariosPage() {
                       {publishingId === scenario.id ? 'Публикация...' : 'Опубликовать'}
                     </button>
                   )}
+                  <button
+                    className="btn-outline text-sm px-3 text-error hover:text-error"
+                    onClick={() => handleDeleteClick(scenario.id)}
+                    disabled={deletingId === scenario.id}
+                    title="Удалить сценарий"
+                  >
+                    {deletingId === scenario.id ? '...' : '🗑️'}
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Удалить сценарий"
+        message="Вы уверены, что хотите удалить этот сценарий? Это действие нельзя отменить."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        variant="danger"
+      />
     </div>
   );
 }

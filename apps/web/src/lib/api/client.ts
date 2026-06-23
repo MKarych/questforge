@@ -511,6 +511,12 @@ class ApiClient {
     });
   }
 
+  async deleteScenario(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/scenarios/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ==================== Sessions ====================
 
   async createSession(data: CreateSessionRequest): Promise<ApiResponse<Session>> {
@@ -635,6 +641,7 @@ export const updateScenario = (id: string, data: Partial<CreateScenarioRequest>)
 export const createScenario = (data: CreateScenarioRequest) => apiClient.createScenario(data);
 export const publishScenario = (id: string, price?: number, licenseType?: string) =>
   apiClient.publishScenario(id, price, licenseType);
+export const deleteScenario = (id: string) => apiClient.deleteScenario(id);
 export const getScenariosForGame = () => apiClient.getScenarios({ published: true });
 export const startSession = (data: CreateSessionRequest) => apiClient.createSession(data);
 export const submitAnswer = (teamId: string, gameId: string, nodeId: string, answer: string) =>

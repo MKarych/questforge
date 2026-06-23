@@ -42,6 +42,7 @@ export default function NodeSettings({ node, allNodes, onUpdate, onDelete, onClo
     TIMER: '⏱ Таймер',
     BRANCH: '🔀 Ветвление',
     NPC: '🗣 NPC',
+    AR: '🧩 AR',
   };
 
   const renderCommonFields = () => (

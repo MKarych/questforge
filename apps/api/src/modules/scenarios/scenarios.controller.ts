@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -34,7 +35,7 @@ export class ScenariosController {
     @Query('offset') offset?: number,
   ) {
     return this.scenariosService.findAll(req.user.userId, {
-      published: published === 'true',
+      published: published !== undefined ? published === 'true' : undefined,
       limit: Number(limit),
       offset: Number(offset),
     });
@@ -52,6 +53,11 @@ export class ScenariosController {
     @Body() dto: Partial<CreateScenarioDto>,
   ) {
     return this.scenariosService.update(req.user.userId, scenarioId, dto);
+  }
+
+  @Delete(':id')
+  async delete(@Request() req: any, @Param('id') scenarioId: string) {
+    return this.scenariosService.delete(req.user.userId, scenarioId);
   }
 
   @Post(':id/validate')

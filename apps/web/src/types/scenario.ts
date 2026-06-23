@@ -52,9 +52,16 @@ export interface ScenarioNodeData {
   npcName?: string;
   npcDescription?: string;
   npcDialogues?: Array<{ npcText: string; options: Array<{ text: string; target: string }> }>;
+  // AR
+  arModelUrl?: string;
+  arAction?: string;
+  arTrigger?: string;
   // General
   points?: number;
   penalty?: number;
+  // Validation state (for visual feedback on canvas)
+  validationStatus?: 'error' | 'blocked' | 'ok';
+  validationMessage?: string;
 }
 
 export type ScenarioNode = Node<ScenarioNodeData, NodeType>;

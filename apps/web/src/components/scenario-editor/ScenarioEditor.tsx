@@ -184,6 +184,9 @@ function ScenarioEditorInner({
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
   const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes || []);
   const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges || []);
+
+  console.log('[ScenarioEditor] initialNodes:', initialNodes?.length, initialNodes);
+  console.log('[ScenarioEditor] initialEdges:', initialEdges?.length, initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
@@ -327,19 +330,19 @@ function ScenarioEditorInner({
       }
 
       // Cmd/Ctrl+Z - Undo
-      if (isModKey(e) && !e.shiftKey && e.key === 'z') {
+      if (isModKey(e) && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
         undo();
       }
 
       // Cmd/Ctrl+Shift+Z - Redo
-      if (isModKey(e) && e.shiftKey && e.key === 'z') {
+      if (isModKey(e) && e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
         redo();
       }
 
       // Cmd/Ctrl+C - Copy
-      if (isModKey(e) && e.key === 'c') {
+      if (isModKey(e) && e.code === 'KeyC') {
         e.preventDefault();
         if (selectedNode) {
           setCopiedNode(selectedNode);
@@ -347,7 +350,7 @@ function ScenarioEditorInner({
       }
 
       // Cmd/Ctrl+V - Paste
-      if (isModKey(e) && e.key === 'v') {
+      if (isModKey(e) && e.code === 'KeyV') {
         e.preventDefault();
         if (copiedNode) {
           pasteNode(copiedNode);
@@ -355,7 +358,7 @@ function ScenarioEditorInner({
       }
 
       // Cmd/Ctrl+A - Select all nodes
-      if (isModKey(e) && e.key === 'a') {
+      if (isModKey(e) && e.code === 'KeyA') {
         e.preventDefault();
         if (nodes.length > 0) {
           reactFlowInstance.setNodes((nds: Node[]) =>
@@ -748,10 +751,16 @@ function ScenarioEditorInner({
           (e) => e.nodeId === node.id
         )?.message;
 
+        // Ensure node has position (React Flow requires position.x and position.y)
+        const safePosition = node.position || { x: 0, y: 0 };
+        // Ensure node has data (ScenarioNode reads data.validationStatus, data.icon, data.label, etc.)
+        const safeData = node.data || { label: 'Узел', icon: '📄' };
+
         return {
           ...node,
+          position: safePosition,
           data: {
-            ...node.data,
+            ...safeData,
             validationStatus,
             validationMessage: errorMsg,
           },

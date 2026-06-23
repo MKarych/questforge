@@ -12,6 +12,8 @@ export class ScenariosService {
     // Debug: log raw dto
     console.log('DEBUG create dto:', JSON.stringify(dto));
     console.log('DEBUG nodes:', JSON.stringify(dto.nodes));
+    console.log('DEBUG edges:', JSON.stringify((dto as any).edges));
+    console.log('DEBUG metadata:', JSON.stringify((dto as any).metadata));
     // Ensure nodes are properly parsed
     let nodes = dto.nodes || [];
     let startNodeId = dto.startNodeId;
@@ -209,6 +211,32 @@ export class ScenariosService {
         ...(licenseType !== undefined && { licenseType }),
       },
     });
+  }
+
+  async delete(userId: string, scenarioId: string) {
+    const scenario = await this.prisma.scenario.findUnique({
+      where: { id: scenarioId },
+    });
+
+    if (!scenario) {
+      throw new NotFoundException('Scenario not found');
+    }
+
+    if (scenario.authorId !== userId) {
+      throw new ForbiddenException('You do not have access to this scenario');
+    }
+
+    // Delete associated versions first
+    await this.prisma.scenarioVersion.deleteMany({
+      where: { scenarioId },
+    });
+
+    await this.prisma.scenario.delete({
+      where: { id: scenarioId },
+    });
+
+    this.logger.log(`Scenario deleted: ${scenarioId} by user ${userId}`);
+    return { message: 'Scenario deleted successfully' };
   }
 
   async createVersion(userId: string, scenarioId: string, nodes: any[], versionNote?: string) {

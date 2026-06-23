@@ -37,17 +37,36 @@ export default function EditScenarioPage() {
       try {
         const response = await getScenario(scenarioId);
         const data = response.data as any;
+        console.log('[EditPage] API response.data:', data);
+        console.log('[EditPage] nodes from API:', data?.nodes);
+        console.log('[EditPage] edges from API:', data?.edges);
         setScenario(data);
         setInitialName(data.name || '');
 
-        // Restore nodes from backend JSON
+        // Restore nodes from backend JSON — ensure each node has required React Flow fields
         if (data.nodes && Array.isArray(data.nodes)) {
-          setInitialNodes(data.nodes);
+          console.log('[EditPage] Restoring nodes:', data.nodes.length);
+          const restoredNodes = data.nodes.map((node: any) => ({
+            ...node,
+            // Ensure position exists (React Flow requires position.x and position.y)
+            position: node.position || { x: 0, y: 0 },
+            // Ensure type exists (React Flow uses it for nodeTypes lookup)
+            type: node.type || 'TEXT',
+            // Ensure data exists (ScenarioNode reads data.validationStatus, data.icon, data.label, etc.)
+            data: node.data || { label: 'Узел', icon: '📄' },
+          }));
+          console.log('[EditPage] Restored nodes:', restoredNodes);
+          setInitialNodes(restoredNodes);
+        } else {
+          console.log('[EditPage] No nodes in API response, data.nodes:', data?.nodes);
         }
 
         // Restore edges from backend JSON
         if (data.edges && Array.isArray(data.edges)) {
+          console.log('[EditPage] Restoring edges:', data.edges.length);
           setInitialEdges(data.edges);
+        } else {
+          console.log('[EditPage] No edges in API response');
         }
 
         // Restore settings from backend JSON (stored in metadata)
@@ -57,11 +76,13 @@ export default function EditScenarioPage() {
             try { metadata = JSON.parse(metadata); } catch {}
           }
           if (metadata?.settings) {
+            console.log('[EditPage] Restoring settings:', metadata.settings);
             setInitialSettings(metadata.settings);
           }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарий';
+        console.error('[EditPage] Load error:', err);
         setError(message);
         if (err instanceof Error && err.message.includes('401')) {
           router.push('/auth/login');

@@ -36,21 +36,26 @@ export default function CreateScenarioPage() {
       const token = localStorage.getItem('auth_token');
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+      const body = {
+        name: data.name,
+        nodes: data.nodes,
+        edges: data.edges,
+        startNodeId: data.startNodeId,
+        metadata: {
+          settings: data.settings,
+        },
+      };
+      console.log('[CreatePage] Sending save body:', body);
+      console.log('[CreatePage] nodes count:', data.nodes?.length);
+      console.log('[CreatePage] edges count:', data.edges?.length);
+
       const response = await fetch(`${API_URL}/scenarios`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: data.name,
-          nodes: data.nodes,
-          edges: data.edges,
-          startNodeId: data.startNodeId,
-          metadata: {
-            settings: data.settings,
-          },
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
