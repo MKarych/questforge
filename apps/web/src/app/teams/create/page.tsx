@@ -24,7 +24,9 @@ function CreateTeamContent() {
       localStorage.setItem('currentTeamId', response.data.id);
       router.push(`/teams/${response.data.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка создания команды');
+      const message = err instanceof Error ? err.message : 'Ошибка создания команды';
+      setError(message);
+      console.error('Create team error:', err);
     } finally {
       setLoading(false);
     }

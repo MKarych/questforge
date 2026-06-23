@@ -13,7 +13,7 @@ export class TeamsService {
     });
 
     if (existingTeam) {
-      throw new BadRequestException('� ��� ��� ���� �������');
+      throw new BadRequestException('У вас уже есть команда. Вы можете создать только одну команду.');
     }
 
     const team = await this.prisma.team.create({
@@ -92,7 +92,7 @@ export class TeamsService {
       },
     });
 
-    if (!team) throw new NotFoundException('������� �� �������');
+    if (!team) throw new NotFoundException('Команда не найдена');
 
     return {
       id: team.id,
@@ -115,54 +115,54 @@ export class TeamsService {
 
   async invite(captainId: string, teamId: string, dto: InviteUserDto) {
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
-    if (!team) throw new NotFoundException('������� �� �������');
-    if (team.captainId !== captainId) throw new ForbiddenException('������ ������� ����� ����������');
+    if (!team) throw new NotFoundException('Команда не найдена');
+    if (team.captainId !== captainId) throw new ForbiddenException('Только капитан может приглашать');
 
     const existingMember = await this.prisma.teamMember.findFirst({ where: { teamId, userId: dto.userId } });
-    if (existingMember) throw new BadRequestException('������������ ��� ������� � �������');
+    if (existingMember) throw new BadRequestException('Пользователь уже в команде');
 
     const member = await this.prisma.teamMember.create({
       data: { teamId, userId: dto.userId, role: 'member', status: 'pending' },
     });
 
-    return { status: 'invited', inviteId: member.id, message: '����������� ����������' };
+    return { status: 'invited', inviteId: member.id, message: 'Приглашение отправлено' };
   }
 
   async join(userId: string, teamId: string) {
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
-    if (!team) throw new NotFoundException('������� �� �������');
+    if (!team) throw new NotFoundException('Команда не найдена');
 
     const member = await this.prisma.teamMember.findFirst({ where: { teamId, userId } });
-    if (!member) throw new BadRequestException('����������� �� �������');
-    if (member.status !== 'pending') throw new BadRequestException('������������ ������');
+    if (!member) throw new BadRequestException('Приглашение не найдено');
+    if (member.status !== 'pending') throw new BadRequestException('Приглашение уже принято');
 
     await this.prisma.teamMember.update({ where: { id: member.id }, data: { status: 'active' } });
-    return { status: 'joined', teamId, message: '�� ������� �������� � �������' };
+    return { status: 'joined', teamId, message: 'Вы успешно вступили в команду' };
   }
 
   async leave(userId: string, teamId: string) {
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
-    if (!team) throw new NotFoundException('������� �� �������');
+    if (!team) throw new NotFoundException('Команда не найдена');
 
     const member = await this.prisma.teamMember.findFirst({ where: { teamId, userId } });
-    if (!member) throw new NotFoundException('�� �� �������� � ���� �������');
-    if (member.role === 'captain') throw new BadRequestException('������� �� ����� �������� �������');
+    if (!member) throw new NotFoundException('Вы не участник этой команды');
+    if (member.role === 'captain') throw new BadRequestException('Капитан не может покинуть команду');
 
     await this.prisma.teamMember.update({ where: { id: member.id }, data: { status: 'left', leftAt: new Date() } });
-    return { status: 'left', message: '�� �������� �������' };
+    return { status: 'left', message: 'Вы покинули команду' };
   }
 
   async removeMember(captainId: string, teamId: string, targetUserId: string) {
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
-    if (!team) throw new NotFoundException('������� �� �������');
-    if (team.captainId !== captainId) throw new ForbiddenException('������ ������� ����� ���������');
-    if (targetUserId === captainId) throw new BadRequestException('������ ��������� ��������');
+    if (!team) throw new NotFoundException('Команда не найдена');
+    if (team.captainId !== captainId) throw new ForbiddenException('Только капитан может исключать');
+    if (targetUserId === captainId) throw new BadRequestException('Нельзя исключить себя');
 
     const member = await this.prisma.teamMember.findFirst({ where: { teamId, userId: targetUserId } });
-    if (!member) throw new NotFoundException('�������� �� ������');
+    if (!member) throw new NotFoundException('Участник не найден');
 
     await this.prisma.teamMember.update({ where: { id: member.id }, data: { status: 'kicked', leftAt: new Date() } });
-    return { status: 'removed', message: '�������� �������� �� �������' };
+    return { status: 'removed', message: 'Участник исключен из команды' };
   }
 
   async getMyTeam(userId: string) {
