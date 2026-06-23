@@ -8,6 +8,10 @@ import ReactFlow, {
   addEdge,
   useNodesState,
   useEdgesState,
+  BaseEdge,
+  getBezierPath,
+  EdgeProps,
+  useReactFlow,
   Connection,
   Edge,
   Node,
@@ -43,6 +47,106 @@ const nodeTypes = {
   NPC: ScenarioNode,
 };
 
+// Custom edge component with visual feedback and delete button
+const ScenarioEdgeComponent = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  selected,
+  data,
+}: EdgeProps) => {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const { setEdges } = useReactFlow();
+
+  const handleDeleteEdge = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEdges((eds: Edge[]) => eds.filter((edge) => edge.id !== id));
+    },
+    [id, setEdges]
+  );
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{
+          stroke: selected ? '#f97316' : '#64748b',
+          strokeWidth: selected ? 3 : 2,
+          transition: 'stroke 0.15s, stroke-width 0.15s',
+          cursor: 'pointer',
+        }}
+      />
+      {/* Edge condition label */}
+      {data?.condition?.label && (
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            background: selected ? '#f97316' : '#334155',
+            color: '#fff',
+            fontSize: 10,
+            padding: '2px 6px',
+            borderRadius: 4,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {data.condition.label}
+        </div>
+      )}
+      {/* Delete button on hover */}
+      <div
+        style={{
+          position: 'absolute',
+          transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + 16}px)`,
+          opacity: 0,
+          transition: 'opacity 0.15s',
+          cursor: 'pointer',
+        }}
+        className="edge-delete-btn group-hover:opacity-100"
+        onClick={handleDeleteEdge}
+        title="Удалить соединение"
+      >
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            background: '#ef4444',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            fontWeight: 'bold',
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </div>
+      </div>
+    </>
+  );
+};
+
+const edgeTypes = {
+  default: ScenarioEdgeComponent,
+};
+
 interface HistoryState {
   nodes: Node<ScenarioNodeData>[];
   edges: Edge[];
@@ -54,16 +158,20 @@ interface HistoryState {
 
 interface ScenarioEditorProps {
   scenarioName?: string;
+  initialNodes?: Node<ScenarioNodeData>[];
+  initialEdges?: Edge[];
+  initialSettings?: GameSettings;
   onSave?: (data: any) => void;
   onNodesChange?: () => void;
   onEdgesChange?: () => void;
 }
 
-export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: onNodesChangeCallback, onEdgesChange: onEdgesChangeCallback }: ScenarioEditorProps) {
+export default function ScenarioEditor({ scenarioName, initialNodes, initialEdges, initialSettings, onSave, onNodesChange: onNodesChangeCallback, onEdgesChange: onEdgesChangeCallback }: ScenarioEditorProps) {
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
-  const [nodes, setNodes, handleNodesChange] = useNodesState([]);
-  const [edges, setEdges, handleEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes || []);
+  const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges || []);
   const [selectedNode, setSelectedNode] = useState<Node<ScenarioNodeData> | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationResult>({ valid: true, errors: [] });
   const [showPreview, setShowPreview] = useState(false);
   const [showTest, setShowTest] = useState(false);
@@ -74,14 +182,16 @@ export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: on
   const [showSettings, setShowSettings] = useState(false);
 
   // Game settings
-  const [gameSettings, setGameSettings] = useState<GameSettings>({
-    totalTime: 0,
-    defaultPoints: 10,
-    defaultPenalty: 0,
-    hintLimit: 3,
-    maxAttempts: 3,
-    variables: [],
-  });
+  const [gameSettings, setGameSettings] = useState<GameSettings>(
+    initialSettings || {
+      totalTime: 0,
+      defaultPoints: 10,
+      defaultPenalty: 0,
+      hintLimit: 3,
+      maxAttempts: 3,
+      variables: [],
+    }
+  );
 
   // Test mode state
   const [testCurrentNodeId, setTestCurrentNodeId] = useState<string | null>(null);
@@ -153,50 +263,70 @@ export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: on
     }
   }, [history, historyIndex, setNodes, setEdges]);
 
+  const deleteEdge = useCallback(
+    (edgeId: string) => {
+      saveHistory('disconnect', undefined, edgeId);
+      setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+      setSelectedEdge(null);
+    },
+    [setEdges, saveHistory]
+  );
+
   // Keyboard shortcuts
   useEffect(() => {
+    const isModKey = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if editing input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
-      // Delete
+      // Delete/Backspace - delete selected node or edge
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNode) {
           e.preventDefault();
           deleteNode(selectedNode.id);
+        } else if (selectedEdge) {
+          e.preventDefault();
+          deleteEdge(selectedEdge.id);
         }
       }
 
-      // Ctrl+S - Save
-      if (e.ctrlKey && e.key === 's') {
+      // Esc - deselect everything
+      if (e.key === 'Escape') {
+        setSelectedNode(null);
+        setSelectedEdge(null);
+      }
+
+      // Cmd/Ctrl+S - Save
+      if (isModKey(e) && e.key === 's') {
         e.preventDefault();
         handleSave();
       }
 
-      // Ctrl+Z - Undo
-      if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+      // Cmd/Ctrl+Z - Undo
+      if (isModKey(e) && !e.shiftKey && e.key === 'z') {
         e.preventDefault();
         undo();
       }
 
-      // Ctrl+Shift+Z - Redo
-      if (e.ctrlKey && e.shiftKey && e.key === 'z') {
+      // Cmd/Ctrl+Shift+Z - Redo
+      if (isModKey(e) && e.shiftKey && e.key === 'z') {
         e.preventDefault();
         redo();
       }
 
-      // Ctrl+C - Copy
-      if (e.ctrlKey && e.key === 'c') {
+      // Cmd/Ctrl+C - Copy
+      if (isModKey(e) && e.key === 'c') {
         e.preventDefault();
         if (selectedNode) {
           setCopiedNode(selectedNode);
         }
       }
 
-      // Ctrl+V - Paste
-      if (e.ctrlKey && e.key === 'v') {
+      // Cmd/Ctrl+V - Paste
+      if (isModKey(e) && e.key === 'v') {
         e.preventDefault();
         if (copiedNode) {
           pasteNode(copiedNode);
@@ -206,7 +336,7 @@ export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: on
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNode, historyIndex, history, copiedNode, undo, redo]);
+  }, [selectedNode, selectedEdge, historyIndex, history, copiedNode, undo, redo, deleteEdge]);
 
   const onDragStart = (event: React.DragEvent, blockType: BlockType) => {
     event.dataTransfer.setData('application/reactflow', blockType.type);
@@ -308,6 +438,24 @@ export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: on
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setSelectedNode(node as Node<ScenarioNodeData>);
+    },
+    []
+  );
+
+  const onEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      setSelectedEdge(edge);
+      setSelectedNode(null);
+    },
+    []
+  );
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Node[]; edges: Edge[] }) => {
+      if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+        setSelectedNode(null);
+        setSelectedEdge(null);
+      }
     },
     []
   );
@@ -823,11 +971,19 @@ export default function ScenarioEditor({ scenarioName, onSave, onNodesChange: on
             }}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            onSelectionChange={onSelectionChange}
+            onPaneClick={() => {
+              setSelectedNode(null);
+              setSelectedEdge(null);
+            }}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             snapToGrid
             snapGrid={[15, 15]}
             className="bg-background"
+            deleteKeyCode={null}
           >
             <Background color="#888" gap={20} />
             <Controls />

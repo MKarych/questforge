@@ -1,33 +1,65 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getScenario, updateScenario, publishScenario, type Scenario } from '@/lib/api/client';
+import { getScenario, publishScenario, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import ScenarioEditor from '@/components/scenario-editor/ScenarioEditor';
+import type { Node, Edge } from 'reactflow';
+import type { ScenarioNodeData, GameSettings } from '@/types/scenario';
 
 export default function EditScenarioPage() {
   const router = useRouter();
   const params = useParams();
   const scenarioId = params.id as string;
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
-  const [name, setName] = useState('');
   const [showExitModal, setShowExitModal] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const hasNavigatedRef = useRef(false);
+
+  // Loaded data for ScenarioEditor
+  const [initialName, setInitialName] = useState('');
+  const [initialNodes, setInitialNodes] = useState<Node<ScenarioNodeData>[]>([]);
+  const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
+  const [initialSettings, setInitialSettings] = useState<GameSettings | undefined>(undefined);
 
   useEffect(() => {
     async function loadScenario() {
       try {
         const response = await getScenario(scenarioId);
-        setScenario(response.data);
-        setName(response.data.name);
+        const data = response.data as any;
+        setScenario(data);
+        setInitialName(data.name || '');
+
+        // Restore nodes from backend JSON
+        if (data.nodes && Array.isArray(data.nodes)) {
+          setInitialNodes(data.nodes);
+        }
+
+        // Restore edges from backend JSON
+        if (data.edges && Array.isArray(data.edges)) {
+          setInitialEdges(data.edges);
+        }
+
+        // Restore settings from backend JSON (stored in metadata)
+        if (data.metadata) {
+          let metadata = data.metadata;
+          if (typeof metadata === 'string') {
+            try { metadata = JSON.parse(metadata); } catch {}
+          }
+          if (metadata?.settings) {
+            setInitialSettings(metadata.settings);
+          }
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарий';
         setError(message);
@@ -44,14 +76,84 @@ export default function EditScenarioPage() {
     }
   }, [scenarioId, router]);
 
-  // Track name changes
-  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-    setName(newName);
-    if (scenario && newName !== scenario.name) {
+  const handleNodesChange = useCallback(() => {
+    if (!hasNavigatedRef.current) {
       setIsDirty(true);
     }
-  }, [scenario]);
+  }, []);
+
+  const handleEdgesChange = useCallback(() => {
+    if (!hasNavigatedRef.current) {
+      setIsDirty(true);
+    }
+  }, []);
+
+  const handleSave = async (data: any) => {
+    if (!scenario) return;
+    hasNavigatedRef.current = true;
+    setSaving(true);
+    setError(null);
+    setToast(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+      const response = await fetch(`${API_URL}/scenarios/${scenarioId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: data.name,
+          nodes: data.nodes,
+          edges: data.edges,
+          startNodeId: data.startNodeId,
+          metadata: {
+            settings: data.settings,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || 'Ошибка при сохранении сценария');
+      }
+
+      const result = await response.json();
+      setScenario(prev => prev ? { ...prev, ...result } : null);
+      setIsDirty(false);
+      setToast({ type: 'success', message: '✅ Сценарий сохранён' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось сохранить сценарий';
+      setError(message);
+      setToast({ type: 'error', message: `❌ Ошибка: ${message}` });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!scenario) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      await publishScenario(scenarioId);
+      setScenario(prev => prev ? { ...prev, isPublished: true } : null);
+      setToast({ type: 'success', message: '✅ Сценарий опубликован' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось опубликовать сценарий';
+      setError(message);
+      setToast({ type: 'error', message: `❌ Ошибка: ${message}` });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const handleExit = () => {
     if (isDirty) {
@@ -67,38 +169,6 @@ export default function EditScenarioPage() {
 
   const handleCancelExit = () => {
     setShowExitModal(false);
-  };
-
-  const handleSave = async () => {
-    if (!scenario) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await updateScenario(scenarioId, { name });
-      setScenario(prev => prev ? { ...prev, name } : null);
-      setIsDirty(false);
-      router.push('/organizer/scenarios');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Не удалось сохранить сценарий';
-      setError(message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePublish = async () => {
-    if (!scenario) return;
-    setPublishing(true);
-    setError(null);
-    try {
-      await publishScenario(scenarioId);
-      setScenario(prev => prev ? { ...prev, isPublished: true } : null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Не удалось опубликовать сценарий';
-      setError(message);
-    } finally {
-      setPublishing(false);
-    }
   };
 
   if (loading) {
@@ -131,7 +201,7 @@ export default function EditScenarioPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      
+
       {/* Top Bar with Exit Button */}
       <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
         <button
@@ -141,80 +211,59 @@ export default function EditScenarioPage() {
         >
           ← Выйти
         </button>
-        <span className="text-xs text-text-secondary">
-          {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
-        </span>
+        <div className="flex items-center gap-3">
+          {!scenario?.isPublished && (
+            <button
+              onClick={handlePublish}
+              disabled={publishing}
+              className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {publishing ? 'Публикация...' : '📢 Опубликовать'}
+            </button>
+          )}
+          <span className="text-xs text-text-secondary">
+            {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
+          </span>
+          <span className="text-xs text-text-secondary">
+            v{scenario?.version || 1}
+          </span>
+        </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Link href="/organizer/scenarios" className="text-text-secondary hover:text-text-primary text-sm">
-            ← Назад к сценариям
-          </Link>
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
+            toast.type === 'success'
+              ? 'bg-green-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          {toast.message}
         </div>
+      )}
 
-        <div className="max-w-2xl mx-auto">
-          <div className="card">
-            <h1 className="text-2xl font-bold text-text-primary mb-2">Редактировать сценарий</h1>
-            <p className="text-text-secondary mb-6">
-              Версия: v{scenario?.version || 1} | Статус: {scenario?.isPublished ? 'Опубликован' : 'Черновик'}
-            </p>
-
-            <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-5">
-              {error && (
-                <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="label">Название сценария</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={handleNameChange}
-                  className="input-field"
-                  required
-                />
-              </div>
-
-              <div className="pt-4 border-t border-border">
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? 'Сохранение...' : 'Сохранить'}
-                  </button>
-                  {!scenario?.isPublished && (
-                    <button
-                      type="button"
-                      onClick={handlePublish}
-                      disabled={publishing}
-                      className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {publishing ? 'Публикация...' : 'Опубликовать'}
-                    </button>
-                  )}
-                  <Link href="/organizer/scenarios" className="btn-secondary">
-                    Отмена
-                  </Link>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          <div className="card mt-6">
-            <h3 className="font-semibold text-text-primary mb-2">ℹ️ Информация</h3>
-            <div className="space-y-2 text-sm text-text-secondary">
-              <p>Создан: {scenario?.createdAt ? new Date(scenario.createdAt).toLocaleDateString('ru-RU') : '—'}</p>
-              <p>Версия: v{scenario?.version || 1}</p>
-              <p>Статус: {scenario?.isPublished ? 'Опубликован' : 'Черновик'}</p>
+      <div className={saving ? 'opacity-50 pointer-events-none' : ''}>
+        <ScenarioEditor
+          scenarioName={initialName}
+          initialNodes={initialNodes}
+          initialEdges={initialEdges}
+          initialSettings={initialSettings}
+          onSave={handleSave}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+        />
+      </div>
+      {saving && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="bg-background p-6 rounded-lg shadow-xl">
+            <div className="text-center">
+              <div className="text-4xl mb-4">💾</div>
+              <div className="text-lg font-semibold text-text-primary">Сохранение...</div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Exit Confirmation Modal */}
       <ConfirmModal

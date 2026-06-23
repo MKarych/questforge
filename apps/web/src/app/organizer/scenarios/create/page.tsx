@@ -11,6 +11,7 @@ export default function CreateScenarioPage() {
   const [saving, setSaving] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const hasNavigatedRef = useRef(false);
 
   // Track changes in the editor
@@ -29,6 +30,7 @@ export default function CreateScenarioPage() {
   const handleSave = async (data: any) => {
     hasNavigatedRef.current = true;
     setSaving(true);
+    setToast(null);
 
     try {
       const token = localStorage.getItem('auth_token');
@@ -42,31 +44,30 @@ export default function CreateScenarioPage() {
         },
         body: JSON.stringify({
           name: data.name,
-          nodes: data.nodes.map((node: any) => ({
-            id: node.id,
-            type: node.type,
-            position: node.position,
-            data: node.data,
-          })),
-          edges: data.edges.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            label: edge.label,
-          })),
+          nodes: data.nodes,
+          edges: data.edges,
           startNodeId: data.startNodeId,
+          metadata: {
+            settings: data.settings,
+          },
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Ошибка при сохранении сценария');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || 'Ошибка при сохранении сценария');
       }
 
-      await response.json();
-      router.push('/organizer/scenarios');
+      const result = await response.json();
+      setToast({ type: 'success', message: '✅ Сценарий создан!' });
+      setTimeout(() => {
+        router.push(`/organizer/scenarios/${result.id}/edit`);
+      }, 1000);
     } catch (err) {
       console.error('Failed to create scenario:', err);
-      alert('❌ Не удалось сохранить сценарий');
+      const message = err instanceof Error ? err.message : 'Не удалось сохранить сценарий';
+      setToast({ type: 'error', message: `❌ Ошибка: ${message}` });
+      setTimeout(() => setToast(null), 5000);
     } finally {
       setSaving(false);
     }
@@ -105,6 +106,19 @@ export default function CreateScenarioPage() {
           {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
         </span>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
+            toast.type === 'success'
+              ? 'bg-green-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
 
       <div className={saving ? 'opacity-50 pointer-events-none' : ''}>
         <ScenarioEditor
