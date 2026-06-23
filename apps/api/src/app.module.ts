@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EngineModule } from './engine/engine.module';
@@ -20,6 +22,18 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, jwtConfig],
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: 60000, // 1 minute
+            limit: config.get<number>('RATE_LIMIT_MAX') || 100, // 100 requests per minute
+          },
+        ],
+      }),
+    }),
     PrismaModule,
     AuthModule,
     GamesModule,
@@ -32,6 +46,12 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     EngineModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

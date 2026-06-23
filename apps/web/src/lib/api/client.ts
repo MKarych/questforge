@@ -335,7 +335,13 @@ class ApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
+    retries = 2,
   ): Promise<T> {
+    // Проверка онлайн-статуса перед запросом
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('Нет подключения к интернету');
+    }
+
     const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -346,19 +352,39 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      const error: ApiError = data;
-      throw new Error(error.error?.message || 'Request failed');
+        if (!response.ok) {
+          const error: ApiError = data;
+          throw new Error(error.error?.message || 'Request failed');
+        }
+
+        return data as T;
+      } catch (err) {
+        // Если это последняя попытка — пробрасываем ошибку
+        if (attempt === retries) {
+          // Проверяем, не связано ли с офлайн-статусом
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            throw new Error('Нет подключения к интернету');
+          }
+          throw err;
+        }
+
+        // Экспоненциальная задержка перед повторной попыткой
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt), 5000))
+        );
+      }
     }
 
-    return data as T;
+    throw new Error('Request failed');
   }
 
   /**

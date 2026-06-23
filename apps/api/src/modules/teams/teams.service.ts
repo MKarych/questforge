@@ -3,6 +3,8 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class TeamsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -14,6 +16,15 @@ export class TeamsService {
 
     if (existingTeam) {
       throw new BadRequestException('У вас уже есть команда. Вы можете создать только одну команду.');
+    }
+
+    // Проверка уникальности имени команды
+    const existingName = await this.prisma.team.findFirst({
+      where: { name: dto.name },
+    });
+
+    if (existingName) {
+      throw new BadRequestException('Команда с таким названием уже существует');
     }
 
     const team = await this.prisma.team.create({
@@ -80,6 +91,9 @@ export class TeamsService {
   }
 
   async findOne(id: string) {
+    if (!UUID_REGEX.test(id)) {
+      throw new NotFoundException('Команда не найдена');
+    }
     const team = await this.prisma.team.findUnique({
       where: { id },
       include: {
@@ -114,6 +128,9 @@ export class TeamsService {
   }
 
   async invite(captainId: string, teamId: string, dto: InviteUserDto) {
+    if (!UUID_REGEX.test(teamId)) {
+      throw new NotFoundException('Команда не найдена');
+    }
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
     if (!team) throw new NotFoundException('Команда не найдена');
     if (team.captainId !== captainId) throw new ForbiddenException('Только капитан может приглашать');
