@@ -122,7 +122,9 @@ export default function EditScenarioPage() {
       }
 
       const result = await response.json();
-      setScenario(prev => prev ? { ...prev, ...result } : null);
+      // Response is wrapped in { success: true, data: { ... } } by TransformInterceptor
+      const scenarioData = result?.data || result;
+      setScenario(prev => prev ? { ...prev, ...scenarioData } : null);
       setIsDirty(false);
       setToast({ type: 'success', message: '✅ Сценарий сохранён' });
       setTimeout(() => setToast(null), 3000);

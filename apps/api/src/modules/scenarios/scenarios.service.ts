@@ -14,7 +14,6 @@ export class ScenariosService {
     console.log('DEBUG nodes:', JSON.stringify(dto.nodes));
     // Ensure nodes are properly parsed
     let nodes = dto.nodes || [];
-    const edges: any[] = [];
     let startNodeId = dto.startNodeId;
 
     // If dto has extra fields not in Scenario model, extract them
@@ -26,6 +25,10 @@ export class ScenariosService {
       if (startNode) startNodeId = startNode.id;
     }
 
+    // Extract edges and metadata from the raw dto (they come through as extra fields)
+    const edges = (dto as any).edges || [];
+    const metadata = (dto as any).metadata || {};
+
     const scenario = await this.prisma.scenario.create({
       data: {
         name: dto.name,
@@ -36,6 +39,7 @@ export class ScenariosService {
         startNodeId: startNodeId || 'node-1',
         price,
         licenseType,
+        metadata,
       },
     });
 

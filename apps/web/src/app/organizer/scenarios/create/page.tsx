@@ -59,9 +59,16 @@ export default function CreateScenarioPage() {
       }
 
       const result = await response.json();
+      // Response is wrapped in { success: true, data: { ... } } by TransformInterceptor
+      const scenarioId = result?.data?.id || result?.id;
+      
+      if (!scenarioId) {
+        throw new Error('API не вернул ID сценария');
+      }
+      
       setToast({ type: 'success', message: '✅ Сценарий создан!' });
       setTimeout(() => {
-        router.push(`/organizer/scenarios/${result.id}/edit`);
+        router.push(`/organizer/scenarios/${scenarioId}/edit`);
       }, 1000);
     } catch (err) {
       console.error('Failed to create scenario:', err);
