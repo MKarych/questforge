@@ -197,7 +197,7 @@ export default function GamePage() {
             {/* Reviews */}
             <div className="card">
               <h2 className="text-lg font-semibold text-text-primary mb-4">Отзывы ({game.reviewsCount})</h2>
-              {game.reviews.length === 0 ? (
+              {!game.reviews || game.reviews.length === 0 ? (
                 <p className="text-text-secondary">Отзывов пока нет</p>
               ) : (
                 <div className="space-y-4">
