@@ -169,7 +169,7 @@ interface ScenarioEditorProps {
   onEdgesChange?: () => void;
 }
 
-export default function ScenarioEditor({
+function ScenarioEditorInner({
   scenarioName,
   initialNodes,
   initialEdges,
@@ -180,6 +180,7 @@ export default function ScenarioEditor({
   onNodesChange: onNodesChangeCallback,
   onEdgesChange: onEdgesChangeCallback,
 }: ScenarioEditorProps) {
+  const reactFlowInstance = useReactFlow();
   const [name, setName] = useState(scenarioName || 'Новый сценарий');
   const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes || []);
   const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges || []);
@@ -291,6 +292,82 @@ export default function ScenarioEditor({
   const markDirty = useCallback(() => {
     setIsDirty(true);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const isModKey = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if editing input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Delete/Backspace - delete selected node or edge
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNode) {
+          e.preventDefault();
+          deleteNode(selectedNode.id);
+        } else if (selectedEdge) {
+          e.preventDefault();
+          deleteEdge(selectedEdge.id);
+        }
+      }
+
+      // Esc - deselect everything
+      if (e.key === 'Escape') {
+        setSelectedNode(null);
+        setSelectedEdge(null);
+      }
+
+      // Cmd/Ctrl+S - Save
+      if (isModKey(e) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+
+      // Cmd/Ctrl+Z - Undo
+      if (isModKey(e) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        undo();
+      }
+
+      // Cmd/Ctrl+Shift+Z - Redo
+      if (isModKey(e) && e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        redo();
+      }
+
+      // Cmd/Ctrl+C - Copy
+      if (isModKey(e) && e.key === 'c') {
+        e.preventDefault();
+        if (selectedNode) {
+          setCopiedNode(selectedNode);
+        }
+      }
+
+      // Cmd/Ctrl+V - Paste
+      if (isModKey(e) && e.key === 'v') {
+        e.preventDefault();
+        if (copiedNode) {
+          pasteNode(copiedNode);
+        }
+      }
+
+      // Cmd/Ctrl+A - Select all nodes
+      if (isModKey(e) && e.key === 'a') {
+        e.preventDefault();
+        if (nodes.length > 0) {
+          reactFlowInstance.setNodes((nds: Node[]) =>
+            nds.map((n: Node) => ({ ...n, selected: true }))
+          );
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNode, selectedEdge, historyIndex, history, copiedNode, undo, redo, deleteEdge, nodes, reactFlowInstance]);
 
   const onDragStart = (event: React.DragEvent, blockType: BlockType) => {
     event.dataTransfer.setData('application/reactflow', blockType.type);
@@ -858,165 +935,6 @@ export default function ScenarioEditor({
     }));
   }, []);
 
-  // ─── Inner component that uses useReactFlow() inside ReactFlowProvider ───
-  function CanvasContent({
-    nodes,
-    edges,
-    onNodesChangeCallback,
-    onEdgesChangeCallback,
-    onConnect,
-    onNodeClick,
-    onEdgeClick,
-    onSelectionChange,
-    setSelectedNode,
-    setSelectedEdge,
-    isEmpty,
-    onDrop,
-    onDragOver,
-  }: {
-    nodes: Node<ScenarioNodeData>[];
-    edges: Edge[];
-    onNodesChangeCallback?: () => void;
-    onEdgesChangeCallback?: () => void;
-    onConnect: (params: Connection) => void;
-    onNodeClick: (_: React.MouseEvent, node: Node) => void;
-    onEdgeClick: (_: React.MouseEvent, edge: Edge) => void;
-    onSelectionChange: (selection: { nodes: Node[]; edges: Edge[] }) => void;
-    setSelectedNode: (node: Node<ScenarioNodeData> | null) => void;
-    setSelectedEdge: (edge: Edge | null) => void;
-    isEmpty: boolean;
-    onDrop: (event: React.DragEvent) => void;
-    onDragOver: (event: React.DragEvent) => void;
-  }) {
-    const reactFlowInstance = useReactFlow();
-
-    // Keyboard shortcuts (moved inside ReactFlowProvider so useReactFlow() works)
-    useEffect(() => {
-      const isModKey = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          return;
-        }
-
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (selectedNode) {
-            e.preventDefault();
-            deleteNode(selectedNode.id);
-          } else if (selectedEdge) {
-            e.preventDefault();
-            deleteEdge(selectedEdge.id);
-          }
-        }
-
-        if (e.key === 'Escape') {
-          setSelectedNode(null);
-          setSelectedEdge(null);
-        }
-
-        if (isModKey(e) && e.key === 's') {
-          e.preventDefault();
-          handleSave();
-        }
-
-        if (isModKey(e) && !e.shiftKey && e.key === 'z') {
-          e.preventDefault();
-          undo();
-        }
-
-        if (isModKey(e) && e.shiftKey && e.key === 'z') {
-          e.preventDefault();
-          redo();
-        }
-
-        if (isModKey(e) && e.key === 'c') {
-          e.preventDefault();
-          if (selectedNode) {
-            setCopiedNode(selectedNode);
-          }
-        }
-
-        if (isModKey(e) && e.key === 'v') {
-          e.preventDefault();
-          if (copiedNode) {
-            pasteNode(copiedNode);
-          }
-        }
-
-        // Cmd/Ctrl+A - Select all nodes
-        if (isModKey(e) && e.key === 'a') {
-          e.preventDefault();
-          if (nodes.length > 0) {
-            reactFlowInstance.setNodes((nds: Node[]) =>
-              nds.map((n: Node) => ({ ...n, selected: true }))
-            );
-          }
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNode, selectedEdge, historyIndex, history, copiedNode, undo, redo, deleteEdge, nodes, reactFlowInstance]);
-
-    return (
-      <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
-        {/* Empty state */}
-        {isEmpty && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            <div className="text-center p-8 rounded-lg bg-background/80 backdrop-blur-sm border border-dashed border-border max-w-md">
-              <div className="text-5xl mb-4">🎨</div>
-              <h3 className="text-xl font-semibold text-text-primary mb-2">Холст пуст</h3>
-              <p className="text-text-secondary">
-                Перетащите блок из палитры, чтобы начать
-              </p>
-            </div>
-          </div>
-        )}
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={(changes) => {
-            handleNodesChange(changes);
-            onNodesChangeCallback?.();
-          }}
-          onEdgesChange={(changes) => {
-            handleEdgesChange(changes);
-            onEdgesChangeCallback?.();
-          }}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          onSelectionChange={onSelectionChange}
-          onPaneClick={() => {
-            setSelectedNode(null);
-            setSelectedEdge(null);
-          }}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          snapToGrid
-          snapGrid={[15, 15]}
-          className="bg-background"
-          deleteKeyCode={null}
-        >
-          <Background color="#888" gap={20} />
-          <Controls />
-          <MiniMap
-            nodeStrokeColor={(n) => {
-              const block = BLOCK_TYPES.find((b) => b.type === n.type);
-              return block ? block.color.replace('bg-', 'border-') : '#888';
-            }}
-            nodeColor={(n) => {
-              const block = BLOCK_TYPES.find((b) => b.type === n.type);
-              return block ? `#${block.color.split('-')[1]}20` : '#eee';
-            }}
-            nodeBorderRadius={8}
-          />
-        </ReactFlow>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-screen">
       {/* Top Bar */}
@@ -1134,24 +1052,62 @@ export default function ScenarioEditor({
         {/* Block Palette */}
         <BlockPalette onDragStart={onDragStart} />
 
-        {/* Canvas — wrapped in ReactFlowProvider for useReactFlow() */}
-        <ReactFlowProvider>
-          <CanvasContent
+        {/* Canvas */}
+        <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
+          {/* Empty state */}
+          {isEmpty && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+              <div className="text-center p-8 rounded-lg bg-background/80 backdrop-blur-sm border border-dashed border-border max-w-md">
+                <div className="text-5xl mb-4">🎨</div>
+                <h3 className="text-xl font-semibold text-text-primary mb-2">Холст пуст</h3>
+                <p className="text-text-secondary">
+                  Перетащите блок из палитры, чтобы начать
+                </p>
+              </div>
+            </div>
+          )}
+          <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChangeCallback={onNodesChangeCallback}
-            onEdgesChangeCallback={onEdgesChangeCallback}
+            onNodesChange={(changes) => {
+              handleNodesChange(changes);
+              onNodesChangeCallback?.();
+            }}
+            onEdgesChange={(changes) => {
+              handleEdgesChange(changes);
+              onEdgesChangeCallback?.();
+            }}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
             onSelectionChange={onSelectionChange}
-            setSelectedNode={setSelectedNode}
-            setSelectedEdge={setSelectedEdge}
-            isEmpty={isEmpty}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-          />
-        </ReactFlowProvider>
+            onPaneClick={() => {
+              setSelectedNode(null);
+              setSelectedEdge(null);
+            }}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            snapToGrid
+            snapGrid={[15, 15]}
+            className="bg-background"
+            deleteKeyCode={null}
+          >
+            <Background color="#888" gap={20} />
+            <Controls />
+            <MiniMap
+              nodeStrokeColor={(n) => {
+                const block = BLOCK_TYPES.find((b) => b.type === n.type);
+                return block ? block.color.replace('bg-', 'border-') : '#888';
+              }}
+              nodeColor={(n) => {
+                const block = BLOCK_TYPES.find((b) => b.type === n.type);
+                return block ? `#${block.color.split('-')[1]}20` : '#eee';
+              }}
+              nodeBorderRadius={8}
+            />
+          </ReactFlow>
+        </div>
 
         {/* Node Settings Panel */}
         {selectedNode && (
@@ -1641,5 +1597,14 @@ export default function ScenarioEditor({
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap in ReactFlowProvider so useReactFlow() works throughout the component
+export default function ScenarioEditor(props: ScenarioEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <ScenarioEditorInner {...props} />
+    </ReactFlowProvider>
   );
 }
