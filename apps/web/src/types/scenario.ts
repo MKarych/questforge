@@ -1,42 +1,85 @@
 import { Node, Edge } from 'reactflow';
 
-export type NodeType = 
-  | 'START' 
-  | 'FINISH' 
-  | 'TEXT' 
-  | 'CODE' 
-  | 'PHOTO' 
-  | 'GPS' 
-  | 'QR' 
-  | 'CHOICE' 
-  | 'TIMER' 
+export type NodeType =
+  | 'START'
+  | 'FINISH'
+  | 'TEXT'
+  | 'CODE'
+  | 'PHOTO'
+  | 'GPS'
+  | 'QR'
+  | 'CHOICE'
+  | 'TIMER'
   | 'BRANCH'
   | 'NPC';
+
+export type EdgeConditionType = 'success' | 'fail' | 'timeout' | 'always' | 'custom';
+
+export interface EdgeCondition {
+  type: EdgeConditionType;
+  label: string;
+  expression?: string; // for custom conditions, e.g. "score > 10"
+}
 
 export interface ScenarioNodeData {
   label: string;
   icon?: string;
+  // Common fields
   question?: string;
   answer?: string;
   hint?: string;
-  options?: string[];
+  // TEXT
+  textAnswer?: string;
+  // CODE
   code?: string;
   attempts?: number;
+  // PHOTO
   photoRequirements?: string;
+  // GPS
   coordinates?: { lat: number; lng: number };
   radius?: number;
+  // QR
   qrData?: string;
+  // CHOICE
+  options?: string[];
+  correctOption?: number;
+  // TIMER
   duration?: number;
-  branches?: Array<{ condition: string; target: string }>;
+  // BRANCH
+  branches?: Array<{ label: string; target: string; condition?: EdgeCondition }>;
+  // NPC
   npcName?: string;
-  npcDialogue?: string;
+  npcDescription?: string;
+  npcDialogues?: Array<{ npcText: string; options: Array<{ text: string; target: string }> }>;
+  // General
   points?: number;
   penalty?: number;
-  timeout?: number;
 }
 
 export type ScenarioNode = Node<ScenarioNodeData, NodeType>;
-export type ScenarioEdge = Edge;
+
+export type ScenarioEdge = Edge & {
+  data?: {
+    condition?: EdgeCondition;
+  };
+};
+
+export interface ScenarioVariable {
+  id: string;
+  name: string;
+  type: 'number' | 'string' | 'boolean';
+  defaultValue: number | string | boolean;
+  description?: string;
+}
+
+export interface GameSettings {
+  totalTime?: number; // minutes, 0 = unlimited
+  defaultPoints: number;
+  defaultPenalty: number;
+  hintLimit: number;
+  maxAttempts: number;
+  variables: ScenarioVariable[];
+}
 
 export interface Scenario {
   id?: string;
@@ -45,6 +88,7 @@ export interface Scenario {
   nodes: ScenarioNode[];
   edges: ScenarioEdge[];
   startNodeId: string;
+  settings?: GameSettings;
   publishedAt?: string;
 }
 
@@ -80,4 +124,12 @@ export interface ValidationError {
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
+}
+
+export interface HistoryAction {
+  type: 'add' | 'remove' | 'update' | 'connect' | 'disconnect' | 'copy' | 'paste';
+  nodeId?: string;
+  edgeId?: string;
+  previousState?: any;
+  currentState?: any;
 }

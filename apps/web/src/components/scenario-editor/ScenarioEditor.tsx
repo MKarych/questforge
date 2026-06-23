@@ -14,7 +14,17 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
-import { ScenarioNodeData, NodeType, BLOCK_TYPES, BlockType, ValidationResult } from '@/types/scenario';
+import {
+  ScenarioNodeData,
+  ScenarioEdge,
+  NodeType,
+  BLOCK_TYPES,
+  BlockType,
+  ValidationResult,
+  ScenarioVariable,
+  GameSettings,
+  EdgeConditionType,
+} from '@/types/scenario';
 import BlockPalette from './BlockPalette';
 import NodeSettings from './NodeSettings';
 import ScenarioNode from './ScenarioNode';
@@ -59,6 +69,24 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [copiedNode, setCopiedNode] = useState<Node<ScenarioNodeData> | null>(null);
   const [currentPreviewNode, setCurrentPreviewNode] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Game settings
+  const [gameSettings, setGameSettings] = useState<GameSettings>({
+    totalTime: 0,
+    defaultPoints: 10,
+    defaultPenalty: 0,
+    hintLimit: 3,
+    maxAttempts: 3,
+    variables: [],
+  });
+
+  // Test mode state
+  const [testCurrentNodeId, setTestCurrentNodeId] = useState<string | null>(null);
+  const [testVariables, setTestVariables] = useState<Record<string, number | string | boolean>>({});
+  const [testScore, setTestScore] = useState(0);
+  const [testLog, setTestLog] = useState<string[]>([]);
+  const [testFinished, setTestFinished] = useState(false);
 
   // Initialize with START and FINISH nodes
   useEffect(() => {
@@ -198,24 +226,45 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
         y: event.clientY - reactFlowBounds.top - 50,
       };
 
+      const baseData: ScenarioNodeData = {
+        label: block.label,
+        icon: block.icon,
+        question: '',
+        hint: '',
+        points: gameSettings.defaultPoints,
+        penalty: gameSettings.defaultPenalty,
+      };
+
+      // Add type-specific default data
+      if (type === 'NPC') {
+        baseData.npcName = '';
+        baseData.npcDescription = '';
+        baseData.npcDialogues = [{ npcText: '', options: [{ text: '', target: '' }] }];
+      }
+
+      if (type === 'BRANCH') {
+        baseData.branches = [{ label: 'Да', target: '', condition: { type: 'always', label: 'Всегда' } }];
+      }
+
+      if (type === 'CODE') {
+        baseData.attempts = gameSettings.maxAttempts;
+      }
+
+      if (type === 'TIMER') {
+        baseData.duration = 60;
+      }
+
       const newNode: Node<ScenarioNodeData> = {
         id: uuidv4(),
         type,
         position,
-        data: {
-          label: block.label,
-          icon: block.icon,
-          question: '',
-          hint: '',
-          points: 10,
-          penalty: 0,
-        },
+        data: baseData,
       };
 
       saveHistory('add', newNode.id);
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, saveHistory]
+    [setNodes, saveHistory, gameSettings]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -228,9 +277,30 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
       if (params.source && params.target) {
         saveHistory('connect', params.source, params.target);
       }
-      setEdges((eds) => addEdge({ ...params, animated: true }, eds));
+      // Default condition is 'success' for mission nodes, 'always' for others
+      const sourceNode = nodes.find((n) => n.id === params.source);
+      const missionTypes = ['TEXT', 'CODE', 'PHOTO', 'GPS', 'QR', 'CHOICE', 'TIMER'];
+      const defaultConditionType: EdgeConditionType =
+        sourceNode && sourceNode.type && missionTypes.includes(sourceNode.type) ? 'success' : 'always';
+
+      setEdges((eds) =>
+        addEdge(
+          {
+            source: params.source!,
+            target: params.target!,
+            animated: true,
+            data: {
+              condition: {
+                type: defaultConditionType,
+                label: defaultConditionType === 'success' ? 'Успех' : 'Всегда',
+              },
+            },
+          } as ScenarioEdge,
+          eds
+        )
+      );
     },
-    [setEdges, saveHistory]
+    [setEdges, saveHistory, nodes]
   );
 
   const onNodeClick = useCallback(
@@ -480,9 +550,10 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
         nodes,
         edges,
         startNodeId: nodes.find((n) => n.type === 'START')?.id,
+        settings: gameSettings,
       });
     }
-  }, [name, nodes, edges, onSave, validateScenario]);
+  }, [name, nodes, edges, onSave, validateScenario, gameSettings]);
 
   const startNodeId = useMemo(
     () => nodes.find((n) => n.type === 'START')?.id || '',
@@ -495,10 +566,153 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
     setShowPreview(true);
   };
 
-  // Test mode handler
+  // Test mode handlers
   const handleTestStart = () => {
+    // Initialize test state
+    const startNode = nodes.find((n) => n.type === 'START');
+    if (startNode) {
+      setTestCurrentNodeId(startNode.id);
+    }
+    // Initialize variables with defaults
+    const initialVars: Record<string, number | string | boolean> = {};
+    gameSettings.variables.forEach((v) => {
+      initialVars[v.name] = v.defaultValue;
+    });
+    setTestVariables(initialVars);
+    setTestScore(0);
+    setTestLog([`🧪 Тестирование начато. Сценарий: "${name}"`]);
+    setTestFinished(false);
     setShowTest(true);
   };
+
+  const handleTestAnswer = useCallback(
+    (answer: string) => {
+      if (!testCurrentNodeId || testFinished) return;
+
+      const currentNode = nodes.find((n) => n.id === testCurrentNodeId);
+      if (!currentNode) return;
+
+      const newLog = [...testLog];
+      let newScore = testScore;
+      const newVars = { ...testVariables };
+      let nextNodeId: string | null = null;
+
+      // Find outgoing edges from current node
+      const outgoingEdges = edges.filter((e) => e.source === testCurrentNodeId);
+
+      if (currentNode.type === 'CHOICE') {
+        const optionIndex = parseInt(answer);
+        const isCorrect = optionIndex === currentNode.data.correctOption;
+        if (isCorrect) {
+          newScore += currentNode.data.points || gameSettings.defaultPoints;
+          newVars.score = newScore;
+          newLog.push(`✅ Правильно! +${currentNode.data.points || gameSettings.defaultPoints} очков`);
+        } else {
+          newScore -= currentNode.data.penalty || gameSettings.defaultPenalty;
+          newVars.score = newScore;
+          newLog.push(`❌ Неправильно. -${currentNode.data.penalty || gameSettings.defaultPenalty} очков`);
+        }
+        // Find success/fail edge
+        const conditionType = isCorrect ? 'success' : 'fail';
+        const matchingEdge = outgoingEdges.find(
+          (e) => (e as ScenarioEdge).data?.condition?.type === conditionType
+        );
+        nextNodeId = matchingEdge?.target || null;
+      } else if (currentNode.type === 'TEXT' || currentNode.type === 'CODE') {
+        const correctAnswer = currentNode.data.textAnswer || currentNode.data.code || '';
+        const isCorrect = answer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+        if (isCorrect) {
+          newScore += currentNode.data.points || gameSettings.defaultPoints;
+          newVars.score = newScore;
+          newLog.push(`✅ Правильно! +${currentNode.data.points || gameSettings.defaultPoints} очков`);
+        } else {
+          newScore -= currentNode.data.penalty || gameSettings.defaultPenalty;
+          newVars.score = newScore;
+          newLog.push(`❌ Неправильно. -${currentNode.data.penalty || gameSettings.defaultPenalty} очков`);
+        }
+        const conditionType = isCorrect ? 'success' : 'fail';
+        const matchingEdge = outgoingEdges.find(
+          (e) => (e as ScenarioEdge).data?.condition?.type === conditionType
+        );
+        nextNodeId = matchingEdge?.target || null;
+      } else if (currentNode.type === 'NPC') {
+        // NPC dialogue - answer determines next node
+        const dialogueIndex = parseInt(answer);
+        const dialogue = currentNode.data.npcDialogues?.[dialogueIndex];
+        if (dialogue) {
+          newLog.push(`🗣 ${currentNode.data.npcName}: "${dialogue.npcText}"`);
+          newLog.push(`👤 Вы выбрали: "${dialogue.options[0]?.text || 'Продолжить'}"`);
+          nextNodeId = dialogue.options[0]?.target || null;
+        }
+      } else {
+        // Default: follow first outgoing edge
+        nextNodeId = outgoingEdges[0]?.target || null;
+        newLog.push(`➡️ Переход к следующему узлу`);
+      }
+
+      // If no matching edge found, try 'always' condition
+      if (!nextNodeId) {
+        const alwaysEdge = outgoingEdges.find(
+          (e) => (e as ScenarioEdge).data?.condition?.type === 'always'
+        );
+        nextNodeId = alwaysEdge?.target || null;
+      }
+
+      // If still no next node, try first edge
+      if (!nextNodeId && outgoingEdges.length > 0) {
+        nextNodeId = outgoingEdges[0].target;
+      }
+
+      // Check if we reached FINISH
+      const nextNode = nodes.find((n) => n.id === nextNodeId);
+      if (nextNode?.type === 'FINISH' || !nextNodeId) {
+        newLog.push(`🏁 Сценарий пройден! Итоговый счёт: ${newScore}`);
+        setTestFinished(true);
+        setTestCurrentNodeId(null);
+      } else {
+        setTestCurrentNodeId(nextNodeId);
+      }
+
+      setTestScore(newScore);
+      setTestVariables(newVars);
+      setTestLog(newLog);
+    },
+    [testCurrentNodeId, testFinished, nodes, edges, testLog, testScore, testVariables, gameSettings]
+  );
+
+  const handleTestRestart = () => {
+    handleTestStart();
+  };
+
+  // Variable management
+  const addVariable = useCallback(() => {
+    const newVar: ScenarioVariable = {
+      id: uuidv4(),
+      name: '',
+      type: 'number',
+      defaultValue: 0,
+    };
+    setGameSettings((prev) => ({
+      ...prev,
+      variables: [...prev.variables, newVar],
+    }));
+  }, []);
+
+  const updateVariable = useCallback((id: string, field: keyof ScenarioVariable, value: any) => {
+    setGameSettings((prev) => ({
+      ...prev,
+      variables: prev.variables.map((v) =>
+        v.id === id ? { ...v, [field]: value } : v
+      ),
+    }));
+  }, []);
+
+  const removeVariable = useCallback((id: string) => {
+    setGameSettings((prev) => ({
+      ...prev,
+      variables: prev.variables.filter((v) => v.id !== id),
+    }));
+  }, []);
 
   return (
     <div className="flex flex-col h-screen">
@@ -538,12 +752,19 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
           >
             👁 Превью
           </button>
-          <button 
-            onClick={handleTestStart} 
+          <button
+            onClick={handleTestStart}
             className="btn-secondary text-sm"
             title="Тестирование сценария"
           >
             🎮 Тест
+          </button>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="btn-secondary text-sm"
+            title="Настройки игры"
+          >
+            ⚙️ Настройки
           </button>
           <button
             onClick={undo}
@@ -715,7 +936,148 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
         </div>
       )}
 
-      {/* Test Mode Modal */}
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="bg-gray-800 p-4 flex items-center justify-between">
+              <div className="text-white font-semibold">⚙️ Настройки игры</div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 space-y-4">
+              {/* General Settings */}
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-3">Общие настройки</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label text-xs">Общее время (мин), 0 = без лимита</label>
+                    <input
+                      type="number"
+                      value={gameSettings.totalTime ?? 0}
+                      onChange={(e) =>
+                        setGameSettings((prev) => ({ ...prev, totalTime: parseInt(e.target.value) || 0 }))
+                      }
+                      className="input-field text-sm"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Лимит подсказок</label>
+                    <input
+                      type="number"
+                      value={gameSettings.hintLimit}
+                      onChange={(e) =>
+                        setGameSettings((prev) => ({ ...prev, hintLimit: parseInt(e.target.value) || 1 }))
+                      }
+                      className="input-field text-sm"
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Очки по умолчанию</label>
+                    <input
+                      type="number"
+                      value={gameSettings.defaultPoints}
+                      onChange={(e) =>
+                        setGameSettings((prev) => ({ ...prev, defaultPoints: parseInt(e.target.value) || 0 }))
+                      }
+                      className="input-field text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Штраф по умолчанию</label>
+                    <input
+                      type="number"
+                      value={gameSettings.defaultPenalty}
+                      onChange={(e) =>
+                        setGameSettings((prev) => ({ ...prev, defaultPenalty: parseInt(e.target.value) || 0 }))
+                      }
+                      className="input-field text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Макс. попыток</label>
+                    <input
+                      type="number"
+                      value={gameSettings.maxAttempts}
+                      onChange={(e) =>
+                        setGameSettings((prev) => ({ ...prev, maxAttempts: parseInt(e.target.value) || 1 }))
+                      }
+                      className="input-field text-sm"
+                      min={1}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Variables */}
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-3">Переменные сценария</h3>
+                <div className="space-y-2">
+                  {gameSettings.variables.map((v) => (
+                    <div key={v.id} className="flex gap-2 items-start p-2 bg-background/50 rounded border border-border">
+                      <div className="flex-1 space-y-1">
+                        <input
+                          type="text"
+                          value={v.name}
+                          onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
+                          className="input-field text-xs"
+                          placeholder="Имя переменной"
+                        />
+                        <div className="flex gap-1">
+                          <select
+                            value={v.type}
+                            onChange={(e) => updateVariable(v.id, 'type', e.target.value)}
+                            className="input-field text-xs flex-1"
+                          >
+                            <option value="number">Число</option>
+                            <option value="string">Строка</option>
+                            <option value="boolean">Булево</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={String(v.defaultValue)}
+                            onChange={(e) => {
+                              const val = v.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+                              updateVariable(v.id, 'defaultValue', val);
+                            }}
+                            className="input-field text-xs w-20"
+                            placeholder="По умолч."
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeVariable(v.id)}
+                        className="text-error hover:text-error/80 text-lg mt-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button onClick={addVariable} className="btn-secondary text-xs w-full">
+                    + Добавить переменную
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-800 border-t flex justify-end">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 text-sm"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test Mode Modal - Interactive */}
       {showTest && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
           <div className="bg-background rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col h-[80vh]">
@@ -726,7 +1088,7 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
               <div className="text-white font-semibold">🎮 Тестирование сценария</div>
-              <button 
+              <button
                 onClick={() => setShowTest(false)}
                 className="text-gray-400 hover:text-white text-xl"
               >
@@ -734,51 +1096,159 @@ export default function ScenarioEditor({ scenarioName, onSave }: ScenarioEditorP
               </button>
             </div>
             <div className="flex-1 overflow-auto p-6">
-              <div className="space-y-4">
-                {nodes.map((node, idx) => (
-                  node.type !== 'START' && node.type !== 'FINISH' && (
-                    <div key={node.id} className="border border-gray-700 rounded-lg p-4 bg-gray-800/50">
-                      <div className="flex items-start gap-4">
-                        <div className="text-2xl">{node.data.icon}</div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-lg font-semibold text-white">{node.data.label}</h3>
-                            <span className="text-sm text-gray-400">Задание {idx}</span>
-                          </div>
-                          {node.data.question && (
-                            <p className="text-gray-300 mb-3">{node.data.question}</p>
-                          )}
-                          {node.data.hint && (
-                            <div className="bg-yellow-500/10 border border-yellow-500/30 p-2 rounded mb-2">
-                              <span className="text-yellow-400 text-sm">💡 Подсказка: {node.data.hint}</span>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
-                            {node.data.points && <span>Очки: +{node.data.points}</span>}
-                            {node.data.penalty && <span>Штраф: -{node.data.penalty}</span>}
-                            {node.data.duration && <span>Длительность: {node.data.duration}с</span>}
-                            {node.data.code && <span>Код: {node.data.code}</span>}
-                            {node.data.textAnswer && <span>Ответ: {node.data.textAnswer}</span>}
-                          </div>
-                        </div>
-                      </div>
+              {/* Score & Variables Bar */}
+              <div className="flex items-center justify-between mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-4">
+                  <span className="text-yellow-400 font-bold">⭐ {testScore} очков</span>
+                  {Object.entries(testVariables).filter(([k]) => k !== 'score').length > 0 && (
+                    <div className="flex gap-2 text-xs text-gray-400">
+                      {Object.entries(testVariables)
+                        .filter(([k]) => k !== 'score')
+                        .map(([key, val]) => (
+                          <span key={key} className="bg-gray-700 px-2 py-1 rounded">
+                            {key}: {String(val)}
+                          </span>
+                        ))}
                     </div>
-                  )
-                ))}
-              </div>
-            </div>
-            <div className="p-4 bg-gray-800 border-t">
-              <p className="text-gray-400 text-sm mb-2">
-                ⚠️ Это предпросмотр. Для полноценного тестирования используйте кнопку "👁 Превью" и откройте каждое задание по очереди.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button 
-                  onClick={() => setShowTest(false)}
-                  className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500"
-                >
-                  Закрыть
+                  )}
+                </div>
+                <button onClick={handleTestRestart} className="btn-secondary text-xs">
+                  🔄 Заново
                 </button>
               </div>
+
+              {/* Current Task */}
+              {testCurrentNodeId && !testFinished && (() => {
+                const currentNode = nodes.find((n) => n.id === testCurrentNodeId);
+                if (!currentNode) return <p className="text-gray-400">Узел не найден</p>;
+
+                return (
+                  <div className="border border-gray-700 rounded-lg p-6 bg-gray-800/50">
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-3xl">{currentNode.data.icon}</span>
+                      <div>
+                        <h3 className="text-xl font-semibold text-white">{currentNode.data.label}</h3>
+                        <span className="text-sm text-gray-400">
+                          {nodes.findIndex((n) => n.id === testCurrentNodeId) > 0
+                            ? `Задание ${nodes.findIndex((n) => n.id === testCurrentNodeId)}`
+                            : 'Начало'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {currentNode.data.question && (
+                      <p className="text-gray-300 mb-4 text-lg">{currentNode.data.question}</p>
+                    )}
+
+                    {currentNode.data.hint && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded mb-4">
+                        <span className="text-yellow-400 text-sm">💡 Подсказка: {currentNode.data.hint}</span>
+                      </div>
+                    )}
+
+                    {/* NPC Dialogue */}
+                    {currentNode.type === 'NPC' && currentNode.data.npcDialogues && (
+                      <div className="space-y-3 mb-4">
+                        {currentNode.data.npcDialogues.map((dialogue: { npcText: string; options: Array<{ text: string; target: string }> }, dIdx: number) => (
+                          <div key={dIdx} className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-lg">
+                            <div className="flex items-start gap-3 mb-3">
+                              <span className="text-2xl">🗣</span>
+                              <div>
+                                <p className="text-cyan-300 font-semibold text-sm">{currentNode.data.npcName}</p>
+                                <p className="text-gray-200 mt-1">{dialogue.npcText}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2 ml-8">
+                              {dialogue.options.map((opt: { text: string; target: string }, oIdx: number) => (
+                                <button
+                                  key={oIdx}
+                                  onClick={() => handleTestAnswer(String(dIdx))}
+                                  className="w-full text-left p-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-200 transition-colors"
+                                >
+                                  {opt.text || `Вариант ${oIdx + 1}`}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* CHOICE */}
+                    {currentNode.type === 'CHOICE' && currentNode.data.options && (
+                      <div className="space-y-2 mb-4">
+                        {currentNode.data.options.map((option: string, idx: number) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleTestAnswer(String(idx))}
+                            className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-200 transition-colors border border-gray-600"
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* TEXT / CODE input */}
+                    {(currentNode.type === 'TEXT' || currentNode.type === 'CODE') && (
+                      <div className="space-y-3 mb-4">
+                        <input
+                          type="text"
+                          placeholder={currentNode.type === 'CODE' ? 'Введите код...' : 'Введите ответ...'}
+                          className="input-field text-sm w-full"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleTestAnswer((e.target as HTMLInputElement).value);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-gray-500">Нажмите Enter, чтобы отправить ответ</p>
+                      </div>
+                    )}
+
+                    {/* Simple nodes - just show continue button */}
+                    {(currentNode.type && ['START', 'BRANCH', 'TIMER', 'PHOTO', 'GPS', 'QR'].includes(currentNode.type)) && (
+                      <button
+                        onClick={() => handleTestAnswer('continue')}
+                        className="btn-primary w-full"
+                      >
+                        ➡️ Продолжить
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Test Finished */}
+              {testFinished && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🏁</div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Сценарий пройден!</h2>
+                  <p className="text-gray-400 mb-2">Итоговый счёт: <span className="text-yellow-400 font-bold text-xl">{testScore}</span></p>
+                  <button onClick={handleTestRestart} className="btn-primary mt-4">
+                    🔄 Пройти заново
+                  </button>
+                </div>
+              )}
+
+              {/* Test Log */}
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-gray-400 mb-2">📋 Лог тестирования</h4>
+                <div className="bg-gray-900 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
+                  {testLog.map((entry, idx) => (
+                    <p key={idx} className="text-xs text-gray-400">{entry}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-800 border-t flex justify-end">
+              <button
+                onClick={() => setShowTest(false)}
+                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 text-sm"
+              >
+                Закрыть
+              </button>
             </div>
           </div>
         </div>
