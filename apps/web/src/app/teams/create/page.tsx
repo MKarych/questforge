@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
-export default function CreateTeamPage() {
+function CreateTeamContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const gameId = searchParams.get('gameId');
@@ -101,5 +101,13 @@ export default function CreateTeamPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateTeamPage() {
+  return (
+    <Suspense fallback={<div>Загрузка...</div>}>
+      <CreateTeamContent />
+    </Suspense>
   );
 }

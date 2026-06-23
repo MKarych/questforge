@@ -12,7 +12,6 @@ export default function CreateGamePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [scenariosLoading, setScenariosLoading] = useState(false);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [formData, setFormData] = useState({
@@ -155,12 +154,10 @@ export default function CreateGamePage() {
       
       // Upload cover if file is selected
       if (coverFile) {
-        setUploading(true);
         const coverUrl = await uploadCover(gameId, coverFile);
         if (!coverUrl) {
           console.warn('Cover upload failed, but game was created successfully');
         }
-        setUploading(false);
       }
       
       // Redirect to game management page
@@ -171,7 +168,6 @@ export default function CreateGamePage() {
       console.error('Failed to create game:', err);
     } finally {
       setLoading(false);
-      setUploading(false);
     }
   };
 
