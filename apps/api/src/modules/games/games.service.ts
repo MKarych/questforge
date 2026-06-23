@@ -695,4 +695,84 @@ _count: { select: { gameTeams: true, reviews: true } },
       },
     });
   }
+
+  // ============================================================
+  // Admin moderation methods
+  // ============================================================
+
+  async findPendingGames(params: { limit: number; offset: number }) {
+    const [items, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where: {
+          moderationStatus: 'PENDING',
+          deletedAt: null,
+        },
+        include: {
+          organizer: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          scenario: {
+            select: { id: true, name: true },
+          },
+          _count: {
+            select: { reviews: true, gameTeams: true },
+          },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.game.count({
+        where: {
+          moderationStatus: 'PENDING',
+          deletedAt: null,
+        },
+      }),
+    ]);
+
+    return { items, total };
+  }
+
+  async moderateGame(
+    gameId: string,
+    status: 'APPROVED' | 'REJECTED',
+    comment: string | undefined,
+    moderatorId: string,
+  ) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
+    if (game.moderationStatus !== 'PENDING') {
+      throw new ForbiddenException('Игра уже прошла модерацию');
+    }
+
+    const updateData: Record<string, unknown> = {
+      moderationStatus: status,
+      moderatedAt: new Date(),
+    };
+
+    if (comment) {
+      updateData.moderationComment = comment;
+    }
+
+    if (status === 'APPROVED') {
+      updateData.status = 'PUBLISHED';
+      updateData.publishedAt = new Date();
+    }
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: updateData,
+      include: {
+        organizer: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+  }
 }

@@ -20,6 +20,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { GamesService } from './games.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -193,5 +195,32 @@ export class GamesController {
   ) {
     const userId = (req as any).user?.userId;
     return this.gamesService.uploadCover(userId, gameId, file);
+  }
+  // ============================================================
+  // Admin endpoints (moderation)
+  // ============================================================
+
+  @Get('admin/pending')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async findPendingGames(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.gamesService.findPendingGames({
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Post(':id/moderate')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async moderateGame(
+    @Param('id') gameId: string,
+    @Body() body: { status: 'APPROVED' | 'REJECTED'; comment?: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.moderateGame(gameId, body.status, body.comment, req.user.userId);
   }
 }
