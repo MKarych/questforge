@@ -12,7 +12,6 @@ export default function GameCard({ game }: GameCardProps) {
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
 
-export default function GameCard({ game }: GameCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {
