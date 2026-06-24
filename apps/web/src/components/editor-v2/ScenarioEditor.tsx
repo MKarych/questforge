@@ -26,6 +26,7 @@ import VariablesPanel from './VariablesPanel';
 import PreviewModal from './PreviewModal';
 import TestModal from './TestModal';
 import EditorNodeComponent from './EditorNode';
+import AssetPanel from './AssetPanel';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
 // ==================== Node Types for React Flow ====================
@@ -623,6 +624,9 @@ function ScenarioEditorInner({
               onUpdateMission={store.updateMission}
               onRemoveMission={store.removeMission}
               onClose={() => store.clearSelection()}
+              onOpenAssetPicker={() => {
+                store.togglePanel('debugger');
+              }}
             />
           )}
 
@@ -635,6 +639,13 @@ function ScenarioEditorInner({
                 onUpdate={(index, data) => store.updateVariable(index, data)}
                 onRemove={(index) => store.removeVariable(index)}
               />
+            </div>
+          )}
+
+          {/* Asset Manager Panel */}
+          {store.openPanels.debugger && !selectedSceneData && (
+            <div className="w-80 bg-background border-l border-border overflow-y-auto">
+              <AssetPanel />
             </div>
           )}
         </div>

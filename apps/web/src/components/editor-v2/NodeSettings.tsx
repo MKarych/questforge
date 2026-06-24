@@ -11,6 +11,7 @@ interface NodeSettingsProps {
   onUpdateMission: (sceneId: string, missionId: string, data: Partial<Mission>) => void;
   onRemoveMission: (sceneId: string, missionId: string) => void;
   onClose: () => void;
+  onOpenAssetPicker?: () => void;
 }
 
 const missionTypeOptions: { value: MissionType; label: string }[] = [
@@ -22,6 +23,16 @@ const missionTypeOptions: { value: MissionType; label: string }[] = [
   { value: 'choice', label: '🎯 Выбор' },
   { value: 'collect', label: '🎒 Сбор' },
   { value: 'dialogue', label: '💬 Диалог' },
+  // Медиа
+  { value: 'audio', label: '🎵 Аудио' },
+  { value: 'video', label: '🎬 Видео' },
+  { value: 'image', label: '🖼 Изображение' },
+  // Инвентарь
+  { value: 'inventory_get', label: '🎒 Получить предмет' },
+  { value: 'inventory_spend', label: '📦 Потратить предмет' },
+  { value: 'inventory_check', label: '🔍 Проверка предмета' },
+  // Достижения
+  { value: 'achievement', label: '🏆 Достижение' },
 ];
 
 export default function NodeSettings({
@@ -32,6 +43,7 @@ export default function NodeSettings({
   onUpdateMission,
   onRemoveMission,
   onClose,
+  onOpenAssetPicker,
 }: NodeSettingsProps) {
   const [localData, setLocalData] = useState<Partial<Scene>>({});
 
@@ -227,7 +239,7 @@ export default function NodeSettings({
                   rows={1}
                 />
                 {/* Mission-specific config fields */}
-                {renderMissionConfig(node.id, mission, onUpdateMission)}
+                {renderMissionConfig(node.id, mission, onUpdateMission, onOpenAssetPicker)}
               </div>
             ))}
             {node.missions.length === 0 && (
@@ -257,7 +269,8 @@ export default function NodeSettings({
 function renderMissionConfig(
   nodeId: string,
   mission: Mission,
-  onUpdateMission: (nodeId: string, missionId: string, data: Partial<Mission>) => void
+  onUpdateMission: (nodeId: string, missionId: string, data: Partial<Mission>) => void,
+  onOpenAssetPicker?: () => void
 ) {
   const update = (data: Partial<Mission>) => onUpdateMission(nodeId, mission.id, data);
   const cfg = mission.config as any;
@@ -474,12 +487,310 @@ function renderMissionConfig(
     case 'dialogue':
       return (
         <div className="space-y-1">
+          <input
+            type="text"
+            value={cfg?.npcName || ''}
+            onChange={(e) => update({ config: { ...cfg, npcName: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Имя NPC"
+          />
           <textarea
-            value={cfg?.dialogueText || ''}
-            onChange={(e) => update({ config: { ...cfg, dialogueText: e.target.value } })}
-            className="input-field text-xs min-h-[60px]"
-            placeholder="Текст диалога NPC"
-            rows={2}
+            value={cfg?.npcDescription || ''}
+            onChange={(e) => update({ config: { ...cfg, npcDescription: e.target.value } })}
+            className="input-field text-xs min-h-[40px]"
+            placeholder="Описание NPC"
+            rows={1}
+          />
+          {(cfg?.dialogues || []).map((entry: any, idx: number) => (
+            <div key={idx} className="p-2 bg-background/30 rounded border border-border space-y-1">
+              <textarea
+                value={entry.npcText || ''}
+                onChange={(e) => {
+                  const newDialogues = [...(cfg?.dialogues || [])];
+                  newDialogues[idx] = { ...entry, npcText: e.target.value };
+                  update({ config: { ...cfg, dialogues: newDialogues } });
+                }}
+                className="input-field text-xs min-h-[40px]"
+                placeholder={`Реплика NPC ${idx + 1}`}
+                rows={1}
+              />
+              {(entry.options || []).map((opt: any, optIdx: number) => (
+                <div key={optIdx} className="flex gap-1 items-center ml-2">
+                  <input
+                    type="text"
+                    value={opt.text || ''}
+                    onChange={(e) => {
+                      const newDialogues = [...(cfg?.dialogues || [])];
+                      const newOptions = [...(newDialogues[idx].options || [])];
+                      newOptions[optIdx] = { ...opt, text: e.target.value };
+                      newDialogues[idx] = { ...newDialogues[idx], options: newOptions };
+                      update({ config: { ...cfg, dialogues: newDialogues } });
+                    }}
+                    className="input-field text-xs flex-1"
+                    placeholder={`Вариант ответа ${optIdx + 1}`}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newDialogues = [...(cfg?.dialogues || [])];
+                  const newOptions = [...(entry.options || []), { text: '', targetSceneId: '' }];
+                  newDialogues[idx] = { ...entry, options: newOptions };
+                  update({ config: { ...cfg, dialogues: newDialogues } });
+                }}
+                className="btn-secondary text-xs w-full"
+              >
+                + Вариант ответа
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const newDialogues = [...(cfg?.dialogues || []), { npcText: '', options: [] }];
+              update({ config: { ...cfg, dialogues: newDialogues } });
+            }}
+            className="btn-secondary text-xs w-full"
+          >
+            + Реплика NPC
+          </button>
+          {commonFields}
+        </div>
+      );
+    case 'audio':
+      return (
+        <div className="space-y-1">
+          <div className="flex gap-1 items-center">
+            <input
+              type="text"
+              value={cfg?.assetId || ''}
+              onChange={(e) => update({ config: { ...cfg, assetId: e.target.value } })}
+              className="input-field text-xs flex-1"
+              placeholder="asset:// ID аудио"
+            />
+            {onOpenAssetPicker && (
+              <button
+                onClick={() => onOpenAssetPicker()}
+                className="btn-secondary text-xs shrink-0"
+              >
+                📁
+              </button>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={cfg?.autoPlay || false}
+              onChange={(e) => update({ config: { ...cfg, autoPlay: e.target.checked } })}
+              className="accent-primary"
+            />
+            Автовоспроизведение
+          </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={cfg?.loop || false}
+              onChange={(e) => update({ config: { ...cfg, loop: e.target.checked } })}
+              className="accent-primary"
+            />
+            Зациклить
+          </label>
+          {commonFields}
+        </div>
+      );
+    case 'video':
+      return (
+        <div className="space-y-1">
+          <div className="flex gap-1 items-center">
+            <input
+              type="text"
+              value={cfg?.assetId || ''}
+              onChange={(e) => update({ config: { ...cfg, assetId: e.target.value } })}
+              className="input-field text-xs flex-1"
+              placeholder="asset:// ID видео"
+            />
+            {onOpenAssetPicker && (
+              <button
+                onClick={() => onOpenAssetPicker()}
+                className="btn-secondary text-xs shrink-0"
+              >
+                📁
+              </button>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={cfg?.autoPlay || false}
+              onChange={(e) => update({ config: { ...cfg, autoPlay: e.target.checked } })}
+              className="accent-primary"
+            />
+            Автовоспроизведение
+          </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={cfg?.loop || false}
+              onChange={(e) => update({ config: { ...cfg, loop: e.target.checked } })}
+              className="accent-primary"
+            />
+            Зациклить
+          </label>
+          {commonFields}
+        </div>
+      );
+    case 'image':
+      return (
+        <div className="space-y-1">
+          <div className="flex gap-1 items-center">
+            <input
+              type="text"
+              value={cfg?.assetId || ''}
+              onChange={(e) => update({ config: { ...cfg, assetId: e.target.value } })}
+              className="input-field text-xs flex-1"
+              placeholder="asset:// ID изображения"
+            />
+            {onOpenAssetPicker && (
+              <button
+                onClick={() => onOpenAssetPicker()}
+                className="btn-secondary text-xs shrink-0"
+              >
+                📁
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={cfg?.caption || ''}
+            onChange={(e) => update({ config: { ...cfg, caption: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Подпись к изображению"
+          />
+          {commonFields}
+        </div>
+      );
+    case 'inventory_get':
+      return (
+        <div className="space-y-1">
+          <input
+            type="text"
+            value={cfg?.itemId || ''}
+            onChange={(e) => update({ config: { ...cfg, itemId: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="ID предмета"
+          />
+          <input
+            type="text"
+            value={cfg?.itemName || ''}
+            onChange={(e) => update({ config: { ...cfg, itemName: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Название предмета"
+          />
+          <input
+            type="number"
+            value={cfg?.quantity || 1}
+            onChange={(e) => update({ config: { ...cfg, quantity: parseInt(e.target.value) || 1 } })}
+            className="input-field text-xs"
+            placeholder="Количество"
+            min={1}
+          />
+          {commonFields}
+        </div>
+      );
+    case 'inventory_spend':
+      return (
+        <div className="space-y-1">
+          <input
+            type="text"
+            value={cfg?.itemId || ''}
+            onChange={(e) => update({ config: { ...cfg, itemId: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="ID предмета"
+          />
+          <input
+            type="text"
+            value={cfg?.itemName || ''}
+            onChange={(e) => update({ config: { ...cfg, itemName: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Название предмета"
+          />
+          <input
+            type="number"
+            value={cfg?.quantity || 1}
+            onChange={(e) => update({ config: { ...cfg, quantity: parseInt(e.target.value) || 1 } })}
+            className="input-field text-xs"
+            placeholder="Количество"
+            min={1}
+          />
+          {commonFields}
+        </div>
+      );
+    case 'inventory_check':
+      return (
+        <div className="space-y-1">
+          <input
+            type="text"
+            value={cfg?.itemId || ''}
+            onChange={(e) => update({ config: { ...cfg, itemId: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="ID предмета"
+          />
+          <input
+            type="text"
+            value={cfg?.itemName || ''}
+            onChange={(e) => update({ config: { ...cfg, itemName: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Название предмета"
+          />
+          <input
+            type="number"
+            value={cfg?.quantity || 1}
+            onChange={(e) => update({ config: { ...cfg, quantity: parseInt(e.target.value) || 1 } })}
+            className="input-field text-xs"
+            placeholder="Необходимое количество"
+            min={1}
+          />
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={cfg?.consumeOnCheck || false}
+              onChange={(e) => update({ config: { ...cfg, consumeOnCheck: e.target.checked } })}
+              className="accent-primary"
+            />
+            Потратить при проверке
+          </label>
+          {commonFields}
+        </div>
+      );
+    case 'achievement':
+      return (
+        <div className="space-y-1">
+          <input
+            type="text"
+            value={cfg?.achievementId || ''}
+            onChange={(e) => update({ config: { ...cfg, achievementId: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="ID достижения"
+          />
+          <input
+            type="text"
+            value={cfg?.achievementName || ''}
+            onChange={(e) => update({ config: { ...cfg, achievementName: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Название достижения"
+          />
+          <textarea
+            value={cfg?.achievementDescription || ''}
+            onChange={(e) => update({ config: { ...cfg, achievementDescription: e.target.value } })}
+            className="input-field text-xs min-h-[40px]"
+            placeholder="Описание достижения"
+            rows={1}
+          />
+          <input
+            type="text"
+            value={cfg?.icon || ''}
+            onChange={(e) => update({ config: { ...cfg, icon: e.target.value } })}
+            className="input-field text-xs"
+            placeholder="Иконка (emoji)"
           />
           {commonFields}
         </div>

@@ -303,6 +303,102 @@ export class ValidationEngine {
             }
             break;
           }
+          case 'collect': {
+            const cfg = mission.config as any;
+            if (!cfg.itemId) {
+              errors.push({
+                code: 'MISSING_ITEM_ID',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" (Сбор) не имеет ID предмета`,
+                severity: 'error',
+              });
+            }
+            break;
+          }
+          case 'dialogue': {
+            const cfg = mission.config as any;
+            if (!cfg.npcName) {
+              errors.push({
+                code: 'MISSING_NPC_NAME',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" (Диалог) не имеет имени NPC`,
+                severity: 'warning',
+              });
+            }
+            if (!cfg.dialogues || cfg.dialogues.length === 0) {
+              errors.push({
+                code: 'MISSING_DIALOGUES',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" (Диалог) не имеет реплик`,
+                severity: 'error',
+              });
+            }
+            break;
+          }
+          case 'audio':
+          case 'video':
+          case 'image': {
+            const cfg = mission.config as any;
+            if (!cfg.assetId) {
+              errors.push({
+                code: 'MISSING_ASSET',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" не имеет привязанного медиа-файла`,
+                severity: 'error',
+              });
+            }
+            break;
+          }
+          case 'inventory_get':
+          case 'inventory_spend':
+          case 'inventory_check': {
+            const cfg = mission.config as any;
+            if (!cfg.itemId) {
+              errors.push({
+                code: 'MISSING_ITEM_ID',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" не имеет ID предмета`,
+                severity: 'error',
+              });
+            }
+            if (!cfg.itemName) {
+              errors.push({
+                code: 'MISSING_ITEM_NAME',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" не имеет названия предмета`,
+                severity: 'warning',
+              });
+            }
+            break;
+          }
+          case 'achievement': {
+            const cfg = mission.config as any;
+            if (!cfg.achievementId) {
+              errors.push({
+                code: 'MISSING_ACHIEVEMENT_ID',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" (Достижение) не имеет ID`,
+                severity: 'error',
+              });
+            }
+            if (!cfg.achievementName) {
+              errors.push({
+                code: 'MISSING_ACHIEVEMENT_NAME',
+                sceneId: scene.id,
+                missionId: mission.id,
+                message: `Миссия "${mission.title}" (Достижение) не имеет названия`,
+                severity: 'warning',
+              });
+            }
+            break;
+          }
         }
       }
     }

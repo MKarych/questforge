@@ -164,7 +164,10 @@ export interface EditorNode extends Scene {
 // ==================== 3.3. Mission (spec 49.3.3) ====================
 export type MissionType =
   | 'text' | 'code' | 'photo' | 'gps' | 'qr'
-  | 'choice' | 'collect' | 'dialogue';
+  | 'choice' | 'collect' | 'dialogue'
+  | 'audio' | 'video' | 'image'
+  | 'inventory_get' | 'inventory_spend' | 'inventory_check'
+  | 'achievement';
 
 export interface Mission {
   id: string;
@@ -185,7 +188,14 @@ export type MissionConfig =
   | QrMissionConfig
   | ChoiceMissionConfig
   | CollectMissionConfig
-  | DialogueMissionConfig;
+  | DialogueMissionConfig
+  | AudioMissionConfig
+  | VideoMissionConfig
+  | ImageMissionConfig
+  | InventoryGetMissionConfig
+  | InventorySpendMissionConfig
+  | InventoryCheckMissionConfig
+  | AchievementMissionConfig;
 
 export interface TextMissionConfig {
   correctAnswer: string;
@@ -252,6 +262,63 @@ export interface DialogueOption {
   text: string;
   targetSceneId: string;
   condition?: Condition;
+}
+
+export interface AudioMissionConfig {
+  assetId: string;
+  autoPlay: boolean;
+  loop: boolean;
+  points?: number;
+  penalty?: number;
+}
+
+export interface VideoMissionConfig {
+  assetId: string;
+  autoPlay: boolean;
+  loop: boolean;
+  points?: number;
+  penalty?: number;
+}
+
+export interface ImageMissionConfig {
+  assetId: string;
+  caption?: string;
+  points?: number;
+  penalty?: number;
+}
+
+export interface InventoryGetMissionConfig {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  points?: number;
+  penalty?: number;
+}
+
+export interface InventorySpendMissionConfig {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  points?: number;
+  penalty?: number;
+}
+
+export interface InventoryCheckMissionConfig {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  consumeOnCheck: boolean;
+  points?: number;
+  penalty?: number;
+}
+
+export interface AchievementMissionConfig {
+  achievementId: string;
+  achievementName: string;
+  achievementDescription: string;
+  icon?: string;
+  points?: number;
+  penalty?: number;
 }
 
 // ==================== Transition (spec 50.3.3) ====================
@@ -503,19 +570,35 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   { type: 'location', label: 'GPS', icon: '📍', description: 'GPS-локация', color: 'bg-yellow-500', category: 'Задания' },
   { type: 'quiz', label: 'QR', icon: '📱', description: 'QR-код', color: 'bg-indigo-500', category: 'Задания' },
   { type: 'quiz', label: 'Выбор', icon: '🎯', description: 'Выбор варианта', color: 'bg-orange-500', category: 'Задания' },
+  // Медиа
+  { type: 'slide', label: 'Аудио', icon: '🎵', description: 'Воспроизведение аудио', color: 'bg-purple-400', category: 'Медиа' },
+  { type: 'slide', label: 'Видео', icon: '🎬', description: 'Воспроизведение видео', color: 'bg-indigo-400', category: 'Медиа' },
+  { type: 'slide', label: 'Изображение', icon: '🖼', description: 'Показ изображения', color: 'bg-pink-400', category: 'Медиа' },
   // Логика
   { type: 'slide', label: 'Таймер', icon: '⏱', description: 'Ограничение по времени', color: 'bg-red-400', category: 'Логика' },
   { type: 'custom', label: 'Ветвление', icon: '🔀', description: 'Ветвление сценария', color: 'bg-teal-500', category: 'Логика' },
+  { type: 'custom', label: 'Условие', icon: '⚖️', description: 'Проверка условия', color: 'bg-amber-500', category: 'Логика' },
+  // Инвентарь
+  { type: 'custom', label: 'Получить предмет', icon: '🎒', description: 'Добавить предмет в инвентарь', color: 'bg-lime-500', category: 'Инвентарь' },
+  { type: 'custom', label: 'Потратить предмет', icon: '📦', description: 'Удалить предмет из инвентаря', color: 'bg-orange-400', category: 'Инвентарь' },
+  { type: 'custom', label: 'Проверка предмета', icon: '🔍', description: 'Проверить наличие предмета', color: 'bg-cyan-400', category: 'Инвентарь' },
+  // Достижения
+  { type: 'custom', label: 'Достижение', icon: '🏆', description: 'Выдать достижение', color: 'bg-yellow-400', category: 'Достижения' },
   // Персонажи
   { type: 'dialogue', label: 'NPC', icon: '🗣', description: 'Взаимодействие с персонажем', color: 'bg-cyan-500', category: 'Персонажи' },
+  { type: 'dialogue', label: 'Диалог', icon: '💬', description: 'Ветка диалога с NPC', color: 'bg-teal-400', category: 'Персонажи' },
   // Экспериментальные
   { type: 'custom', label: 'AR', icon: '🧩', description: 'Дополненная реальность', color: 'bg-gray-500', category: 'Экспериментальные', experimental: true },
+  { type: 'custom', label: 'Битва', icon: '⚔️', description: 'Мини-битва', color: 'bg-red-600', category: 'Экспериментальные', experimental: true },
 ];
 
 export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: 'Базовые', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Базовые') },
   { name: 'Задания', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Задания') },
+  { name: 'Медиа', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Медиа') },
   { name: 'Логика', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Логика') },
+  { name: 'Инвентарь', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Инвентарь') },
+  { name: 'Достижения', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Достижения') },
   { name: 'Персонажи', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Персонажи') },
   { name: 'Экспериментальные', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Экспериментальные') },
 ];

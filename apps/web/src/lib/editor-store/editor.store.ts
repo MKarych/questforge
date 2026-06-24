@@ -727,6 +727,20 @@ function getDefaultMissionConfig(type: MissionType): MissionConfig {
       return { itemId: '', itemName: '', quantity: 1 };
     case 'dialogue':
       return { npcName: '', npcDescription: '', dialogues: [] };
+    case 'audio':
+      return { assetId: '', autoPlay: false, loop: false };
+    case 'video':
+      return { assetId: '', autoPlay: false, loop: false };
+    case 'image':
+      return { assetId: '', caption: '' };
+    case 'inventory_get':
+      return { itemId: '', itemName: '', quantity: 1 };
+    case 'inventory_spend':
+      return { itemId: '', itemName: '', quantity: 1 };
+    case 'inventory_check':
+      return { itemId: '', itemName: '', quantity: 1, consumeOnCheck: false };
+    case 'achievement':
+      return { achievementId: '', achievementName: '', achievementDescription: '', icon: '' };
     default:
       return { correctAnswer: '', matchMode: 'exact', maxAttempts: 3 };
   }
@@ -758,6 +772,18 @@ function checkMissionAnswer(mission: Mission, answer: string): boolean {
       const cfg = mission.config as any;
       return parseInt(answer) === cfg.correctIndex;
     }
+    case 'inventory_check': {
+      // В тестовом режиме считаем, что предмет есть, если ответ 'yes'
+      return answer === 'yes';
+    }
+    // Медиа-типы, инвентарь (get/spend), achievement — auto-complete
+    case 'audio':
+    case 'video':
+    case 'image':
+    case 'inventory_get':
+    case 'inventory_spend':
+    case 'achievement':
+      return true;
     default:
       return true;
   }

@@ -68,7 +68,9 @@ export default function PreviewModal({ node, allScenes, onClose, onNavigate }: P
                 )}
 
                 {/* Missions */}
-                {node.missions.map((mission) => (
+                {node.missions.map((mission) => {
+                  const cfg = mission.config as any;
+                  return (
                   <div key={mission.id} className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{getMissionIcon(mission.type)}</span>
@@ -79,6 +81,52 @@ export default function PreviewModal({ node, allScenes, onClose, onNavigate }: P
 
                     {mission.description && (
                       <p className="text-gray-600 text-sm">{mission.description}</p>
+                    )}
+
+                    {/* Audio / Video / Image — плеер */}
+                    {(mission.type === 'audio' || mission.type === 'video') && (
+                      <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 text-sm">
+                        {mission.type === 'audio' ? '🎵 Аудиоплеер' : '🎬 Видеоплеер'}
+                        <div className="text-xs text-gray-400 mt-1">
+                          {cfg?.assetId ? `ID: ${cfg.assetId}` : 'Медиа не выбрано'}
+                        </div>
+                      </div>
+                    )}
+
+                    {mission.type === 'image' && (
+                      <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 text-sm">
+                        🖼 Изображение
+                        <div className="text-xs text-gray-400 mt-1">
+                          {cfg?.assetId ? `ID: ${cfg.assetId}` : 'Медиа не выбрано'}
+                        </div>
+                        {cfg?.caption && (
+                          <p className="text-xs text-gray-500 mt-1">{cfg.caption}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Inventory get/spend/check */}
+                    {mission.type === 'inventory_get' && (
+                      <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-sm text-green-800">
+                        🎒 Получить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </div>
+                    )}
+                    {mission.type === 'inventory_spend' && (
+                      <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg text-sm text-orange-800">
+                        📦 Потратить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </div>
+                    )}
+                    {mission.type === 'inventory_check' && (
+                      <div className="bg-cyan-50 border border-cyan-200 p-3 rounded-lg text-sm text-cyan-800">
+                        🔍 Проверить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </div>
+                    )}
+
+                    {/* Achievement */}
+                    {mission.type === 'achievement' && (
+                      <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-sm text-yellow-800">
+                        🏆 Достижение: <strong>{cfg?.achievementName || cfg?.achievementId || '?'}</strong>
+                      </div>
                     )}
 
                     {/* Answer input placeholder */}
@@ -120,7 +168,8 @@ export default function PreviewModal({ node, allScenes, onClose, onNavigate }: P
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
 
                 {/* GPS info */}
                 {node.metadata?.gps && (
@@ -179,6 +228,13 @@ function getMissionIcon(type: string): string {
     choice: '🎯',
     collect: '🎒',
     dialogue: '💬',
+    audio: '🎵',
+    video: '🎬',
+    image: '🖼',
+    inventory_get: '🎒',
+    inventory_spend: '📦',
+    inventory_check: '🔍',
+    achievement: '🏆',
   };
   return icons[type] || '📋';
 }

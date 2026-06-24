@@ -86,7 +86,9 @@ export default function TestModal({
               )}
 
               {/* Missions */}
-              {currentNode.missions.map((mission) => (
+              {currentNode.missions.map((mission) => {
+                const cfg = mission.config as any;
+                return (
                 <div key={mission.id} className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">{getMissionIcon(mission.type)}</span>
@@ -109,9 +111,9 @@ export default function TestModal({
                   )}
 
                   {/* Choice */}
-                  {mission.type === 'choice' && (mission.config as any)?.options && (
+                  {mission.type === 'choice' && cfg?.options && (
                     <div className="space-y-2">
-                      {(mission.config as any).options.map((opt: string, idx: number) => (
+                      {cfg.options.map((opt: string, idx: number) => (
                         <button
                           key={idx}
                           onClick={() => onAnswer(String(idx))}
@@ -144,8 +146,108 @@ export default function TestModal({
                       </p>
                     </div>
                   )}
+
+                  {/* Audio / Video / Image */}
+                  {(mission.type === 'audio' || mission.type === 'video') && (
+                    <div className="bg-gray-700/50 rounded-lg p-4 text-center text-gray-400 text-sm border border-gray-600">
+                      {mission.type === 'audio' ? '🎵 Аудиоплеер' : '🎬 Видеоплеер'}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {cfg?.assetId ? `ID: ${cfg.assetId}` : 'Медиа не выбрано'}
+                      </div>
+                      <button
+                        onClick={() => onAnswer('continue')}
+                        className="btn-primary text-xs mt-2"
+                      >
+                        ➡️ Продолжить
+                      </button>
+                    </div>
+                  )}
+
+                  {mission.type === 'image' && (
+                    <div className="bg-gray-700/50 rounded-lg p-4 text-center text-gray-400 text-sm border border-gray-600">
+                      🖼 Изображение
+                      <div className="text-xs text-gray-500 mt-1">
+                        {cfg?.assetId ? `ID: ${cfg.assetId}` : 'Медиа не выбрано'}
+                      </div>
+                      {cfg?.caption && (
+                        <p className="text-xs text-gray-500 mt-1">{cfg.caption}</p>
+                      )}
+                      <button
+                        onClick={() => onAnswer('continue')}
+                        className="btn-primary text-xs mt-2"
+                      >
+                        ➡️ Продолжить
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Inventory get/spend/check */}
+                  {mission.type === 'inventory_get' && (
+                    <div className="bg-green-500/10 border border-green-500/30 p-3 rounded-lg">
+                      <p className="text-green-400 text-sm">
+                        🎒 Получить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </p>
+                      <button
+                        onClick={() => onAnswer('continue')}
+                        className="btn-primary text-xs mt-2"
+                      >
+                        ➡️ Получить
+                      </button>
+                    </div>
+                  )}
+                  {mission.type === 'inventory_spend' && (
+                    <div className="bg-orange-500/10 border border-orange-500/30 p-3 rounded-lg">
+                      <p className="text-orange-400 text-sm">
+                        📦 Потратить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </p>
+                      <button
+                        onClick={() => onAnswer('continue')}
+                        className="btn-primary text-xs mt-2"
+                      >
+                        ➡️ Потратить
+                      </button>
+                    </div>
+                  )}
+                  {mission.type === 'inventory_check' && (
+                    <div className="bg-cyan-500/10 border border-cyan-500/30 p-3 rounded-lg">
+                      <p className="text-cyan-400 text-sm">
+                        🔍 Проверить предмет: <strong>{cfg?.itemName || cfg?.itemId || '?'}</strong> x{cfg?.quantity || 1}
+                      </p>
+                      <button
+                        onClick={() => onAnswer('yes')}
+                        className="btn-primary text-xs mt-2 mr-2"
+                      >
+                        ✅ Есть
+                      </button>
+                      <button
+                        onClick={() => onAnswer('no')}
+                        className="btn-secondary text-xs mt-2"
+                      >
+                        ❌ Нет
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Achievement */}
+                  {mission.type === 'achievement' && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg">
+                      <p className="text-yellow-400 text-sm">
+                        🏆 Достижение: <strong>{cfg?.achievementName || cfg?.achievementId || '?'}</strong>
+                      </p>
+                      {cfg?.achievementDescription && (
+                        <p className="text-yellow-400/70 text-xs mt-1">{cfg.achievementDescription}</p>
+                      )}
+                      <button
+                        onClick={() => onAnswer('continue')}
+                        className="btn-primary text-xs mt-2"
+                      >
+                        ➡️ Выдать
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Continue button for non-mission nodes */}
               {currentNode.missions.length === 0 && (
@@ -231,6 +333,13 @@ function getMissionIcon(type: string): string {
     choice: '🎯',
     collect: '🎒',
     dialogue: '💬',
+    audio: '🎵',
+    video: '🎬',
+    image: '🖼',
+    inventory_get: '🎒',
+    inventory_spend: '📦',
+    inventory_check: '🔍',
+    achievement: '🏆',
   };
   return icons[type] || '📋';
 }
