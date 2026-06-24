@@ -1,9 +1,9 @@
-markdown
+```markdown
 # 50. Runtime Engine Spec: Архитектурный контракт движка исполнения сценариев
 
 > **Дата:** 24.06.2026  
 > **Статус:** Утвержден  
-> **Версия:** 1.0  
+> **Версия:** 2.0  
 > **Класс:** Архитектурный контракт (10/10)  
 > **Цель:** Описать ядро исполнения сценариев — движок, который делает возможным прохождение любых игр: от городских квестов до квизов, корпоративов и RPG.
 
@@ -13,9 +13,9 @@ markdown
 
 1. **Движок — единственный источник истины.** Все игровые состояния хранятся и вычисляются только в Engine.
 2. **Детерминизм.** Одинаковый вход → одинаковый выход.
-3. **Event Sourcing.** Все события сохраняются.
+3. **Audit Log.** Все события сохраняются для аудита и отладки (Event Sourcing — в v2.0).
 4. **Server-Authoritative.** Frontend никогда не доверяется.
-5. **Расширяемость.** Новые типы узлов, миссий и механик добавляются без изменения ядра.
+5. **Расширяемость.** Новые типы сцен, миссий и механик добавляются без изменения ядра.
 6. **Универсальность.** Движок поддерживает любые форматы: городские квесты, квизы, мозгобойни, корпоративы, RPG, конференции, музеи.
 
 ---
@@ -30,22 +30,23 @@ interface Scenario {
   name: string;
   description: string;
   version: number;
-  nodes: Node[];
-  startNodeId: string;
+  scenes: Scene[];
+  startSceneId: string;
   variables: VariableDefinition[];
   metadata: ScenarioMetadata;
   createdAt: Date;
   updatedAt: Date;
 }
-2.2. Node (Игровая сцена)
-Node = Игровая сцена. Это может быть локация, раунд, этап, комната — любая точка в игровом пространстве.
+2.2. Scene (Сцена)
+Scene — это игровая сцена. Это может быть локация, раунд квиза, экран диалога, игровое поле или слайд презентации.
 
 typescript
-interface Node {
+interface Scene {
   id: string;
-  type: NodeType; // 'location' | 'quiz' | 'dialogue' | 'conference' | 'rpg' | 'custom'
+  type: 'location' | 'quiz' | 'dialogue' | 'game' | 'slide' | 'custom';
   title: string;
   description: string;
+  view: View;
   missions: Mission[];
   transitions: Transition[];
   position: { x: number; y: number };
@@ -56,22 +57,22 @@ interface Node {
     conditions?: Condition[];
   };
 }
-Типы узлов:
+Типы сцен:
 
 Тип	Описание	GPS	Применение
 location	Физическая локация	✅	Городские квесты
 quiz	Раунд викторины	❌	Квизы, мозгобойня
 dialogue	Диалог с NPC	❌	RPG, нарративные игры
-conference	Секция конференции	❌	Мероприятия
-rpg	RPG-сцена	❌	Ролевые игры
+game	Игровая сцена	❌	Морской бой, крестики-нолики
+slide	Слайд презентации	❌	Конференции, обучение
 custom	Пользовательский тип	⚠️	Расширения
 2.3. Mission (Задание)
-Mission — переиспользуемая единица действия. Может использоваться в разных узлах.
+Mission — переиспользуемая единица действия. Может использоваться в разных сценах.
 
 typescript
 interface Mission {
   id: string;
-  type: MissionType; // 'text' | 'code' | 'photo' | 'gps' | 'qr' | 'choice' | 'collect' | 'dialogue'
+  type: 'text' | 'code' | 'photo' | 'gps' | 'qr' | 'choice' | 'collect' | 'dialogue';
   title: string;
   description: string;
   config: MissionConfig;
@@ -118,15 +119,15 @@ interface GameSession {
   scenario: Scenario;
   teamId: string;
   team: Team;
-  currentNodeId: string;
-  variables: Record<string, any>; // Текущие переменные
-  inventory: Inventory; // Текущий инвентарь
+  currentSceneId: string;
+  variables: Record<string, any>;
+  inventory: Inventory;
   score: number;
   achievements: Achievement[];
-  status: SessionStatus; // 'created' | 'running' | 'paused' | 'finished' | 'cancelled'
+  status: SessionStatus; // 'created' | 'running' | 'paused' | 'finished' | 'cancelled' | 'failed'
   startedAt: Date;
   finishedAt: Date;
-  events: GameEvent[];
+  events: AuditLog[];
   version: number; // Optimistic locking
 }
 Статусы сессии:
@@ -136,6 +137,7 @@ created → running → finished
          ↑          ↑
          └── paused ┘
          └── cancelled
+         └── failed
 3. Execution Engine (Движок выполнения)
 3.1. Оркестратор выполнения
 typescript
@@ -143,8 +145,8 @@ class ExecutionEngine {
   // Запуск сессии
   startSession(sessionId: string): GameSession;
 
-  // Переход к узлу
-  transitionToNode(sessionId: string, nodeId: string): GameSession;
+  // Переход к сцене
+  transitionToScene(sessionId: string, sceneId: string): GameSession;
 
   // Выполнение миссии
   executeMission(sessionId: string, missionId: string, answer: any): MissionResult;
@@ -154,39 +156,24 @@ class ExecutionEngine {
 }
 3.2. Порядок выполнения
 text
-1. Игрок отправляет ответ (Mission)
-   ↓
-2. Execution Engine принимает событие
-   ↓
-3. Проверка: активна ли сессия?
-   ↓
-4. Проверка: правильный ли узел?
-   ↓
-5. Проверка: правильная ли миссия?
-   ↓
-6. Condition Engine проверяет условия
-   ↓
-7. Выполняется логика миссии
-   ↓
-8. Reward Engine начисляет награды
-   ↓
-9. State Engine обновляет состояние
-   ↓
-10. Event System генерирует события
-   ↓
-11. Event Log сохраняет все изменения
-   ↓
-12. Проверка переходов (Transitions)
-   ↓
-13. Возврат нового состояния игроку
+1. Игрок открывает сценарий → создается GameSession
+2. Движок загружает первую сцену (START)
+3. Игрок выполняет Mission (отвечает, загружает фото и т.д.)
+4. Движок проверяет Answer через Condition Engine
+5. Движок применяет Reward Engine
+6. Движок обновляет State
+7. Движок определяет Transition (по условиям)
+8. Движок загружает следующую Scene
+9. Цикл повторяется до FINISH
+10. GameSession завершается
 3.3. Переходы (Transitions)
 Directed Graph — разрешены циклы, но валидатор проверяет бесконечные циклы.
 
 typescript
 interface Transition {
   id: string;
-  fromNodeId: string;
-  toNodeId: string;
+  fromSceneId: string;
+  toSceneId: string;
   condition: Condition;
   type: TransitionType; // 'manual' | 'auto' | 'conditional' | 'random'
 }
@@ -197,339 +184,291 @@ manual	Игрок выбирает путь (кнопка)
 auto	Автоматический переход после выполнения
 conditional	Переход по условию (if/else)
 random	Случайный переход (рандом)
-4. State Engine (Движок состояния)
-4.1. Переменные
+4. Condition Engine (Движок условий) — AST
+4.1. Структура условия (AST)
 typescript
-interface VariableDefinition {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  defaultValue: any;
-  scope: 'local' | 'global';
+interface ConditionGroup {
+  operator: 'AND' | 'OR';
+  conditions: (SingleCondition | ConditionGroup)[];
 }
 
-interface VariableState {
-  [key: string]: any;
+interface SingleCondition {
+  type: 'variable' | 'score' | 'inventory' | 'flag' | 'role' | 'time' | 'random';
+  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'has';
+  left: string | number | boolean;
+  right: string | number | boolean;
 }
-Системные переменные:
-
-text
-team.name
-team.score
-team.members
-player.name
-player.role
-game.time
-game.elapsed
-game.currentNode
-game.totalNodes
-Пользовательские переменные:
-
-text
-coins: number = 0
-health: number = 100
-reputation: number = 50
-has_key: boolean = false
-4.2. Операции с переменными
+4.2. Примеры условий
 typescript
-enum VariableOperation {
-  SET = 'set',
-  ADD = 'add',
-  SUBTRACT = 'subtract',
-  MULTIPLY = 'multiply',
-  DIVIDE = 'divide',
-  INCREMENT = 'increment',
-  DECREMENT = 'decrement',
-}
-Примеры:
-
-text
-coins += 10
-health -= 20
-reputation = 50
-has_key = true
-4.3. Инвентарь
-typescript
-interface Inventory {
-  items: InventoryItem[];
-  capacity: number;
-}
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  description: string;
-  type: ItemType; // 'key' | 'consumable' | 'currency' | 'quest' | 'weapon' | 'armor'
-  quantity: number;
-  icon: string;
-  effects: ItemEffect[];
-}
-Операции с инвентарем:
-
-text
-addItem('key', 1)
-removeItem('key', 1)
-hasItem('key')
-5. Condition Engine (Движок условий)
-5.1. Структура условия
-typescript
-interface Condition {
-  type: ConditionType;
-  operator: Operator;
-  left: string | number | boolean | VariableReference;
-  right: string | number | boolean | VariableReference;
-  children?: Condition[];
-}
-
-enum ConditionType {
-  SINGLE = 'single',
-  AND = 'and',
-  OR = 'or',
-  NOT = 'not',
-}
-
-enum Operator {
-  EQ = 'eq', // ==
-  NE = 'ne', // !=
-  GT = 'gt', // >
-  LT = 'lt', // <
-  GTE = 'gte', // >=
-  LTE = 'lte', // <=
-  CONTAINS = 'contains',
-  STARTS_WITH = 'startsWith',
-  ENDS_WITH = 'endsWith',
-  MATCHES = 'matches', // regex
-  HAS_ITEM = 'hasItem',
-  HAS_ACHIEVEMENT = 'hasAchievement',
-  HAS_ROLE = 'hasRole',
-}
-5.2. Примеры условий
-text
-coins > 50
-hasItem('key') == true
-player.role == 'captain'
-score >= 100 AND hasItem('key')
-reputation > 50 OR team.members > 3
-NOT hasItem('key')
-5.3. Использование в узлах и переходах
-typescript
-// В узле
-if (coins > 50) {
-  // Показать секретную комнату
-}
-
-// В переходе
+// coins > 50
 {
-  from: 'node-1',
-  to: 'node-2',
-  condition: 'coins > 50'
+  type: 'variable',
+  operator: 'gt',
+  left: 'coins',
+  right: 50
 }
-6. Reward Engine (Движок наград)
-6.1. Структура награды
+
+// coins > 50 AND hasKey == true
+{
+  operator: 'AND',
+  conditions: [
+    {
+      type: 'variable',
+      operator: 'gt',
+      left: 'coins',
+      right: 50
+    },
+    {
+      type: 'variable',
+      operator: 'eq',
+      left: 'hasKey',
+      right: true
+    }
+  ]
+}
+
+// role == 'captain'
+{
+  type: 'role',
+  operator: 'eq',
+  left: 'role',
+  right: 'captain'
+}
+4.3. Вычисление условий
+typescript
+function evaluateCondition(condition: ConditionGroup, context: ExecutionContext): boolean {
+  if (condition.operator === 'AND') {
+    return condition.conditions.every(c => evaluateCondition(c, context));
+  }
+  if (condition.operator === 'OR') {
+    return condition.conditions.some(c => evaluateCondition(c, context));
+  }
+  // SingleCondition
+  const leftValue = resolveValue(condition.left, context);
+  const rightValue = resolveValue(condition.right, context);
+  return compare(leftValue, condition.operator, rightValue);
+}
+5. Reward Engine (Движок наград)
+5.1. Структура награды
 typescript
 interface Reward {
-  type: RewardType;
+  type: 'score' | 'money' | 'item' | 'achievement' | 'variable' | 'experience';
   target: 'team' | 'player' | 'all';
   value: any;
   message?: string;
 }
-
-enum RewardType {
-  ADD_SCORE = 'addScore',
-  ADD_MONEY = 'addMoney',
-  ADD_EXPERIENCE = 'addExperience',
-  GIVE_ITEM = 'giveItem',
-  UNLOCK_ACHIEVEMENT = 'unlockAchievement',
-  SET_VARIABLE = 'setVariable',
-  ADD_REPUTATION = 'addReputation',
-  TELEPORT = 'teleport',
-  UNLOCK_NODE = 'unlockNode',
-}
-6.2. Примеры наград
+5.2. Примеры наград
 typescript
 // Базовые
-{ type: 'addScore', value: 10, target: 'team' }
-{ type: 'addMoney', value: 50, target: 'team' }
-{ type: 'giveItem', value: { id: 'key', quantity: 1 }, target: 'team' }
+{ type: 'score', value: 10, target: 'team' }
+{ type: 'money', value: 50, target: 'team' }
+{ type: 'item', value: { id: 'key', quantity: 1 }, target: 'team' }
 
 // Сложные
-{ type: 'unlockAchievement', value: 'first_code', target: 'player' }
-{ type: 'setVariable', value: { name: 'coins', operation: 'add', value: 10 }, target: 'team' }
-{ type: 'teleport', value: 'node-5', target: 'team' }
-7. Event System (Событийная модель)
-7.1. Типы событий
+{ type: 'achievement', value: 'first_code', target: 'player' }
+{ type: 'variable', value: { name: 'coins', operation: 'add', value: 10 }, target: 'team' }
+{ type: 'experience', value: 20, target: 'team' }
+5.3. Применение наград
 typescript
-enum GameEventType {
-  // Системные
-  SESSION_CREATED = 'session.created',
-  SESSION_STARTED = 'session.started',
-  SESSION_FINISHED = 'session.finished',
-  SESSION_PAUSED = 'session.paused',
-  SESSION_RESUMED = 'session.resumed',
-  SESSION_CANCELLED = 'session.cancelled',
-
-  // Игроки
-  PLAYER_JOINED = 'player.joined',
-  PLAYER_LEFT = 'player.left',
-  PLAYER_ANSWERED = 'player.answered',
-
-  // Узлы
-  NODE_ENTERED = 'node.entered',
-  NODE_EXITED = 'node.exited',
-  NODE_COMPLETED = 'node.completed',
-  NODE_FAILED = 'node.failed',
-
-  // Миссии
-  MISSION_STARTED = 'mission.started',
-  MISSION_COMPLETED = 'mission.completed',
-  MISSION_FAILED = 'mission.failed',
-
-  // Награды
-  REWARD_APPLIED = 'reward.applied',
-  SCORE_CHANGED = 'score.changed',
-  ACHIEVEMENT_UNLOCKED = 'achievement.unlocked',
-
-  // Инвентарь
-  ITEM_ADDED = 'item.added',
-  ITEM_REMOVED = 'item.removed',
-
-  // Переменные
-  VARIABLE_CHANGED = 'variable.changed',
-
-  // Таймеры
-  TIMER_STARTED = 'timer.started',
-  TIMER_TICK = 'timer.tick',
-  TIMER_EXPIRED = 'timer.expired',
+function applyReward(reward: Reward, context: ExecutionContext): void {
+  switch (reward.type) {
+    case 'score':
+      context.team.score += reward.value;
+      break;
+    case 'money':
+      context.team.money += reward.value;
+      break;
+    case 'item':
+      context.team.inventory.add(reward.value);
+      break;
+    case 'achievement':
+      context.team.achievements.push(reward.value);
+      break;
+    case 'variable':
+      context.variables[reward.value.name] += reward.value.value;
+      break;
+    case 'experience':
+      context.team.experience += reward.value;
+      break;
+  }
 }
-7.2. События (Action-реакция)
+6. Trigger System (Система триггеров)
+6.1. Структура триггера
 typescript
-interface EventAction {
-  on: GameEventType;
+interface Trigger {
+  id: string;
+  event: string; // 'onTimer' | 'onScore' | 'onSceneEnter' | 'onSceneComplete' | 'onAchievement'
+  conditions: ConditionGroup;
   actions: Action[];
 }
-
-interface Action {
-  type: ActionType;
-  config: any;
-}
-
-enum ActionType {
-  SEND_PUSH = 'sendPush',
-  GIVE_ITEM = 'giveItem',
-  ADD_SCORE = 'addScore',
-  TELEPORT = 'teleport',
-  UNLOCK_NODE = 'unlockNode',
-  PLAY_SOUND = 'playSound',
-  SHOW_IMAGE = 'showImage',
-  SET_VARIABLE = 'setVariable',
-  UNLOCK_ACHIEVEMENT = 'unlockAchievement',
-}
-7.3. Пример
+6.2. Примеры триггеров
 typescript
-// При получении достижения
+// Когда осталось 10 минут
 {
-  on: 'achievement.unlocked',
+  id: 'timer-10min',
+  event: 'onTimer',
+  conditions: {
+    type: 'time',
+    operator: 'lte',
+    left: 'remaining',
+    right: 600
+  },
   actions: [
-    { type: 'sendPush', config: { message: '🎉 Вы получили достижение!' } },
-    { type: 'addScore', config: { value: 50 } },
-    { type: 'playSound', config: { sound: 'success.mp3' } }
+    { type: 'sendPush', config: { message: 'Осталось 10 минут!' } }
   ]
 }
-8. Event Log (Лог событий)
-8.1. Структура лога
+
+// Когда команда набрала 100 очков
+{
+  id: 'score-100',
+  event: 'onScore',
+  conditions: {
+    type: 'score',
+    operator: 'gte',
+    left: 'score',
+    right: 100
+  },
+  actions: [
+    { type: 'unlockAchievement', config: { achievement: 'score-master' } },
+    { type: 'addScore', config: { value: 20 } }
+  ]
+}
+7. Scheduler (Планировщик)
+7.1. Структура
 typescript
-interface EventLog {
+interface Schedule {
+  id: string;
+  type: 'absolute' | 'relative' | 'periodic';
+  at?: string; // "2026-06-24T20:00:00Z" (absolute)
+  delay?: number; // 900 (сек) (relative)
+  interval?: number; // 300 (сек) (periodic)
+  action: Action;
+}
+7.2. Примеры
+typescript
+// Старт раунда в 20:00
+{
+  id: 'round-start',
+  type: 'absolute',
+  at: '2026-06-24T20:00:00Z',
+  action: { type: 'startRound', config: { roundId: 'round-2' } }
+}
+
+// Подсказка через 15 минут
+{
+  id: 'hint-delay',
+  type: 'relative',
+  delay: 900,
+  action: { type: 'showHint', config: { hint: 'Посмотрите на колонну' } }
+}
+
+// Автофиниш через 3 часа
+{
+  id: 'auto-finish',
+  type: 'relative',
+  delay: 10800,
+  action: { type: 'finishGame', config: {} }
+}
+8. Audit Log (Аудит)
+Для MVP используем Audit Log (храним только факты). Event Sourcing (восстановление состояния из событий) — в v2.0.
+
+8.1. Структура
+typescript
+interface AuditLog {
   id: string;
   sessionId: string;
   teamId: string;
-  type: GameEventType;
+  type: AuditEventType;
   payload: any;
   timestamp: Date;
   sequence: number;
-  version: number;
 }
-8.2. Примеры записей
+
+enum AuditEventType {
+  SESSION_CREATED = 'session.created',
+  SCENE_ENTERED = 'scene.entered',
+  SCENE_EXITED = 'scene.exited',
+  MISSION_STARTED = 'mission.started',
+  MISSION_COMPLETED = 'mission.completed',
+  MISSION_FAILED = 'mission.failed',
+  ANSWER_SUBMITTED = 'answer.submitted',
+  ANSWER_CORRECT = 'answer.correct',
+  ANSWER_WRONG = 'answer.wrong',
+  HINT_USED = 'hint.used',
+  REWARD_APPLIED = 'reward.applied',
+  SCORE_CHANGED = 'score.changed',
+  ACHIEVEMENT_UNLOCKED = 'achievement.unlocked',
+  ITEM_ADDED = 'item.added',
+  ITEM_REMOVED = 'item.removed',
+  TRANSITION = 'transition',
+  SESSION_FINISHED = 'session.finished',
+  SESSION_FAILED = 'session.failed',
+  SESSION_CANCELLED = 'session.cancelled',
+}
+8.2. Пример
 json
 {
-  "id": "evt-001",
+  "id": "log-001",
   "sessionId": "sess-123",
   "teamId": "team-456",
-  "type": "player.answered",
+  "type": "mission.completed",
   "payload": {
-    "playerId": "player-789",
-    "nodeId": "node-1",
+    "sceneId": "scene-1",
     "missionId": "mission-1",
     "answer": "Красная",
-    "correct": true
+    "score": 10
   },
   "timestamp": "2026-06-24T12:00:00Z",
-  "sequence": 42,
-  "version": 1
+  "sequence": 42
 }
-8.3. Назначение
-Отладка: Понимание, что произошло
+9. Anti-Cheat Model
+9.1. Принципы
+Server-Authoritative. Все проверки на сервере.
 
-Споры: Доказательство действий игроков
+Локальная + серверная проверка. GPS проверяется локально (предварительно) и на сервере (финально).
 
-Аналитика: Построение тепловых карт
+Rate Limiting. Ограничение на количество запросов.
 
-Античит: Обнаружение аномалий
+Аномалии. Подозрительные действия логируются.
 
-Replay: Воспроизведение игры
-
-9. Validation Engine (Движок валидации)
-9.1. Проверки сценария
-typescript
-interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-}
-
-interface ValidationError {
-  code: string;
-  nodeId?: string;
-  missionId?: string;
-  message: string;
-  severity: 'error' | 'warning';
-}
-9.2. Правила валидации
-Правило	Код	Тип	Блокирует публикацию?
-Есть START узел	NO_START	error	✅
-Есть FINISH узел	NO_FINISH	error	✅
-Нет бесконечных циклов	INFINITE_LOOP	error	✅
-Все узлы достижимы	ORPHAN_NODE	warning	❌
-Все переходы валидны	BROKEN_TRANSITION	error	✅
-Все миссии имеют конфиг	MISSION_NO_CONFIG	error	✅
-Переменные существуют	UNKNOWN_VARIABLE	error	✅
-10. Runtime Debugger (DevTools)
-10.1. Панель отладки
-typescript
-interface DebuggerPanel {
-  sessionId: string;
-  currentNodeId: string;
-  variables: Record<string, any>;
-  inventory: Inventory;
-  score: number;
-  achievements: Achievement[];
-  events: EventLog[];
-  timers: Timer[];
-}
-10.2. Функции
+9.2. GPS Anti-Cheat
 text
-Просмотр состояния сессии
-Просмотр переменных
-Просмотр инвентаря
-Просмотр лога событий
-Временная шкала
-Симуляция ответов
-Перемотка времени
-Экспорт лога
-10.3. Доступ
+1. Локальная предварительная проверка (на устройстве)
+2. Серверная финальная проверка (при синхронизации)
+3. Если проверка не совпадает → ошибка "GPS не подтверждён"
+4. Максимальная скорость перемещения между точками (пешком 5 км/ч, авто 60 км/ч)
+9.3. Ответы
 text
-Только для разработчиков
-Только для авторов сценариев (в тестовом режиме)
-Доступен в панели организатора
-11. Public API (Доступные эндпоинты)
+Ограничение на количество попыток (3-5)
+Время между ответами (минимум 2 секунды)
+Подозрительно быстрые ответы → запрос CAPTCHA
+10. State Machine (Машина состояний)
+typescript
+enum SessionStatus {
+  CREATED = 'created',
+  RUNNING = 'running',
+  PAUSED = 'paused',
+  FINISHED = 'finished',
+  CANCELLED = 'cancelled',
+  FAILED = 'failed',
+}
+Переходы:
+
+text
+CREATED → RUNNING
+RUNNING → PAUSED
+PAUSED → RUNNING
+RUNNING → FINISHED
+RUNNING → CANCELLED
+RUNNING → FAILED
+Запрещенные переходы:
+
+text
+CREATED → FINISHED ❌
+FINISHED → RUNNING ❌
+CANCELLED → RUNNING ❌
+FAILED → RUNNING ❌
+11. Public API
 Метод	URL	Описание
 POST	/sessions	Создать сессию
 GET	/sessions/:id	Получить состояние сессии
@@ -538,18 +477,18 @@ POST	/sessions/:id/pause	Поставить на паузу
 POST	/sessions/:id/resume	Продолжить игру
 POST	/sessions/:id/finish	Завершить игру
 POST	/sessions/:id/answer	Отправить ответ
+GET	/sessions/:id/audit	Получить аудит-лог
 GET	/sessions/:id/debug	Получить отладочную информацию
-GET	/sessions/:id/events	Получить лог событий
 12. Архитектурные правила (Контракт для агентов)
 Движок — единственный источник истины.
 
 Все изменения проходят через Execution Engine.
 
-Каждое изменение сохраняется в Event Log.
+Каждое изменение сохраняется в Audit Log.
 
 Состояние сессии — immutable (только через апдейты).
 
-Условия проверяются через Condition Engine.
+Условия проверяются через Condition Engine (AST).
 
 Награды начисляются через Reward Engine.
 
@@ -560,15 +499,6 @@ GET	/sessions/:id/events	Получить лог событий
 Все внешние зависимости передаются через контекст.
 
 Детерминизм обязателен для воспроизводимости.
-
-13. Связи с другими документами
-Документ	Связь
-47-game-module-spec.md	Игровой модуль использует движок для прохождения
-49-scenario-editor-ultimate-spec.md	Редактор создаёт сценарии для движка
-38-test-contract.md	Тестирование движка через сценарии
-10-development-rules.md	Правила разработки движка
-14. Итоговый принцип
-Движок исполнения сценариев — это ядро платформы. Он не знает о фронтенде, БД, WebSocket. Он только исполняет сценарии и управляет состоянием игры.
 
 Дата: 24.06.2026
 Статус: Утвержден

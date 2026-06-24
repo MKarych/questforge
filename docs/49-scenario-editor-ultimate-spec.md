@@ -1,3 +1,5 @@
+49-scenario-editor-ultimate-spec.md
+markdown
 # 49. Scenario Editor Ultimate Spec: Полная спецификация конструктора сценариев
 
 > **Дата:** 24.06.2026  
@@ -21,23 +23,128 @@
 
 **Всё начинается с редактора. Если редактор хуёвый — всё остальное не имеет значения.**
 
----
+### 1.2. Core Runtime Primitives (Ядро платформы)
 
-## 2. Архитектура редактора
+**Любая игровая механика на платформе должна собираться из шести универсальных сущностей.** Эти примитивы — основа для создания любых игр: от городских квестов до квизов, корпоративов, RPG и музейных маршрутов.
 
-### 2.1. Три слоя
+#### 1.2.1. Scene (Сцена)
 
-| Слой | Компонент | Ответственность |
-| :--- | :--- | :--- |
-| **Презентация** | React Flow, UI Kit | Отрисовка холста, блоков, панелей, соединений |
-| **Логика** | Zustand Store, History Manager | Undo/Redo, состояние сценария, буфер обмена, переменные |
-| **Данные** | Scenario Service (NestJS) | Сохранение, валидация, версионирование, публикация |
+Сцена — это контейнер для игрового действия. Это может быть локация, раунд квиза, экран диалога, игровое поле или слайд презентации.
 
-### 2.2. Asset Manager
+```typescript
+interface Scene {
+  id: string;
+  type: 'location' | 'quiz' | 'dialogue' | 'game' | 'slide' | 'custom';
+  title: string;
+  description: string;
+  view: View;
+  missions: Mission[];
+  transitions: Transition[];
+  position: { x: number; y: number };
+  metadata: {
+    gps?: { lat: number; lng: number; radius: number };
+    timer?: number;
+    requiredRole?: string;
+    conditions?: Condition[];
+  };
+}
+1.2.2. Action (Действие)
+Действие — это то, что делает игрок. Ввод текста, клик на карте, выбор варианта, загрузка фото, отметка GPS.
 
+typescript
+interface Action {
+  id: string;
+  type: 'text' | 'click' | 'choice' | 'photo' | 'gps' | 'qr' | 'code' | 'drag' | 'collect' | 'dialogue';
+  label: string;
+  config: ActionConfig;
+  conditions: Condition[];
+  rewards: Reward[];
+}
+1.2.3. State (Состояние)
+Состояние — это все данные, которые меняются в процессе игры: счёт, инвентарь, переменные, флаги, роли.
+
+typescript
+interface State {
+  variables: Record<string, any>;
+  inventory: InventoryItem[];
+  score: number;
+  flags: Record<string, boolean>;
+  progress: {
+    completedScenes: string[];
+    currentSceneId: string;
+    totalScenes: number;
+  };
+}
+1.2.4. Condition (Условие)
+Условие — это проверка, которая определяет, что произойдёт дальше. Без условий игры становятся линейными.
+
+typescript
+interface Condition {
+  type: 'variable' | 'score' | 'inventory' | 'flag' | 'role' | 'time' | 'random';
+  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'has';
+  left: string | number | boolean;
+  right: string | number | boolean;
+}
+Примеры условий:
+
+text
+score > 100
+hasItem('key') == true
+role == 'captain'
+visitedScenes >= 5
+time > 300
+1.2.5. Event (Событие)
+Событие — это то, что запускает действия в игре. Игрок нажал на кнопку, таймер истёк, достижение разблокировано.
+
+typescript
+interface Event {
+  type: 'onClick' | 'onAnswer' | 'onTimer' | 'onComplete' | 'onAchievement' | 'onEnter' | 'onExit';
+  actions: Action[];
+}
+1.2.6. View (Представление)
+Представление — это то, как игрок видит сцену. Карта, список, слайд, сетка, временная шкала.
+
+typescript
+interface View {
+  type: 'map' | 'list' | 'card' | 'grid' | 'slide' | 'timeline' | 'canvas';
+  config: {
+    background?: string;
+    layout?: 'vertical' | 'horizontal' | 'grid' | 'free';
+    elements?: ViewElement[];
+    interactive?: boolean;
+  };
+}
+1.3. Как собираются игры из примитивов
+Игра	Scene	Action	State	Condition	Event	View
+Encounter	Location	Text, Code, Photo, GPS	score, inventory	score > 100	onAnswer	Map
+Мозгобойня	Quiz	Choice	score, round	score > 50	onAnswer	Slide
+Туц Туц	Slide	Choice, Photo	score, vote	score > 30	onAnswer	Slide
+Карта сокровищ	Location	Click, GPS	inventory, flags	hasItem('key')	onClick	Map
+Морской бой	Game	Click	field, hits	hits == 10	onClick	Grid
+Музей	Location	QR, Audio	visited, flags	hasFlag('room1')	onEnter	Map
+Корпоратив	Location	Photo, Choice	score, team	role == 'captain'	onAnswer	List
+Мафия	Dialogue	Choice	roles, votes	role == 'mafia'	onAnswer	Card
+1.4. Почему это работает
+Универсальность. Один движок обслуживает все типы игр.
+
+Расширяемость. Новые типы сцен, действий и представлений добавляются без изменения ядра.
+
+Маркетплейс. Авторы могут продавать не только сценарии, но и отдельные примитивы (View Pack, Action Pack).
+
+Простота. Автор не думает о том, "как сделать морской бой". Он просто комбинирует примитивы.
+
+Это и есть Game Runtime Platform.
+
+2. Архитектура редактора
+2.1. Три слоя
+Слой	Компонент	Ответственность
+Презентация	React Flow, UI Kit	Отрисовка холста, блоков, панелей, соединений
+Логика	Zustand Store, History Manager	Undo/Redo, состояние сценария, буфер обмена, переменные
+Данные	Scenario Service (NestJS)	Сохранение, валидация, версионирование, публикация
+2.2. Asset Manager
 Все медиа-файлы хранятся централизованно.
 
-```text
+text
 /assets
   /images
   /audio
@@ -58,8 +165,8 @@ interface Scenario {
   name: string;
   description: string;
   version: number;
-  nodes: Node[];
-  startNodeId: string;
+  scenes: Scene[];
+  startSceneId: string;
   variables: VariableDefinition[];
   metadata: ScenarioMetadata;
   status: ScenarioStatus;
@@ -67,13 +174,14 @@ interface Scenario {
   updatedAt: Date;
   deletedAt: Date | null;
 }
-3.2. Узел (Node)
+3.2. Сцена (Scene)
 typescript
-interface Node {
+interface Scene {
   id: string;
-  type: 'location' | 'quiz' | 'dialogue' | 'conference' | 'rpg' | 'custom';
+  type: 'location' | 'quiz' | 'dialogue' | 'game' | 'slide' | 'custom';
   title: string;
   description: string;
+  view: View;
   missions: Mission[];
   transitions: Transition[];
   position: { x: number; y: number };
@@ -143,10 +251,10 @@ QR	QR-код, Очки, Штраф
 Ветвление	Условия (массив: метка → переход)
 6.3. Переходы
 text
-Успех → [узел]
-Ошибка → [узел]
-Таймаут → [узел]
-Условие → [узел]
+Успех → [сцена]
+Ошибка → [сцена]
+Таймаут → [сцена]
+Условие → [сцена]
 7. Жизненный цикл сценария и состояние редактора (САМОЕ ВАЖНОЕ)
 7.1. Жизненный цикл сценария
 text
@@ -209,7 +317,7 @@ text
 Нет FINISH	NO_FINISH	error	✅
 Бесконечный цикл	INFINITE_LOOP	error	✅
 Переход в никуда	BROKEN_TRANSITION	error	✅
-Недостижимый узел	ORPHAN_NODE	warning	❌
+Недостижимая сцена	ORPHAN_SCENE	warning	❌
 Нет ответа (Текст/Код)	MISSING_ANSWER	error	✅
 8.2. Отображение
 text
@@ -220,7 +328,7 @@ text
 9. Режим превью
 text
 Показывает сценарий как на телефоне игрока
-Можно переключаться между узлами
+Можно переключаться между сценами
 Можно вводить ответы (но не сохранять)
 Закрывается по клику вне модалки
 10. Режим тестирования
@@ -242,8 +350,8 @@ player.name
 player.role
 game.time
 game.elapsed
-game.currentNode
-game.totalNodes
+game.currentScene
+game.totalScenes
 11.2. Пользовательские переменные
 text
 coins: number = 0
@@ -296,7 +404,7 @@ text
 🎖️ Ночной охотник
 14.2. Условия
 text
-Если completed_nodes >= 10 → "Исследователь"
+Если completed_scenes >= 10 → "Исследователь"
 15. Маркетплейс сценариев
 15.1. Публикация
 text
@@ -396,3 +504,7 @@ Undo/Redo (история 50 шагов)
 
 20. Итоговый принцип
 Редактор сценариев — это наш главный продукт. Он должен быть лучшим в мире. Всё остальное (игры, команды, профили, админка) — это обёртка вокруг него.
+
+Дата: 24.06.2026
+Статус: Утвержден. КРИТИЧЕСКИЙ ДОКУМЕНТ
+Класс: Архитектурный контракт (10/10)
