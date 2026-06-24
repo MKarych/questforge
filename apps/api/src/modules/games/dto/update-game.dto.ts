@@ -10,45 +10,53 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 
-export class CreateGameDto {
+export class UpdateGameDto {
   @IsString()
   @MaxLength(100)
-  title!: string;
+  @IsOptional()
+  title?: string;
 
   @IsString()
-  @IsOptional()
   @MaxLength(3000)
+  @IsOptional()
   description?: string;
 
   @IsString()
   @MaxLength(100)
-  city!: string;
+  @IsOptional()
+  city?: string;
 
   @IsString()
-  @IsOptional()
   @MaxLength(500)
+  @IsOptional()
   address?: string;
 
   @IsDateString()
-  date!: string;
+  @IsOptional()
+  date?: string;
 
   @IsString()
-  time!: string; // HH:mm
+  @IsOptional()
+  time?: string; // HH:mm
 
   @IsNumber()
   @Min(1)
-  duration!: number;
+  @IsOptional()
+  duration?: number;
 
   @IsNumber()
   @Min(0)
-  price!: number;
+  @IsOptional()
+  price?: number;
 
   @IsNumber()
   @Min(1)
-  maxTeams!: number;
+  @IsOptional()
+  maxTeams?: number;
 
   @IsString()
-  scenarioId!: string;
+  @IsOptional()
+  scenarioId?: string;
 
   @IsString()
   @IsOptional()

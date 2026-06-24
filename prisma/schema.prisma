@@ -99,6 +99,8 @@ model User {
   joinRequestsResolved   JoinRequest[]          @relation("JoinRequestResolver")
   transfersFrom          OwnershipTransfer[]    @relation("TransferFrom")
   transfersTo            OwnershipTransfer[]    @relation("TransferTo")
+  gameComments           GameComment[]
+  gameQuestions          GameQuestion[]
 
   @@index([email])
   @@index([username])
@@ -166,25 +168,40 @@ model ActivityLog {
 }
 
 // ============================================================
-// GAME
+// GAME — Aggregate Root
 // ============================================================
 
 model Game {
   id                String           @id @default(uuid()) @db.Uuid
+  slug              String           @unique @db.VarChar(150)
   title             String           @db.VarChar(255)
   description       String?
   city              String           @db.VarChar(100)
+  address           String?          @db.VarChar(500)
   date              DateTime
+  time              String           @db.VarChar(5) // HH:mm
   duration          Int              @map("duration")
   price             Decimal          @default(0) @db.Decimal(10, 2)
   maxTeams          Int              @default(50) @map("max_teams")
   shareLink         String           @unique @map("share_link") @db.VarChar(50)
-  status            GameStatus       @default(CREATED)
+  imageUrl          String?          @map("image_url")
+  bannerUrl         String?          @map("banner_url")
+  tags              String[]         @default([]) @map("tags")
+  status            GameStatus       @default(DRAFT)
   moderationStatus  ModerationStatus @default(PENDING) @map("moderation_status")
   moderationComment String?          @map("moderation_comment")
+  version           Int              @default(1) // Optimistic locking
+
+  // Настройки старта
+  autoStart         Boolean          @default(false) @map("auto_start")
+  autoStartDelay    Int              @default(0) @map("auto_start_delay")
+  allowEarlyStart   Boolean          @default(true) @map("allow_early_start")
+  startBuffer       Int              @default(15) @map("start_buffer")
+  allowLateRegistration Boolean       @default(false) @map("allow_late_registration")
+
   organizerId       String           @map("organizer_id") @db.Uuid
   scenarioId        String?          @map("scenario_id") @db.Uuid
-  imageUrl          String?          @map("image_url")
+
   publishedAt       DateTime?        @map("published_at")
   submittedAt       DateTime?        @map("submitted_at")
   moderatedAt       DateTime?        @map("moderated_at")
@@ -193,11 +210,16 @@ model Game {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   deletedAt         DateTime?        @map("deleted_at")
-  comments          Comment[]
-  events            Event[]
+
+  // Relations
   organizer         User             @relation(fields: [organizerId], references: [id])
   scenario          Scenario?        @relation(fields: [scenarioId], references: [id])
+  comments          Comment[]
+  events            Event[]
   gameTeams         GameTeam[]
+  registrations     GameRegistration[]
+  gameComments      GameComment[]
+  gameQuestions     GameQuestion[]
   heatmapData       HeatmapData[]
   media             Media[]
   reviews           Review[]
@@ -209,6 +231,70 @@ model Game {
   @@index([date])
   @@index([scenarioId])
   @@index([moderationStatus])
+  @@index([slug])
+  @@index([deletedAt])
+}
+
+// ============================================================
+// GAME REGISTRATION
+// ============================================================
+
+model GameRegistration {
+  id        String             @id @default(uuid()) @db.Uuid
+  gameId    String             @map("game_id") @db.Uuid
+  teamId    String             @map("team_id") @db.Uuid
+  status    RegistrationStatus @default(REGISTERED)
+  readyAt   DateTime?          @map("ready_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  game      Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  team      Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, teamId])
+  @@index([gameId])
+  @@index([teamId])
+  @@index([status])
+}
+
+// ============================================================
+// GAME COMMENT (обсуждения игры)
+// ============================================================
+
+model GameComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  text      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([gameId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// GAME QUESTION (вопросы организатору)
+// ============================================================
+
+model GameQuestion {
+  id         String    @id @default(uuid()) @db.Uuid
+  gameId     String    @map("game_id") @db.Uuid
+  authorId   String    @map("author_id") @db.Uuid
+  question   String    @db.Text
+  answer     String?   @db.Text
+  answeredAt DateTime? @map("answered_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  game       Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  author     User      @relation(fields: [authorId], references: [id])
+
+  @@index([gameId])
+  @@index([authorId])
+  @@index([answeredAt])
 }
 
 // ============================================================
@@ -304,6 +390,7 @@ model Team {
   transfers     OwnershipTransfer[]
   events        Event[]
   games         GameTeam[]
+  registrations GameRegistration[]
   heatmapData   HeatmapData[]
   inventory     Inventory?
   media         Media[]
@@ -679,20 +766,30 @@ enum OrganizerStatus {
 }
 
 enum GameStatus {
-  CREATED
+  DRAFT
+  PENDING
+  APPROVED
   PUBLISHED
-  WAITING_FOR_PLAYERS
-  STARTED
-  IN_PROGRESS
-  PAUSED
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  LOBBY
+  RUNNING
   FINISHED
   ARCHIVED
+  CANCELLED
+  RESCHEDULED
 }
 
 enum ModerationStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  READY
+  NOT_READY
 }
 
 enum TeamStatus {
