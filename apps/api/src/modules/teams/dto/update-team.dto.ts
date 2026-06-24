@@ -1,7 +1,7 @@
 import {
   IsOptional, IsString, MaxLength, IsEnum, IsArray, IsNumber, Min, Max,
 } from 'class-validator';
-import { TeamVisibility, JoinPolicy } from '../types/team-types';
+import { TeamVisibility, JoinPolicy, TeamStatus } from '../types/team-types';
 
 export class UpdateTeamDto {
   @IsString()
@@ -45,6 +45,10 @@ export class UpdateTeamDto {
   @IsEnum(TeamVisibility)
   @IsOptional()
   privacy?: TeamVisibility;
+
+  @IsEnum(TeamStatus)
+  @IsOptional()
+  status?: TeamStatus;
 
   @IsEnum(JoinPolicy)
   @IsOptional()

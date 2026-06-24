@@ -22,6 +22,12 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -182,6 +188,9 @@ export class TeamsService {
   // FIND ONE (public)
   // ================================================================
   async findOne(id: string) {
+    if (!isValidUuid(id)) {
+      throw new NotFoundException('Команда не найдена');
+    }
     const team = await this.prisma.team.findFirst({
       where: { id, deletedAt: null, status: { not: TeamStatus.DELETED } },
       include: {
@@ -1183,11 +1192,240 @@ export class TeamsService {
   }
 
   // ================================================================
+  // ADMIN METHODS
+  // ================================================================
+
+  async getAllTeams(query: {
+    search?: string;
+    status?: string;
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: any = { deletedAt: null };
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { slug: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+    if (query.status) {
+      where.status = query.status;
+    }
+    if (query.city) {
+      where.city = { contains: query.city, mode: 'insensitive' };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.team.findMany({
+        where,
+        include: {
+          captain: { select: { id: true, name: true, avatarUrl: true, email: true } },
+          _count: { select: { members: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: query.limit || 20,
+        skip: query.offset || 0,
+      }),
+      this.prisma.team.count({ where }),
+    ]);
+
+    return {
+      items: items.map((team) => ({
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        avatar: team.avatar,
+        description: team.description,
+        city: team.city,
+        status: team.status,
+        privacy: team.privacy,
+        captain: {
+          id: team.captain.id,
+          name: team.captain.name,
+          avatarUrl: team.captain.avatarUrl,
+          email: team.captain.email,
+        },
+        membersCount: team._count.members,
+        createdAt: team.createdAt,
+        updatedAt: team.updatedAt,
+        deletedAt: team.deletedAt,
+      })),
+      total,
+    };
+  }
+
+  async getTeamDetails(id: string) {
+    if (!isValidUuid(id)) {
+      throw new NotFoundException('Команда не найдена');
+    }
+
+    const team = await this.prisma.team.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        captain: { select: { id: true, name: true, avatarUrl: true, email: true } },
+        members: {
+          include: {
+            user: { select: { id: true, name: true, avatarUrl: true, email: true } },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+        _count: { select: { members: true, invites: true, joinRequests: true } },
+      },
+    });
+
+    if (!team) throw new NotFoundException('Команда не найдена');
+
+    return {
+      id: team.id,
+      name: team.name,
+      slug: team.slug,
+      avatar: team.avatar,
+      banner: team.banner,
+      description: team.description,
+      city: team.city,
+      country: team.country,
+      website: team.website,
+      status: team.status,
+      privacy: team.privacy,
+      joinPolicy: team.joinPolicy,
+      tags: team.tags,
+      captain: {
+        id: team.captain.id,
+        name: team.captain.name,
+        avatarUrl: team.captain.avatarUrl,
+        email: team.captain.email,
+      },
+      members: team.members.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        avatarUrl: m.user.avatarUrl,
+        email: m.user.email,
+        role: m.role,
+        joinedAt: m.joinedAt,
+      })),
+      membersCount: team._count.members,
+      invitesCount: team._count.invites,
+      joinRequestsCount: team._count.joinRequests,
+      createdAt: team.createdAt,
+      updatedAt: team.updatedAt,
+      deletedAt: team.deletedAt,
+    };
+  }
+
+  async adminUpdateTeam(actorId: string, teamId: string, dto: UpdateTeamDto) {
+    const team = await this.getActiveTeam(teamId);
+
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+
+    if (dto.name !== undefined) {
+      oldValues.name = team.name;
+      newValues.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      oldValues.description = team.description;
+      newValues.description = dto.description;
+    }
+    if (dto.city !== undefined) {
+      oldValues.city = team.city;
+      newValues.city = dto.city;
+    }
+    if (dto.status !== undefined) {
+      oldValues.status = team.status;
+      newValues.status = dto.status;
+    }
+    if (dto.privacy !== undefined) {
+      oldValues.privacy = team.privacy;
+      newValues.privacy = dto.privacy;
+    }
+    if (dto.joinPolicy !== undefined) {
+      oldValues.joinPolicy = team.joinPolicy;
+      newValues.joinPolicy = dto.joinPolicy;
+    }
+    if (dto.tags !== undefined) {
+      oldValues.tags = team.tags;
+      newValues.tags = dto.tags;
+    }
+
+    const updated = await this.prisma.team.update({
+      where: { id: teamId, version: team.version },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.city !== undefined && { city: dto.city }),
+        ...(dto.country !== undefined && { country: dto.country }),
+        ...(dto.website !== undefined && { website: dto.website }),
+        ...(dto.status !== undefined && { status: dto.status as TeamStatus }),
+        ...(dto.privacy !== undefined && { privacy: dto.privacy as any }),
+        ...(dto.joinPolicy !== undefined && { joinPolicy: dto.joinPolicy as any }),
+        ...(dto.tags !== undefined && { tags: dto.tags }),
+        version: { increment: 1 },
+      },
+      include: {
+        captain: { select: { id: true, name: true, avatarUrl: true } },
+        _count: { select: { members: true } },
+      },
+    });
+
+    await this.createAuditLog({
+      teamId,
+      actorId,
+      action: 'ADMIN_UPDATE_TEAM',
+      entity: 'Team',
+      entityId: teamId,
+      oldValue: oldValues,
+      newValue: newValues,
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+      description: updated.description,
+      city: updated.city,
+      status: updated.status,
+      privacy: updated.privacy,
+      joinPolicy: updated.joinPolicy,
+      tags: updated.tags,
+      captain: updated.captain,
+      membersCount: updated._count.members,
+      updatedAt: updated.updatedAt,
+    };
+  }
+
+  async adminDeleteTeam(actorId: string, teamId: string) {
+    const team = await this.getActiveTeam(teamId);
+
+    await this.prisma.team.update({
+      where: { id: teamId, version: team.version },
+      data: {
+        status: TeamStatus.DELETED,
+        deletedAt: new Date(),
+        version: { increment: 1 },
+      },
+    });
+
+    await this.createAuditLog({
+      teamId,
+      actorId,
+      action: 'ADMIN_DELETE_TEAM',
+      entity: 'Team',
+      entityId: teamId,
+      oldValue: { name: team.name, status: team.status },
+      newValue: { status: TeamStatus.DELETED, deletedAt: new Date().toISOString() },
+    });
+
+    return { message: 'Команда удалена' };
+  }
+
+  // ================================================================
   // HELPERS
   // ================================================================
 
   private async getActiveTeam(id: string) {
-    if (!id || typeof id !== 'string' || id.length < 8) {
+    if (!isValidUuid(id)) {
       throw new NotFoundException('Команда не найдена');
     }
     const team = await this.prisma.team.findFirst({

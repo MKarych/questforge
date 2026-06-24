@@ -116,6 +116,12 @@ export default function AdminDashboardPage() {
               👥 Пользователи
             </Link>
           )}
+          <Link
+            href="/admin/teams"
+            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
+          >
+            👥 Команды
+          </Link>
         </div>
 
         {/* Stats Cards */}

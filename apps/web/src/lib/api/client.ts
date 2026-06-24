@@ -941,6 +941,40 @@ class ApiClient {
       body: JSON.stringify({ role }),
     });
   }
+
+  // ==================== Admin Teams ====================
+
+  async getAdminTeams(params?: {
+    search?: string;
+    status?: string;
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ items: any[]; total: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.city) queryParams.append('city', params.city);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const query = queryParams.toString();
+    return this.request(`/admin/teams${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminTeam(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/admin/teams/${id}`);
+  }
+
+  async updateAdminTeam(id: string, data: any): Promise<ApiResponse<any>> {
+    return this.request(`/admin/teams/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAdminTeam(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/admin/teams/${id}`, { method: 'DELETE' });
+  }
 }
 
 // Export singleton instance
@@ -1034,3 +1068,9 @@ export const declineInvite = (teamId: string, inviteId: string) => apiClient.dec
 export const transferOwnership = (teamId: string, data: TransferOwnershipRequest) => apiClient.transferOwnership(teamId, data);
 export const acceptTransfer = (teamId: string) => apiClient.acceptTransfer(teamId);
 export const getTeamHistory = (id: string) => apiClient.getTeamHistory(id);
+
+// Admin Teams
+export const getAdminTeams = (params?: { search?: string; status?: string; city?: string; limit?: number; offset?: number }) => apiClient.getAdminTeams(params);
+export const getAdminTeam = (id: string) => apiClient.getAdminTeam(id);
+export const updateAdminTeam = (id: string, data: any) => apiClient.updateAdminTeam(id, data);
+export const deleteAdminTeam = (id: string) => apiClient.deleteAdminTeam(id);

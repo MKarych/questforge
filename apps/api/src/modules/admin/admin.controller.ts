@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -10,6 +11,8 @@ import {
   Request,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { TeamsService } from '../teams/teams.service';
+import { UpdateTeamDto } from '../teams/dto/update-team.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -17,7 +20,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly teamsService: TeamsService,
+  ) {}
 
   // ============================================================
   // Dashboard
@@ -128,5 +134,51 @@ export class AdminController {
     @Body('role') role: string,
   ) {
     return this.adminService.changeUserRole(userId, role);
+  }
+
+  // ============================================================
+  // Teams Management
+  // ============================================================
+
+  @Get('teams')
+  @Roles('ADMIN', 'MODERATOR')
+  async getAllTeams(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('city') city?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.teamsService.getAllTeams({
+      search,
+      status,
+      city,
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Get('teams/:id')
+  @Roles('ADMIN', 'MODERATOR')
+  async getTeamDetails(@Param('id') id: string) {
+    return this.teamsService.getTeamDetails(id);
+  }
+
+  @Patch('teams/:id')
+  @Roles('ADMIN', 'MODERATOR')
+  async updateTeam(
+    @Param('id') id: string,
+    @Body() dto: UpdateTeamDto,
+    @Request() req: any,
+  ) {
+    const actorId = req.user?.userId || req.user?.sub;
+    return this.teamsService.adminUpdateTeam(actorId, id, dto);
+  }
+
+  @Delete('teams/:id')
+  @Roles('ADMIN')
+  async deleteTeam(@Param('id') id: string, @Request() req: any) {
+    const actorId = req.user?.userId || req.user?.sub;
+    return this.teamsService.adminDeleteTeam(actorId, id);
   }
 }

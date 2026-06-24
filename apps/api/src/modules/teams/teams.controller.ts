@@ -22,12 +22,11 @@ export class TeamsController {
   // ================================================================
   @Post()
   async create(@Request() req: UserRequest, @Body() dto: CreateTeamDto) {
-    const result = await this.teamsService.create(req.user.userId, dto);
-    return { success: true, data: result };
+    return this.teamsService.create(req.user.userId, dto);
   }
 
   // ================================================================
-  // FIND ALL
+  // FIND ALL (public)
   // ================================================================
   @Get()
   async findAll(
@@ -38,7 +37,7 @@ export class TeamsController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    const result = await this.teamsService.findAll({
+    return this.teamsService.findAll({
       city,
       search,
       status: status as any,
@@ -46,7 +45,22 @@ export class TeamsController {
       limit: limit ? Number(limit) : 20,
       offset: offset ? Number(offset) : 0,
     });
-    return { success: true, data: result };
+  }
+
+  // ================================================================
+  // GET MY TEAM (static routes MUST be before :id)
+  // ================================================================
+  @Get('me/team')
+  async getMyTeam(@Request() req: UserRequest) {
+    return this.teamsService.getMyTeam(req.user.userId);
+  }
+
+  // ================================================================
+  // GET MY TEAMS
+  // ================================================================
+  @Get('my')
+  async getMyTeams(@Request() req: UserRequest) {
+    return this.teamsService.getMyTeams(req.user.userId);
   }
 
   // ================================================================
@@ -54,8 +68,7 @@ export class TeamsController {
   // ================================================================
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const result = await this.teamsService.findOne(id);
-    return { success: true, data: result };
+    return this.teamsService.findOne(id);
   }
 
   // ================================================================
@@ -63,8 +76,7 @@ export class TeamsController {
   // ================================================================
   @Get(':id/private')
   async findPrivate(@Request() req: UserRequest, @Param('id') id: string) {
-    const result = await this.teamsService.findPrivate(id, req.user.userId);
-    return { success: true, data: result };
+    return this.teamsService.findPrivate(id, req.user.userId);
   }
 
   // ================================================================
@@ -76,8 +88,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Body() dto: UpdateTeamDto,
   ) {
-    const result = await this.teamsService.update(req.user.userId, id, dto);
-    return { success: true, data: result };
+    return this.teamsService.update(req.user.userId, id, dto);
   }
 
   // ================================================================
@@ -85,8 +96,7 @@ export class TeamsController {
   // ================================================================
   @Delete(':id')
   async delete(@Request() req: UserRequest, @Param('id') id: string) {
-    const result = await this.teamsService.delete(req.user.userId, id);
-    return { success: true, data: result };
+    return this.teamsService.delete(req.user.userId, id);
   }
 
   // ================================================================
@@ -94,8 +104,7 @@ export class TeamsController {
   // ================================================================
   @Get(':id/members')
   async getMembers(@Param('id') id: string) {
-    const result = await this.teamsService.getMembers(id);
-    return { success: true, data: result };
+    return this.teamsService.getMembers(id);
   }
 
   // ================================================================
@@ -108,8 +117,7 @@ export class TeamsController {
     @Param('userId') userId: string,
     @Body() dto: UpdateMemberRoleDto,
   ) {
-    const result = await this.teamsService.updateMemberRole(req.user.userId, id, userId, dto);
-    return { success: true, data: result };
+    return this.teamsService.updateMemberRole(req.user.userId, id, userId, dto);
   }
 
   // ================================================================
@@ -121,8 +129,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('userId') userId: string,
   ) {
-    const result = await this.teamsService.removeMember(req.user.userId, id, userId);
-    return { success: true, data: result };
+    return this.teamsService.removeMember(req.user.userId, id, userId);
   }
 
   // ================================================================
@@ -134,8 +141,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Body() dto: CreateJoinRequestDto,
   ) {
-    const result = await this.teamsService.createJoinRequest(req.user.userId, id, dto);
-    return { success: true, data: result };
+    return this.teamsService.createJoinRequest(req.user.userId, id, dto);
   }
 
   // ================================================================
@@ -147,8 +153,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('requestId') requestId: string,
   ) {
-    const result = await this.teamsService.approveJoinRequest(req.user.userId, id, requestId);
-    return { success: true, data: result };
+    return this.teamsService.approveJoinRequest(req.user.userId, id, requestId);
   }
 
   // ================================================================
@@ -160,8 +165,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('requestId') requestId: string,
   ) {
-    const result = await this.teamsService.rejectJoinRequest(req.user.userId, id, requestId);
-    return { success: true, data: result };
+    return this.teamsService.rejectJoinRequest(req.user.userId, id, requestId);
   }
 
   // ================================================================
@@ -169,8 +173,7 @@ export class TeamsController {
   // ================================================================
   @Post(':id/leave')
   async leave(@Request() req: UserRequest, @Param('id') id: string) {
-    const result = await this.teamsService.leave(req.user.userId, id);
-    return { success: true, data: result };
+    return this.teamsService.leave(req.user.userId, id);
   }
 
   // ================================================================
@@ -182,8 +185,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Body() dto: InviteUserDto,
   ) {
-    const result = await this.teamsService.invite(req.user.userId, id, dto);
-    return { success: true, data: result };
+    return this.teamsService.invite(req.user.userId, id, dto);
   }
 
   // ================================================================
@@ -195,8 +197,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('inviteId') inviteId: string,
   ) {
-    const result = await this.teamsService.acceptInvite(req.user.userId, id, inviteId);
-    return { success: true, data: result };
+    return this.teamsService.acceptInvite(req.user.userId, id, inviteId);
   }
 
   // ================================================================
@@ -208,8 +209,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('inviteId') inviteId: string,
   ) {
-    const result = await this.teamsService.declineInvite(req.user.userId, id, inviteId);
-    return { success: true, data: result };
+    return this.teamsService.declineInvite(req.user.userId, id, inviteId);
   }
 
   // ================================================================
@@ -221,8 +221,7 @@ export class TeamsController {
     @Param('id') id: string,
     @Body() dto: TransferOwnershipDto,
   ) {
-    const result = await this.teamsService.transferOwnership(req.user.userId, id, dto);
-    return { success: true, data: result };
+    return this.teamsService.transferOwnership(req.user.userId, id, dto);
   }
 
   // ================================================================
@@ -233,8 +232,7 @@ export class TeamsController {
     @Request() req: UserRequest,
     @Param('id') id: string,
   ) {
-    const result = await this.teamsService.acceptTransfer(req.user.userId, id);
-    return { success: true, data: result };
+    return this.teamsService.acceptTransfer(req.user.userId, id);
   }
 
   // ================================================================
@@ -242,25 +240,6 @@ export class TeamsController {
   // ================================================================
   @Get(':id/history')
   async getHistory(@Param('id') id: string) {
-    const result = await this.teamsService.getHistory(id);
-    return { success: true, data: result };
-  }
-
-  // ================================================================
-  // GET MY TEAM
-  // ================================================================
-  @Get('me/team')
-  async getMyTeam(@Request() req: UserRequest) {
-    const result = await this.teamsService.getMyTeam(req.user.userId);
-    return { success: true, data: result };
-  }
-
-  // ================================================================
-  // GET MY TEAMS
-  // ================================================================
-  @Get('my')
-  async getMyTeams(@Request() req: UserRequest) {
-    const result = await this.teamsService.getMyTeams(req.user.userId);
-    return { success: true, data: result };
+    return this.teamsService.getHistory(id);
   }
 }

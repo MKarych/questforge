@@ -71,15 +71,17 @@ export default function TeamDetailsPage() {
 
   const teamId = params.id as string;
 
-  // Redirect if ID is missing
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // Redirect if ID is missing or not a valid UUID
   useEffect(() => {
-    if (!teamId) {
+    if (!teamId || !UUID_REGEX.test(teamId)) {
       router.push('/teams');
     }
   }, [teamId, router]);
 
   useEffect(() => {
-    if (!teamId) return;
+    if (!teamId || !UUID_REGEX.test(teamId)) return;
     async function loadData() {
       try {
         const [teamResponse, profileResponse, myTeamResponse] = await Promise.allSettled([
