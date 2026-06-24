@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
+import ScrollToTopWrapper from '@/components/ui/ScrollToTopWrapper';
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -114,6 +115,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background text-text-primary antialiased">
         {children}
+        <ScrollToTopWrapper />
       </body>
     </html>
   );

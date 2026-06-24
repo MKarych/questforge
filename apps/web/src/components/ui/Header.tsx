@@ -109,9 +109,9 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
               <Breadcrumbs />
             </div>
 
-            {/* Center: Desktop Navigation */}
+            {/* Center: Desktop Navigation (lg+) */}
             <nav className="hidden lg:flex items-center gap-1">
-              {/* Основные пункты */}
+              {/* Основные пункты — видны всем */}
               {visibleMainNav.map((item) => (
                 <Link
                   key={item.href}
@@ -126,7 +126,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                 </Link>
               ))}
 
-              {/* Организаторские пункты */}
+              {/* Организаторские пункты — только на десктопе */}
               {visibleOrganizerNav.length > 0 && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
@@ -146,7 +146,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                 </>
               )}
 
-              {/* Админка */}
+              {/* Админка — только на десктопе */}
               {visibleAdminNav.length > 0 && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
@@ -165,6 +165,23 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   ))}
                 </>
               )}
+            </nav>
+
+            {/* Center: Mobile Navigation (< lg) — только основные пункты */}
+            <nav className="lg:hidden flex items-center gap-1">
+              {visibleMainNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-2 py-2 text-sm rounded-lg transition-colors ${
+                    pathname.startsWith(item.href)
+                      ? 'text-primary bg-primary/10 font-medium'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
             </nav>
 
             {/* Right: Actions */}
