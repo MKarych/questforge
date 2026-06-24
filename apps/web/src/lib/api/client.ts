@@ -2,7 +2,136 @@
 // на тот же origin (localhost:3001), избегая CORS-проблем
 const API_BASE_URL = '/api';
 
-// Shared types from backend
+// ==================== Home Page Aggregated DTO ====================
+
+export interface GameCard {
+  id: string;
+  title: string;
+  description: string | null;
+  city: string;
+  date: string;
+  duration: number;
+  price: number;
+  maxTeams: number;
+  shareLink: string;
+  status: string;
+  imageUrl: string | null;
+  publishedAt: string | null;
+  organizer: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+  averageRating: number;
+  reviewsCount: number;
+  teamsCount: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  gamesCount: number;
+}
+
+export interface OrganizerCard {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  rating: number;
+  gamesCount: number;
+  reviewsCount: number;
+}
+
+export interface TeamCard {
+  id: string;
+  name: string;
+  slug: string;
+  avatar: string | null;
+  rating: number;
+  wins: number;
+  membersCount: number;
+  city: string | null;
+}
+
+export interface WinnerCard {
+  teamName: string;
+  gameName: string;
+  gameId: string;
+  wonAt: string;
+}
+
+export interface ReviewCard {
+  id: string;
+  rating: number;
+  text: string | null;
+  createdAt: string;
+  user: {
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface FeatureFlags {
+  search: boolean;
+  notifications: boolean;
+  marketplace: boolean;
+  ai: boolean;
+  reviews: boolean;
+  chat: boolean;
+  liveActivity: boolean;
+  mapPreview: boolean;
+  partners: boolean;
+  press: boolean;
+  downloadApp: boolean;
+}
+
+export interface SystemStatus {
+  status: 'online' | 'maintenance' | 'beta' | 'error';
+  message: string;
+}
+
+export interface HomePageResponse {
+  hero: {
+    title: string;
+    subtitle: string;
+    ctaText: string;
+    ctaLink: string;
+    secondaryCtaText: string;
+    secondaryCtaLink: string;
+  };
+  stats: {
+    games: number;
+    teams: number;
+    players: number;
+    cities: number;
+    organizers: number;
+  };
+  games: {
+    featured: GameCard[];
+    popular: GameCard[];
+    recent: GameCard[];
+    trending: GameCard[];
+  };
+  categories: Category[];
+  topOrganizers: OrganizerCard[];
+  topTeams: TeamCard[];
+  recentWinners: WinnerCard[];
+  recentReviews: ReviewCard[];
+  faq: FAQItem[];
+  featureFlags: FeatureFlags;
+  systemStatus: SystemStatus;
+}
+
+// ==================== Shared types from backend ====================
+
 export interface Game {
   id: string;
   title: string;
@@ -976,6 +1105,10 @@ class ApiClient {
     return this.request(`/admin/teams/${id}`, { method: 'DELETE' });
   }
 }
+
+// ==================== Home Page ====================
+
+export const getHomePage = () => apiClient.get<ApiResponse<HomePageResponse>>('/home');
 
 // Export singleton instance
 export const apiClient = new ApiClient(API_BASE_URL);

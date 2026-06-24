@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { Game } from '@/lib/api/client';
+import type { GameCard as GameCardType } from '@/lib/api/client';
 import ImageModal from './ImageModal';
 
 const DEFAULT_LOGO = '/images/logo/logo.png';
 
 interface GameCardProps {
-  game: Game;
+  game: GameCardType;
 }
 
 export default function GameCard({ game }: GameCardProps) {
