@@ -77,7 +77,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
   // Админка — только ADMIN
   const adminNavItems = [
-    { label: 'Админка', href: '/admin', roles: ['ADMIN'] },
+    { label: 'Админка', href: '/admin/dashboard', roles: ['ADMIN'] },
   ];
 
   const visibleMainNav = mainNavItems.filter((item) => item.roles.includes(userRole as any));
