@@ -138,11 +138,18 @@ export default function CreateGamePage() {
       const dateObj = new Date(formData.date);
       const isoDate = dateObj.toISOString();
 
+      // Parse time from datetime-local value (format: "2026-06-24T19:00")
+      const time = formData.date.includes('T') ? formData.date.split('T')[1] : '';
+      if (!time || typeof time !== 'string') {
+        throw new Error('Время должно быть строкой');
+      }
+
       const gameData: CreateGameRequest = {
         title: formData.title,
         description: formData.description,
         city: formData.city,
         date: isoDate,
+        time,
         duration: formData.duration,
         price: formData.price,
         maxTeams: formData.maxTeams,

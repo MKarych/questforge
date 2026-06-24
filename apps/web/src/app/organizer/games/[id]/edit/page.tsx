@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getGame, updateGame, publishGame, type GameDetails } from '@/lib/api/client';
+import { getGame, updateGame, publishGame, getScenariosForGame, type GameDetails, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -11,12 +11,14 @@ export default function EditGamePage() {
   const router = useRouter();
   const params = useParams();
   const gameId = params.id as string;
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [game, setGame] = useState<GameDetails | null>(null);
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [scenariosLoading, setScenariosLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -25,6 +27,7 @@ export default function EditGamePage() {
     duration: 180,
     price: 0,
     maxTeams: 20,
+    scenarioId: '',
   });
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export default function EditGamePage() {
           duration: g.duration,
           price: Number(g.price),
           maxTeams: g.maxTeams,
+          scenarioId: g.scenario?.id || '',
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить игру';
@@ -53,12 +57,25 @@ export default function EditGamePage() {
       }
     }
 
+    async function loadScenarios() {
+      setScenariosLoading(true);
+      try {
+        const response = await getScenariosForGame();
+        setScenarios(response.data.data);
+      } catch (err) {
+        console.error('Failed to load scenarios:', err);
+      } finally {
+        setScenariosLoading(false);
+      }
+    }
+
     if (gameId) {
       loadGame();
+      loadScenarios();
     }
   }, [gameId, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -247,6 +264,30 @@ export default function EditGamePage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Сценарий (необязательно)</label>
+                <select
+                  name="scenarioId"
+                  value={formData.scenarioId}
+                  onChange={handleChange}
+                  className="input-field"
+                >
+                  <option value="">Без сценария</option>
+                  {scenariosLoading ? (
+                    <option disabled>Загрузка...</option>
+                  ) : (
+                    scenarios.map((scenario) => (
+                      <option key={scenario.id} value={scenario.id}>
+                        {scenario.name} (v{scenario.version})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <p className="text-xs text-text-secondary mt-1">
+                  Сценарий можно привязать или изменить позже
+                </p>
               </div>
 
               <div className="pt-4 border-t border-border">

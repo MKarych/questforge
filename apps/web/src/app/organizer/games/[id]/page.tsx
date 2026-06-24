@@ -183,14 +183,35 @@ export default function GamePage() {
 
             {/* Scenario */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-text-primary mb-4">Сценарий</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">Сценарий</h2>
+                {game.scenario ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                    Сценарий привязан
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    Сценарий не привязан
+                  </span>
+                )}
+              </div>
               {game.scenario ? (
                 <div className="space-y-2">
                   <p className="text-text-primary font-medium">{game.scenario.name}</p>
                   <p className="text-sm text-text-secondary">Версия: v{game.scenario.version}</p>
                 </div>
               ) : (
-                <p className="text-text-secondary">Сценарий не привязан</p>
+                <div>
+                  <p className="text-text-secondary mb-3">Сценарий не привязан</p>
+                  <Link
+                    href={`/organizer/games/${game.id}/edit`}
+                    className="text-primary hover:text-primary-hover text-sm font-medium"
+                  >
+                    Привязать сценарий →
+                  </Link>
+                </div>
               )}
             </div>
 

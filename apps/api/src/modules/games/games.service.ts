@@ -1070,6 +1070,10 @@ export class GamesService {
 
     this.checkOwnershipOrAdmin(game, userId);
 
+    if (!game.scenarioId) {
+      throw new BadRequestException('Сценарий не привязан. Привяжите сценарий перед публикацией.');
+    }
+
     validateTransition(game.status, GAME_STATUS.PUBLISHED);
 
     return this.prisma.game.update({

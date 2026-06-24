@@ -29,7 +29,7 @@ markdown
 | :--- | :--- | :--- |
 | **Game Identity** | `uuid`, `slug`, `shareLink`, `createdAt` | Game Service |
 | **Game Profile** | `title`, `description`, `city`, `address`, `image`, `banner` | Game Service |
-| **Game Settings** | `date`, `time`, `duration`, `maxTeams`, `price`, `scenarioId`, `autoStart`, `autoStartDelay`, `allowEarlyStart`, `startBuffer` | Game Service |
+| **Game Settings** | `date`, `time`, `duration`, `maxTeams`, `price`, `scenarioId?`, `autoStart`, `autoStartDelay`, `allowEarlyStart`, `startBuffer` | Game Service |
 | **Game Status** | `status`, `moderationStatus`, `publishedAt`, `startedAt`, `finishedAt` | Game Service |
 | **Game Registration** | `teams`, `players`, `registrations`, `teamReadyStatus` | Registration Service |
 | **Game Statistics** | `teamsCount`, `playersCount`, `averageScore`, `completionRate` | Stats Service |
@@ -51,7 +51,7 @@ interface Game {
   deletedAt: Date;                 // Soft Delete
 
   organizerId: string;            // ID организатора
-  scenarioId: string;             // ID сценария
+  scenarioId: string | null;      // ID сценария (может быть null — привязывается позже)
   teams: TeamRegistration[];      // Зарегистрированные команды с их статусами готовности
   
   profile: GameProfile;
@@ -86,7 +86,7 @@ interface GameSettings {
   duration: number;                // Длительность в минутах
   maxTeams: number;                // Максимум команд
   price: number;                   // Цена участия (0 — бесплатно)
-  scenarioId: string;              // ID сценария
+  scenarioId: string | null;       // ID сценария (null — не привязан, можно привязать позже)
   
   // Настройки старта
   autoStart: boolean;              // Включить автостарт?

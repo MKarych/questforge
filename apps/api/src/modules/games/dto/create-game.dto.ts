@@ -48,7 +48,8 @@ export class CreateGameDto {
   maxTeams!: number;
 
   @IsString()
-  scenarioId!: string;
+  @IsOptional()
+  scenarioId?: string;
 
   @IsString()
   @IsOptional()

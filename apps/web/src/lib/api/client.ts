@@ -332,6 +332,7 @@ export interface CreateGameRequest {
   description: string;
   city: string;
   date: string;
+  time: string;
   duration: number;
   price: number;
   maxTeams: number;
