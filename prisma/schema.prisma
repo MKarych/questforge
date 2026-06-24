@@ -101,6 +101,7 @@ model User {
   transfersTo            OwnershipTransfer[]    @relation("TransferTo")
   gameComments           GameComment[]
   gameQuestions          GameQuestion[]
+  notifications          Notification[]
 
   @@index([email])
   @@index([username])
@@ -148,6 +149,26 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@index([entity, entityId])
+}
+
+// ============================================================
+// NOTIFICATION (уведомления пользователя)
+// ============================================================
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(50)
+  title     String   @db.VarChar(255)
+  message   String?  @db.Text
+  link      String?  @db.VarChar(500)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
 }
 
 // ============================================================
@@ -218,8 +239,8 @@ model Game {
   events            Event[]
   gameTeams         GameTeam[]
   registrations     GameRegistration[]
-  gameComments      GameComment[]
-  gameQuestions     GameQuestion[]
+  gameComments           GameComment[]
+  gameQuestions          GameQuestion[]
   heatmapData       HeatmapData[]
   media             Media[]
   reviews           Review[]

@@ -1,20 +1,58 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
-interface Notification {
+interface NotificationItem {
   id: string;
-  type: 'team_invite' | 'game_start' | 'comment' | 'organizer_reply' | 'moderation' | 'game_cancel';
+  type: string;
   title: string;
-  description: string;
-  href: string;
-  isRead: boolean;
+  message: string | null;
+  link: string | null;
+  read: boolean;
   createdAt: string;
 }
 
-// Мок-данные (пока без API)
-const MOCK_NOTIFICATIONS: Notification[] = [];
+interface RecentResponse {
+  items: NotificationItem[];
+  unreadCount: number;
+}
+
+const NOTIFICATION_ICONS: Record<string, string> = {
+  team_invite: '👥',
+  team_invite_accepted: '✅',
+  team_invite_declined: '❌',
+  game_start: '🎮',
+  game_finish: '🏁',
+  game_cancel: '❌',
+  game_reschedule: '📅',
+  game_registration: '📝',
+  comment: '💬',
+  review: '⭐',
+  organizer_reply: '📝',
+  moderation: '🛡️',
+  scenario_approved: '✅',
+  scenario_rejected: '❌',
+  achievement: '🏆',
+};
+
+function getIcon(type: string): string {
+  return NOTIFICATION_ICONS[type] || '🔔';
+}
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const date = new Date(dateStr).getTime();
+  const diff = now - date;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'только что';
+  if (minutes < 60) return `${minutes}м назад`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}ч назад`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}д назад`;
+  return new Date(dateStr).toLocaleDateString('ru-RU');
+}
 
 interface NotificationBellProps {
   enabled: boolean;
@@ -22,10 +60,32 @@ interface NotificationBellProps {
 
 export default function NotificationBell({ enabled }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [data, setData] = useState<RecentResponse | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      const res = await fetch('/api/notifications/recent', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (enabled) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [enabled, fetchNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -41,12 +101,36 @@ export default function NotificationBell({ enabled }: NotificationBellProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  const handleOpen = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      fetchNotifications();
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchNotifications();
+    } catch {
+      // ignore
+    }
+  };
+
   if (!enabled) return null;
+
+  const unreadCount = data?.unreadCount ?? 0;
+  const notifications = data?.items ?? [];
 
   return (
     <div ref={containerRef} className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleOpen}
         className="relative p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-surface-elevated"
         aria-label={`Уведомления${unreadCount > 0 ? `, ${unreadCount} новых` : ''}`}
         aria-expanded={isOpen}
@@ -65,13 +149,23 @@ export default function NotificationBell({ enabled }: NotificationBellProps) {
         <div className="absolute right-0 mt-2 w-80 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="text-sm font-semibold text-text-primary">Уведомления</h3>
-            <Link
-              href="/notifications"
-              className="text-xs text-primary hover:text-primary-hover"
-              onClick={() => setIsOpen(false)}
-            >
-              Все уведомления
-            </Link>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="text-xs text-primary hover:text-primary-hover"
+                >
+                  Прочитать всё
+                </button>
+              )}
+              <Link
+                href="/notifications"
+                className="text-xs text-primary hover:text-primary-hover"
+                onClick={() => setIsOpen(false)}
+              >
+                Все уведомления
+              </Link>
+            </div>
           </div>
 
           {notifications.length === 0 ? (
@@ -84,30 +178,30 @@ export default function NotificationBell({ enabled }: NotificationBellProps) {
               {notifications.slice(0, 10).map((notification) => (
                 <li key={notification.id}>
                   <Link
-                    href={notification.href}
+                    href={notification.link || '/notifications'}
                     className={`block px-4 py-3 hover:bg-surface-elevated transition-colors ${
-                      !notification.isRead ? 'bg-primary/5' : ''
+                      !notification.read ? 'bg-primary/5' : ''
                     }`}
                     onClick={() => setIsOpen(false)}
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-lg shrink-0 mt-0.5">
-                        {notification.type === 'team_invite' && '👥'}
-                        {notification.type === 'game_start' && '🎮'}
-                        {notification.type === 'comment' && '💬'}
-                        {notification.type === 'organizer_reply' && '📝'}
-                        {notification.type === 'moderation' && '🛡️'}
-                        {notification.type === 'game_cancel' && '❌'}
+                        {getIcon(notification.type)}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">
                           {notification.title}
                         </p>
-                        <p className="text-xs text-text-muted line-clamp-2">
-                          {notification.description}
+                        {notification.message && (
+                          <p className="text-xs text-text-muted line-clamp-2">
+                            {notification.message}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted mt-1">
+                          {timeAgo(notification.createdAt)}
                         </p>
                       </div>
-                      {!notification.isRead && (
+                      {!notification.read && (
                         <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
                       )}
                     </div>
