@@ -28,7 +28,7 @@ export class AdminService {
       this.prisma.game.count({ where: { deletedAt: null } }),
       this.prisma.game.count({
         where: {
-          status: { in: ['IN_PROGRESS', 'STARTED', 'PUBLISHED'] },
+          status: { in: ['RUNNING', 'LOBBY', 'PUBLISHED'] },
           deletedAt: null,
         },
       }),

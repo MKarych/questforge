@@ -30,7 +30,7 @@ export class SessionsService {
       throw new NotFoundException('Game not found');
     }
 
-    if (game.status !== 'PUBLISHED' && game.status !== 'IN_PROGRESS' && game.status !== 'STARTED') {
+    if (game.status !== 'PUBLISHED' && game.status !== 'RUNNING' && game.status !== 'LOBBY') {
       throw new ConflictException('Game is not active');
     }
 
