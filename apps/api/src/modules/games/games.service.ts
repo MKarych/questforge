@@ -6,13 +6,10 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, GameStatus, RegistrationStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
-import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Slug generation
 function slugify(text: string): string {
@@ -32,6 +29,22 @@ function generateShareLink(): string {
   }
   return result;
 }
+
+// Prisma GameStatus enum values as const
+const GAME_STATUS = {
+  DRAFT: 'DRAFT',
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  PUBLISHED: 'PUBLISHED',
+  REGISTRATION_OPEN: 'REGISTRATION_OPEN',
+  REGISTRATION_CLOSED: 'REGISTRATION_CLOSED',
+  LOBBY: 'LOBBY',
+  RUNNING: 'RUNNING',
+  FINISHED: 'FINISHED',
+  ARCHIVED: 'ARCHIVED',
+  CANCELLED: 'CANCELLED',
+  RESCHEDULED: 'RESCHEDULED',
+} as const;
 
 @Injectable()
 export class GamesService {
@@ -129,7 +142,7 @@ export class GamesService {
     // 8. Организатор имеет роль ORGANIZER
     const user = await this.prisma.user.findUnique({
       where: { id: organizerId },
-      select: { roles: true },
+      select: { role: true },
     });
     if (!user) {
       throw new NotFoundException({
@@ -137,7 +150,7 @@ export class GamesService {
         message: 'Пользователь не найден',
       });
     }
-    if (!user.roles.includes('ORGANIZER') && !user.roles.includes('ADMIN')) {
+    if (user.role !== 'ORGANIZER' && user.role !== 'ADMIN') {
       throw new ForbiddenException({
         code: 'NOT_ORGANIZER',
         message: 'Пользователь не имеет роли организатора',
@@ -159,7 +172,7 @@ export class GamesService {
     }
 
     // Нельзя редактировать после открытия регистрации
-    const editableStatuses: GameStatus[] = ['DRAFT', 'PENDING', 'APPROVED', 'PUBLISHED'];
+    const editableStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'PUBLISHED'];
     if (!editableStatuses.includes(game.status)) {
       throw new BadRequestException({
         code: 'CANNOT_EDIT_AFTER_REGISTRATION',
@@ -253,7 +266,7 @@ export class GamesService {
         imageUrl: data.imageUrl || null,
         bannerUrl: data.bannerUrl || null,
         tags: data.tags || [],
-        status: 'DRAFT',
+        status: GAME_STATUS.DRAFT,
         moderationStatus: 'PENDING',
         version: 1,
         autoStart: data.autoStart ?? false,
@@ -293,7 +306,7 @@ export class GamesService {
           select: {
             gameTeams: true,
             reviews: true,
-            gameComments: true,
+            comments: true,
             registrations: true,
           },
         },
@@ -329,9 +342,9 @@ export class GamesService {
     if (existing.organizerId !== userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { roles: true },
+        select: { role: true },
       });
-      if (!user?.roles.includes('ADMIN')) {
+      if (user?.role !== 'ADMIN') {
         throw new ForbiddenException({
           code: 'NOT_OWNER',
           message: 'Только организатор может редактировать игру',
@@ -339,7 +352,7 @@ export class GamesService {
       }
     }
 
-    const updateData: Prisma.GameUpdateInput = {};
+    const updateData: Record<string, unknown> = {};
 
     if (data.title !== undefined) {
       updateData.title = data.title;
@@ -365,13 +378,10 @@ export class GamesService {
 
     try {
       const game = await this.prisma.game.update({
-        where: {
-          id: gameId,
-          version: existing.version, // Optimistic locking
-        },
+        where: { id: gameId },
         data: {
           ...updateData,
-          version: { increment: 1 },
+          version: existing.version + 1,
         },
         include: {
           organizer: {
@@ -383,7 +393,7 @@ export class GamesService {
         },
       });
 
-      this.logger.log(`Game updated: ${gameId} (version ${existing.version} -> ${existing.version + 1})`);
+      this.logger.log(`Game updated: ${gameId} (version ${existing.version} -> ${game.version})`);
 
       return game;
     } catch (error) {
@@ -420,9 +430,9 @@ export class GamesService {
     if (game.organizerId !== userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { roles: true },
+        select: { role: true },
       });
-      if (!user?.roles.includes('ADMIN')) {
+      if (user?.role !== 'ADMIN') {
         throw new ForbiddenException({
           code: 'NOT_OWNER',
           message: 'Только организатор может удалить игру',
@@ -448,7 +458,7 @@ export class GamesService {
   }
 
   // ============================================================
-  // Public methods (сохранены из существующей реализации)
+  // Public methods
   // ============================================================
 
   async findAllPublic(params: {
@@ -573,7 +583,7 @@ export class GamesService {
           select: {
             gameTeams: true,
             reviews: true,
-            gameComments: true,
+            comments: true,
           },
         },
       },
@@ -589,14 +599,14 @@ export class GamesService {
         ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length
         : 0;
 
-    const count = game._count || { gameTeams: 0, reviews: 0, gameComments: 0 };
+    const count = game._count || { gameTeams: 0, reviews: 0, comments: 0 };
 
     return {
       ...game,
       averageRating: Math.round(avgRating * 100) / 100,
       reviewsCount: count.reviews,
       teamsCount: count.gameTeams,
-      commentsCount: count.gameComments,
+      commentsCount: count.comments,
     };
   }
 
@@ -641,7 +651,7 @@ export class GamesService {
           select: {
             gameTeams: true,
             reviews: true,
-            gameComments: true,
+            comments: true,
           },
         },
       },
@@ -656,14 +666,14 @@ export class GamesService {
         ? game.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / game.reviews.length
         : 0;
 
-    const count = game._count || { gameTeams: 0, reviews: 0, gameComments: 0 };
+    const count = game._count || { gameTeams: 0, reviews: 0, comments: 0 };
 
     return {
       ...game,
       averageRating: Math.round(avgRating * 100) / 100,
       reviewsCount: count.reviews,
       teamsCount: count.gameTeams,
-      commentsCount: count.gameComments,
+      commentsCount: count.comments,
     };
   }
 
@@ -772,7 +782,7 @@ export class GamesService {
           select: {
             gameTeams: true,
             reviews: true,
-            gameComments: true,
+            comments: true,
           },
         },
       },
@@ -945,7 +955,7 @@ export class GamesService {
       });
     }
 
-    if (game.status !== 'DRAFT') {
+    if (game.status !== GAME_STATUS.DRAFT) {
       throw new BadRequestException({
         code: 'INVALID_STATUS_TRANSITION',
         message: 'Только черновик можно отправить на модерацию',
@@ -955,7 +965,7 @@ export class GamesService {
     return this.prisma.game.update({
       where: { id: gameId },
       data: {
-        status: 'PENDING',
+        status: GAME_STATUS.PENDING,
         submittedAt: new Date(),
       },
     });
@@ -969,7 +979,7 @@ export class GamesService {
     return this.prisma.game.findMany({
       where: {
         moderationStatus: 'PENDING',
-        status: 'PENDING',
+        status: GAME_STATUS.PENDING,
         deletedAt: null,
       },
       orderBy: { submittedAt: 'asc' },
@@ -984,7 +994,7 @@ export class GamesService {
     });
   }
 
-  async approveGame(gameId: string, moderatorId: string) {
+  async approveGame(gameId: string, _moderatorId: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId, deletedAt: null },
     });
@@ -996,7 +1006,7 @@ export class GamesService {
       });
     }
 
-    if (game.status !== 'PENDING') {
+    if (game.status !== GAME_STATUS.PENDING) {
       throw new BadRequestException({
         code: 'INVALID_STATUS_TRANSITION',
         message: 'Игра не находится на модерации',
@@ -1006,7 +1016,7 @@ export class GamesService {
     return this.prisma.game.update({
       where: { id: gameId },
       data: {
-        status: 'APPROVED',
+        status: GAME_STATUS.APPROVED,
         moderationStatus: 'APPROVED',
         moderatedAt: new Date(),
         moderationComment: null,
@@ -1014,7 +1024,7 @@ export class GamesService {
     });
   }
 
-  async rejectGame(gameId: string, moderatorId: string, reason: string) {
+  async rejectGame(gameId: string, _moderatorId: string, reason: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId, deletedAt: null },
     });
@@ -1026,7 +1036,7 @@ export class GamesService {
       });
     }
 
-    if (game.status !== 'PENDING') {
+    if (game.status !== GAME_STATUS.PENDING) {
       throw new BadRequestException({
         code: 'INVALID_STATUS_TRANSITION',
         message: 'Игра не находится на модерации',
@@ -1036,7 +1046,7 @@ export class GamesService {
     return this.prisma.game.update({
       where: { id: gameId },
       data: {
-        status: 'DRAFT',
+        status: GAME_STATUS.DRAFT,
         moderationStatus: 'REJECTED',
         moderatedAt: new Date(),
         moderationComment: reason,
