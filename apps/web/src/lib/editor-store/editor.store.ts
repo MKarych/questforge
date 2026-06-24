@@ -19,6 +19,7 @@ import {
   MissionConfig,
   Condition,
   BLOCK_DEFINITIONS,
+  ToolbarSettings,
 } from './editor.types';
 import { validationEngine } from '../editor-validation/validation-engine';
 import { autoSaveManager, AutoSaveData } from './autosave';
@@ -114,6 +115,17 @@ export interface EditorActions {
 
   // Reset
   reset: () => void;
+
+  // UX features
+  setShowTemplates: (show: boolean) => void;
+  setShowAIAssistant: (show: boolean) => void;
+  setShowAiEnhance: (show: boolean) => void;
+  setShowToolbarSettings: (show: boolean) => void;
+  setLivePreviewScene: (sceneId: string | null) => void;
+  setToolbarSettings: (settings: ToolbarSettings) => void;
+  clearAll: () => void;
+  addAuthorAchievement: (achievementId: string) => void;
+  dismissNewAchievements: () => void;
 }
 
 // ==================== Initial State ====================
@@ -163,6 +175,17 @@ const createInitialState = (): EditorState => ({
   mode: 'edit',
   previewSceneId: null,
   testState: null,
+
+  // UX features
+  showTemplates: false,
+  showAIAssistant: false,
+  showAiEnhance: false,
+  showToolbarSettings: false,
+  livePreviewSceneId: null,
+  authorAchievements: [],
+  newAchievementAlerts: [],
+  toolbarSettings: { size: 'medium', display: 'icon_label' },
+  flowKey: 0,
 });
 
 // ==================== Store ====================
@@ -686,7 +709,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   // ==================== Load ====================
   loadScenario: (data) => {
-    set({
+    set((state) => ({
       scenarioId: data.id || null,
       name: data.name,
       description: data.description || '',
@@ -699,13 +722,70 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       lastSavedAt: new Date(),
       history: { undoStack: [], redoStack: [], maxHistory: 50 },
       validationResult: { valid: true, errors: [], warnings: [] },
-    });
+      flowKey: state.flowKey + 1,
+    }));
   },
 
   // ==================== Reset ====================
   reset: () => {
     set(createInitialState());
   },
+
+  // ==================== UX Features ====================
+  setShowTemplates: (show) => set({ showTemplates: show }),
+  setShowAIAssistant: (show) => set({ showAIAssistant: show }),
+  setShowAiEnhance: (show) => set({ showAiEnhance: show }),
+  setShowToolbarSettings: (show) => set({ showToolbarSettings: show }),
+  setLivePreviewScene: (sceneId) => set({ livePreviewSceneId: sceneId }),
+  setToolbarSettings: (settings) => set({ toolbarSettings: settings }),
+
+  // ==================== Clear All ====================
+  clearAll: () => {
+    get().pushHistory();
+    const startId = `scene-${Date.now()}-start`;
+    const finishId = `scene-${Date.now()}-finish`;
+    const startScene: Scene = {
+      id: startId,
+      type: 'location',
+      title: 'Старт',
+      description: 'Начало сценария',
+      missions: [],
+      metadata: {},
+      view: { type: 'list', config: {} },
+      position: { x: 100, y: 200 },
+      transitions: [],
+    };
+    const finishScene: Scene = {
+      id: finishId,
+      type: 'location',
+      title: 'Финиш',
+      description: 'Конец сценария',
+      missions: [],
+      metadata: {},
+      view: { type: 'list', config: {} },
+      position: { x: 500, y: 200 },
+      transitions: [],
+    };
+    set({
+      scenes: [startScene, finishScene],
+      edges: [],
+      selectedNodes: [],
+      selectedEdges: [],
+      validationResult: { valid: true, errors: [], warnings: [] },
+      flowKey: get().flowKey + 1,
+    });
+  },
+  addAuthorAchievement: (achievementId) => {
+    const state = get();
+    const alreadyHas = state.authorAchievements.some((a) => a.id === achievementId);
+    if (alreadyHas) return;
+    const newAchievement = { id: achievementId, unlockedAt: Date.now() };
+    set({
+      authorAchievements: [...state.authorAchievements, newAchievement],
+      newAchievementAlerts: [...state.newAchievementAlerts, newAchievement],
+    });
+  },
+  dismissNewAchievements: () => set({ newAchievementAlerts: [] }),
 }));
 
 // ==================== Helpers ====================

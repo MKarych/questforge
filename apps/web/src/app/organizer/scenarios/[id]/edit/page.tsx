@@ -22,6 +22,7 @@ export default function EditScenarioPage() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const hasNavigatedRef = useRef(false);
 
   // Loaded data for ScenarioEditorV2
@@ -175,35 +176,39 @@ export default function EditScenarioPage() {
 
   return (
     <div className="min-h-screen">
-      <Header />
+      {!headerHidden && (
+        <>
+          <Header />
 
-      {/* Top Bar with Exit Button */}
-      <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
-        <button
-          onClick={handleExit}
-          className="btn-secondary text-sm flex items-center gap-1"
-          title="Выйти в список сценариев"
-        >
-          ← Выйти
-        </button>
-        <div className="flex items-center gap-3">
-          {!scenario?.isPublished && (
+          {/* Top Bar with Exit Button */}
+          <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
             <button
-              onClick={handlePublish}
-              disabled={publishing}
-              className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleExit}
+              className="btn-secondary text-sm flex items-center gap-1"
+              title="Выйти в список сценариев"
             >
-              {publishing ? 'Публикация...' : '📢 Опубликовать'}
+              ← Выйти
             </button>
-          )}
-          <span className="text-xs text-text-secondary">
-            {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
-          </span>
-          <span className="text-xs text-text-secondary">
-            v{scenario?.version || 1}
-          </span>
-        </div>
-      </div>
+            <div className="flex items-center gap-3">
+              {!scenario?.isPublished && (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {publishing ? 'Публикация...' : '📢 Опубликовать'}
+                </button>
+              )}
+              <span className="text-xs text-text-secondary">
+                {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
+              </span>
+              <span className="text-xs text-text-secondary">
+                v{scenario?.version || 1}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Toast notification */}
       {toast && (
@@ -228,6 +233,8 @@ export default function EditScenarioPage() {
             isPublished={scenario?.isPublished ?? false}
             onSave={handleSave}
             onPublish={handlePublish}
+            headerHidden={headerHidden}
+            onToggleHeader={() => setHeaderHidden(!headerHidden)}
           />
         )}
       </div>

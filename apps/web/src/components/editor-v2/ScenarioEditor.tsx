@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -19,7 +19,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
-import { BlockDefinition, BLOCK_DEFINITIONS, MissionType } from '@/lib/editor-store/editor.types';
+import { BlockDefinition, BLOCK_DEFINITIONS, MissionType, Scene } from '@/lib/editor-store/editor.types';
 import BlockPalette from './BlockPalette';
 import NodeSettings from './NodeSettings';
 import VariablesPanel from './VariablesPanel';
@@ -27,6 +27,12 @@ import PreviewModal from './PreviewModal';
 import TestModal from './TestModal';
 import EditorNodeComponent from './EditorNode';
 import AssetPanel from './AssetPanel';
+import LivePreview from './LivePreview';
+import ScenarioTemplatesModal from './ScenarioTemplatesModal';
+import AIAssistant from './AIAssistant';
+import AuthorAchievements from './AuthorAchievements';
+import AiEnhanceModal from './AiEnhanceModal';
+import ToolbarSettingsModal from './ToolbarSettingsModal';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
 // ==================== Node Types for React Flow ====================
@@ -145,6 +151,8 @@ interface ScenarioEditorV2Props {
   isPublished?: boolean;
   onSave?: (data: any) => void;
   onPublish?: () => void;
+  headerHidden?: boolean;
+  onToggleHeader?: () => void;
 }
 
 // ==================== Inner Component ====================
@@ -155,10 +163,13 @@ function ScenarioEditorInner({
   isPublished = false,
   onSave,
   onPublish,
+  headerHidden = false,
+  onToggleHeader,
 }: ScenarioEditorV2Props) {
   const reactFlowInstance = useReactFlow();
   const store = useEditorStore();
   const initialized = useRef(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Initialize store with initial data
   useEffect(() => {
@@ -341,10 +352,17 @@ function ScenarioEditorInner({
     [store]
   );
 
-  // Selection
+  // Selection + Live Preview
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       store.selectNode(node.id);
+    },
+    [store]
+  );
+
+  const onNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      store.setLivePreviewScene(node.id);
     },
     [store]
   );
@@ -396,45 +414,68 @@ function ScenarioEditorInner({
   const isEmpty = store.scenes.length === 0;
   const hasErrors = store.validationResult.errors.length > 0;
 
+  // Show templates modal on first load if empty
+  useEffect(() => {
+    if (isEmpty && store.scenes.length === 0 && !store.showTemplates) {
+      store.setShowTemplates(true);
+    }
+  }, []);
+
   return (
     <div className="flex flex-col h-screen">
-      {/* Top Bar */}
-      <div className="h-14 bg-background border-b border-border flex items-center justify-between px-4">
-        <div className="flex items-center gap-4">
+      {/* Top Bar — компактный как в Figma/Notion */}
+      <div className="h-11 bg-background border-b border-border flex items-center justify-between px-3">
+        <div className="flex items-center gap-1.5">
+          {/* Toggle header visibility */}
+          {onToggleHeader && (
+            <button
+              onClick={onToggleHeader}
+              className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded hover:bg-background-modifier-hover text-xs"
+              title={headerHidden ? 'Показать шапку' : 'Скрыть шапку'}
+            >
+              {headerHidden ? '⤵' : '⤴'}
+            </button>
+          )}
           <input
             type="text"
             value={store.name}
             onChange={(e) => store.setName(e.target.value)}
-            className="text-lg font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/30 rounded px-2 py-1"
+            className="text-sm font-semibold bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary/30 rounded px-1.5 py-0.5 w-48"
             placeholder="Название сценария"
           />
+          {/* Templates button */}
+          <button
+            onClick={() => store.setShowTemplates(true)}
+            className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all"
+            title="Выбрать шаблон"
+          >
+            📋
+          </button>
           <span
-            className={`text-xs font-semibold px-2 py-1 rounded ${
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
               isPublished
                 ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                 : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
             }`}
           >
-            {isPublished ? 'PUBLISHED' : 'DRAFT'}
+            {isPublished ? 'PUB' : 'DRF'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Validation indicator */}
           {hasErrors && (
-            <span className="text-xs text-error bg-error/10 px-2 py-1 rounded">
-              ⚠️ {store.validationResult.errors.length} ошибок
+            <span className="text-[10px] text-error bg-error/10 px-1.5 py-0.5 rounded">
+              ⚠️{store.validationResult.errors.length}
             </span>
           )}
 
           <button
-            onClick={() => {
-              store.validate();
-            }}
-            className="btn-secondary text-sm"
+            onClick={() => { store.validate(); }}
+            className="btn-secondary text-[11px] px-1.5 py-1"
             title="Проверить сценарий"
           >
-            ✅ Проверить
+            ✅
           </button>
 
           <button
@@ -445,44 +486,64 @@ function ScenarioEditorInner({
                 store.setMode('preview');
               }
             }}
-            className="btn-secondary text-sm"
+            className="btn-secondary text-[11px] px-1.5 py-1"
             title="Превью"
           >
-            👁 Превью
+            👁
           </button>
 
           <button
             onClick={() => store.startTest()}
-            className="btn-secondary text-sm"
+            className="btn-secondary text-[11px] px-1.5 py-1"
             title="Тестирование"
           >
-            🎮 Тест
+            🎮
+          </button>
+
+          {/* ✨ AI Доработка */}
+          <button
+            onClick={() => store.setShowAiEnhance(true)}
+            className="btn-secondary text-[11px] px-1.5 py-1 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-500/20"
+            title="Доработать сценарий с AI"
+          >
+            ✨
+          </button>
+
+          {/* ✨ AI Assistant (генерация) */}
+          <button
+            onClick={() => store.setShowAIAssistant(true)}
+            className="btn-secondary text-[11px] px-1.5 py-1 bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/20"
+            title="AI-помощник"
+          >
+            🤖
           </button>
 
           <button
             onClick={() => store.togglePanel('variables')}
-            className={`btn-secondary text-sm ${
+            className={`btn-secondary text-[11px] px-1.5 py-1 ${
               store.openPanels.variables ? 'bg-primary/20' : ''
             }`}
             title="Переменные"
           >
-            📊 Переменные
+            📊
           </button>
 
           <button
             onClick={() => store.togglePanel('validation')}
-            className={`btn-secondary text-sm ${
+            className={`btn-secondary text-[11px] px-1.5 py-1 ${
               store.openPanels.validation ? 'bg-primary/20' : ''
             }`}
             title="Валидация"
           >
-            📋 Ошибки
+            📋
           </button>
+
+          <div className="w-px h-5 bg-border mx-0.5" />
 
           <button
             onClick={store.undo}
             disabled={store.history.undoStack.length === 0}
-            className="btn-secondary text-sm disabled:opacity-30"
+            className="btn-secondary text-[11px] px-1.5 py-1 disabled:opacity-30"
             title="Отменить (Ctrl+Z)"
           >
             ↩️
@@ -491,7 +552,7 @@ function ScenarioEditorInner({
           <button
             onClick={store.redo}
             disabled={store.history.redoStack.length === 0}
-            className="btn-secondary text-sm disabled:opacity-30"
+            className="btn-secondary text-[11px] px-1.5 py-1 disabled:opacity-30"
             title="Повторить (Ctrl+Shift+Z)"
           >
             ↪️
@@ -500,11 +561,35 @@ function ScenarioEditorInner({
           {!isPublished && onPublish && (
             <button
               onClick={onPublish}
-              className="btn-primary text-sm bg-green-600 hover:bg-green-700"
+              className="btn-primary text-[11px] px-2 py-1 bg-green-600 hover:bg-green-700"
             >
-              📢 Опубликовать
+              📢
             </button>
           )}
+
+          {/* 🗑️ Очистить всё */}
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            className="btn-secondary text-[11px] px-1.5 py-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20"
+            title="Очистить все блоки"
+          >
+            🗑️
+          </button>
+
+          {/* Author Achievements */}
+          <AuthorAchievements
+            unlockedIds={store.authorAchievements.map((a) => a.id)}
+            newAchievements={store.newAchievementAlerts.map((a) => ({
+              id: a.id,
+              name: '',
+              description: '',
+              icon: '',
+              condition: () => false,
+              unlocked: true,
+              unlockedAt: a.unlockedAt,
+            }))}
+            onDismissNew={() => store.dismissNewAchievements()}
+          />
 
           <button
             onClick={handleSave}
@@ -563,8 +648,11 @@ function ScenarioEditorInner({
           )}
 
           <ReactFlow
+            key={store.flowKey}
             nodes={nodes}
             edges={edges}
+            nodesDraggable={true}
+            elementsSelectable={true}
             onNodesChange={(changes) => {
               onNodesChange(changes);
               // Sync position changes back to store
@@ -585,6 +673,7 @@ function ScenarioEditorInner({
             }}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
             onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
@@ -673,6 +762,159 @@ function ScenarioEditorInner({
           onRestart={() => store.testRestart()}
           onClose={() => store.stopTest()}
         />
+      )}
+
+      {/* Templates Modal */}
+      {store.showTemplates && (
+        <ScenarioTemplatesModal
+          onSelect={(template) => {
+            store.loadScenario({
+              name: template.name,
+              description: template.description,
+              scenes: template.scenes,
+              edges: template.edges,
+              variables: [],
+              settings: {
+                totalTime: 0,
+                defaultPoints: 10,
+                defaultPenalty: 0,
+                hintLimit: 3,
+                maxAttempts: 3,
+                variables: [],
+              },
+            });
+            store.setShowTemplates(false);
+            store.addAuthorAchievement('first_scenario');
+          }}
+          onClose={() => store.setShowTemplates(false)}
+        />
+      )}
+
+      {/* AI Assistant Modal */}
+      {store.showAIAssistant && (
+        <AIAssistant
+          onGenerate={(prompt) => {
+            // Создаём простую структуру на основе промпта
+            const startScene: Scene = {
+              id: 'ai-start',
+              type: 'location',
+              title: 'Старт',
+              description: prompt,
+              missions: [{
+                id: 'ai-mission-1',
+                type: 'text',
+                title: 'Начало',
+                description: 'Напишите "готов" чтобы начать',
+                config: { correctAnswer: 'готов', matchMode: 'case_insensitive', maxAttempts: 99 },
+                rewards: [],
+                conditions: [],
+                hints: [],
+              }],
+              metadata: {},
+              view: { type: 'list', config: {} },
+              position: { x: 100, y: 100 },
+              transitions: [],
+            };
+            const finishScene: Scene = {
+              id: 'ai-finish',
+              type: 'location',
+              title: 'Финиш',
+              description: 'Сценарий завершён!',
+              missions: [],
+              metadata: {},
+              view: { type: 'list', config: {} },
+              position: { x: 400, y: 100 },
+              transitions: [],
+            };
+            store.loadScenario({
+              name: `AI: ${prompt.slice(0, 40)}...`,
+              description: prompt,
+              scenes: [startScene, finishScene],
+              edges: [{ id: 'ai-edge-1', source: startScene.id, target: finishScene.id, type: 'auto' }],
+              variables: [],
+              settings: {
+                totalTime: 0,
+                defaultPoints: 10,
+                defaultPenalty: 0,
+                hintLimit: 3,
+                maxAttempts: 3,
+                variables: [],
+              },
+            });
+            store.setShowAIAssistant(false);
+            store.addAuthorAchievement('first_scenario');
+          }}
+          onClose={() => store.setShowAIAssistant(false)}
+        />
+      )}
+
+      {/* Live Preview */}
+      {store.livePreviewSceneId && (
+        <LivePreview
+          scene={store.scenes.find((s) => s.id === store.livePreviewSceneId)!}
+          allScenes={store.scenes}
+          onClose={() => store.setLivePreviewScene(null)}
+          onNavigate={(sceneId) => store.setLivePreviewScene(sceneId)}
+        />
+      )}
+
+      {/* AI Enhance Modal */}
+      {store.showAiEnhance && (
+        <AiEnhanceModal
+          scenarioJson={JSON.stringify({
+            id: store.scenarioId || '',
+            name: store.name,
+            description: store.description,
+            scenes: store.scenes,
+            edges: store.edges,
+            variables: store.variables,
+            settings: store.settings,
+            version: store.version,
+          })}
+          onApply={(data) => {
+            store.loadScenario({
+              name: data.name || store.name,
+              description: data.description || store.description,
+              scenes: data.scenes || store.scenes,
+              edges: data.edges || store.edges,
+              variables: data.variables || store.variables,
+              settings: data.settings || store.settings,
+            });
+          }}
+          onClose={() => store.setShowAiEnhance(false)}
+        />
+      )}
+
+      {/* Clear All Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 animate-scale-in p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-3">🗑️</div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Очистить всё?</h3>
+              <p className="text-sm text-text-secondary">
+                Вы уверены, что хотите удалить все блоки? Это действие можно отменить через Ctrl+Z.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-background-modifier-hover"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  store.clearAll();
+                  setShowClearConfirm(false);
+                }}
+                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+              >
+                Да, удалить
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

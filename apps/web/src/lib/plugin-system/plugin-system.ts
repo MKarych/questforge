@@ -5,16 +5,6 @@
 
 import {
   MissionType,
-  MissionConfig,
-  TextMissionConfig,
-  CodeMissionConfig,
-  PhotoMissionConfig,
-  GpsMissionConfig,
-  QrMissionConfig,
-  ChoiceMissionConfig,
-  CollectMissionConfig,
-  DialogueMissionConfig,
-  Reward,
   InventoryItem,
   ItemType,
 } from '@/lib/editor-store/editor.types';
@@ -321,13 +311,13 @@ export class PhotoMissionPlugin implements MissionPlugin {
     },
   };
 
-  validate(config: any): ValidationResult {
+  validate(_config: any): ValidationResult {
     return { valid: true, errors: [] };
   }
 
-  execute(context: PluginExecutionContext, config: any): MissionResult {
+  execute(context: PluginExecutionContext, _config: any): MissionResult {
     // Фото проверяется вручную или AI — для MVP всегда успех
-    const score = config.points || 20;
+    const score = _config.points || 20;
     context.addScore(score);
     return { success: true, score, rewards: [], message: '📷 Фото загружено' };
   }
@@ -520,7 +510,6 @@ export class CollectMissionPlugin implements MissionPlugin {
 
   execute(context: PluginExecutionContext, config: any): MissionResult {
     const itemId = config.itemId;
-    const requiredQuantity = config.quantity || 1;
 
     if (context.hasItem(itemId)) {
       const score = config.points || 40;

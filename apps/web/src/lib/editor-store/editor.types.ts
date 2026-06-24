@@ -341,6 +341,12 @@ export interface VariableDefinition {
   scope: 'local' | 'global';
 }
 
+export interface AuthorAchievementData {
+  id: string;
+  unlockedAt: number;
+}
+
+// ==================== Editor State ====================
 export type VariableOperation =
   | 'set' | 'add' | 'subtract' | 'multiply' | 'divide'
   | 'increment' | 'decrement';
@@ -451,6 +457,29 @@ export interface EditorState {
   mode: 'edit' | 'preview' | 'test';
   previewSceneId: string | null;
   testState: TestState | null;
+
+  // UX features
+  showTemplates: boolean;
+  showAIAssistant: boolean;
+  showAiEnhance: boolean;
+  showToolbarSettings: boolean;
+  livePreviewSceneId: string | null;
+  authorAchievements: AuthorAchievementData[];
+  newAchievementAlerts: AuthorAchievementData[];
+
+  // Toolbar settings
+  toolbarSettings: ToolbarSettings;
+
+  // Flow key for ReactFlow remounting
+  flowKey: number;
+}
+
+export type ToolbarSize = 'small' | 'medium' | 'large';
+export type ToolbarDisplay = 'icon' | 'icon_label' | 'label';
+
+export interface ToolbarSettings {
+  size: ToolbarSize;
+  display: ToolbarDisplay;
 }
 
 export interface EditorSnapshot {

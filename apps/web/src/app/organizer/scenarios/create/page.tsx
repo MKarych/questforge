@@ -12,6 +12,7 @@ export default function CreateScenarioPage() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [isDirty] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const hasNavigatedRef = useRef(false);
 
   const handleSave = async (data: any) => {
@@ -87,21 +88,25 @@ export default function CreateScenarioPage() {
 
   return (
     <div className="min-h-screen">
-      <Header />
-      
-      {/* Top Bar with Exit Button */}
-      <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
-        <button
-          onClick={handleExit}
-          className="btn-secondary text-sm flex items-center gap-1"
-          title="Выйти в список сценариев"
-        >
-          ← Выйти
-        </button>
-        <span className="text-xs text-text-secondary">
-          {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
-        </span>
-      </div>
+      {!headerHidden && (
+        <>
+          <Header />
+          
+          {/* Top Bar with Exit Button */}
+          <div className="bg-background border-b border-border px-4 py-2 flex items-center justify-between">
+            <button
+              onClick={handleExit}
+              className="btn-secondary text-sm flex items-center gap-1"
+              title="Выйти в список сценариев"
+            >
+              ← Выйти
+            </button>
+            <span className="text-xs text-text-secondary">
+              {isDirty ? '⚠️ Есть несохранённые изменения' : '✓ Изменений нет'}
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Toast notification */}
       {toast && (
@@ -119,6 +124,8 @@ export default function CreateScenarioPage() {
       <div className={saving ? 'opacity-50 pointer-events-none' : ''}>
         <ScenarioEditorV2
           onSave={handleSave}
+          headerHidden={headerHidden}
+          onToggleHeader={() => setHeaderHidden(!headerHidden)}
         />
       </div>
       {saving && (
