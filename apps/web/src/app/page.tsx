@@ -1,132 +1,195 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { getPublicGames, type Game } from '@/lib/api/client';
-import GameCard from '@/components/ui/GameCard';
+import { useEffect, useState, useCallback } from 'react';
+import { getHomePage, type HomePageResponse } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+import Footer from '@/components/ui/Footer';
+import HeroBlock from '@/components/home/HeroBlock';
+import StatsBar from '@/components/home/StatsBar';
+import QuickSearch from '@/components/home/QuickSearch';
+import LiveActivity from '@/components/home/LiveActivity';
+import GamesSection from '@/components/home/GamesSection';
+import TrendingSection from '@/components/home/TrendingSection';
+import CategoriesGrid from '@/components/home/CategoriesGrid';
+import OrganizersSection from '@/components/home/OrganizersSection';
+import TeamsSection from '@/components/home/TeamsSection';
+import WinnersSection from '@/components/home/WinnersSection';
+import ReviewsSection from '@/components/home/ReviewsSection';
+import EventsCalendar from '@/components/home/EventsCalendar';
+import MapPreview from '@/components/home/MapPreview';
+import WhyUs from '@/components/home/WhyUs';
+import FAQBlock from '@/components/home/FAQBlock';
+import CTABlock from '@/components/home/CTABlock';
 
 export default function HomePage() {
-  const [games, setGames] = useState<Game[]>([]);
+  const [data, setData] = useState<HomePageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const loadHomePage = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await getHomePage();
+      setData(response.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось загрузить страницу';
+      setError(message);
+
+      // Автоматический retry (3 попытки с экспоненциальной задержкой)
+      if (retryCount < 3) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+        setTimeout(() => {
+          setRetryCount((prev) => prev + 1);
+        }, delay);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [retryCount]);
 
   useEffect(() => {
-    async function loadGames() {
-      try {
-        const response = await getPublicGames({ limit: 6 });
-        setGames(response.data.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Не удалось загрузить игры');
-      } finally {
-        setLoading(false);
-      }
-    }
+    loadHomePage();
+  }, [loadHomePage]);
 
-    loadGames();
-  }, []);
+  const featureFlags = data?.featureFlags || {
+    search: true,
+    notifications: true,
+    marketplace: false,
+    ai: false,
+    reviews: true,
+    chat: false,
+    liveActivity: true,
+    mapPreview: false,
+    partners: false,
+    press: false,
+    downloadApp: false,
+  };
+
+  // Глобальная ошибка — вся страница не загрузилась
+  if (error && !data && retryCount >= 3) {
+    return (
+      <div className="min-h-screen">
+        <Header systemStatus={null} featureFlags={featureFlags} />
+        <div className="container mx-auto px-4 py-20">
+          <div className="card border-error/30 bg-error/5 text-center py-16 max-w-lg mx-auto">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-text-primary mb-2">
+              Не удалось загрузить страницу
+            </h2>
+            <p className="text-sm text-text-secondary mb-6">{error}</p>
+            <button
+              onClick={() => {
+                setRetryCount(0);
+                setLoading(true);
+                loadHomePage();
+              }}
+              className="btn-primary"
+            >
+              Повторить
+            </button>
+          </div>
+        </div>
+        <Footer featureFlags={featureFlags} stats={null} />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      
-      <div className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <section className="mb-12 text-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/images/logo/logo.png"
-                alt="Adventure Engine"
-                width={40}
-                height={40}
-                className="h-10 w-auto"
-                priority
-              />
-              <span className="text-2xl font-bold text-white">
-                Город Приключений
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-text-primary">
-              Городские игры нового поколения
-            </h1>
-            <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-8">
-              Присоединяйтесь к захватывающим квестам в вашем городе или создайте свою собственную игру
-            </p>
-            <div className="flex gap-4 justify-center">
-              <Link href="/games" className="btn-primary">
-                Выбрать игру
-              </Link>
-              <Link href="/organizer" className="btn-secondary">
-                Стать организатором
-              </Link>
-            </div>
-          </div>
-        </section>
+    <div className="min-h-screen flex flex-col">
+      <Header systemStatus={data?.systemStatus || null} featureFlags={featureFlags} />
 
-        {/* Games Grid */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-text-primary">Доступные игры</h2>
-            <Link href="/games" className="text-primary hover:text-primary-hover font-medium">
-              Смотреть все →
-            </Link>
-          </div>
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-8">
+          {/* Hero */}
+          <HeroBlock hero={data?.hero || null} loading={loading} />
 
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card animate-pulse">
-                  <div className="h-48 bg-surface-elevated rounded-lg mb-4" />
-                  <div className="h-6 bg-surface-elevated rounded mb-2 w-3/4" />
-                  <div className="h-4 bg-surface-elevated rounded mb-2 w-full" />
-                  <div className="h-4 bg-surface-elevated rounded w-1/2" />
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="card border-error">
-              <p className="text-error">{error}</p>
-            </div>
-          ) : games.length === 0 ? (
-            <div className="card text-center py-12">
-              <p className="text-text-secondary">Игр пока нет. Будьте первыми!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {games.map((game) => (
-                <GameCard key={game.id} game={game} />
-              ))}
-            </div>
+          {/* Stats */}
+          <StatsBar stats={data?.stats || null} loading={loading} />
+
+          {/* Quick Search */}
+          <QuickSearch />
+
+          {/* Live Activity */}
+          <LiveActivity enabled={featureFlags.liveActivity} />
+
+          {/* Featured Games */}
+          <GamesSection
+            title="Доступные игры"
+            link="/games"
+            games={data?.games?.featured || null}
+            loading={loading}
+          />
+
+          {/* Popular Games */}
+          <GamesSection
+            title="Популярные игры"
+            link="/games?sort=popular"
+            games={data?.games?.popular || null}
+            loading={loading}
+          />
+
+          {/* Recent Games */}
+          <GamesSection
+            title="Новые игры"
+            link="/games?sort=recent"
+            games={data?.games?.recent || null}
+            loading={loading}
+          />
+
+          {/* Trending */}
+          <TrendingSection
+            games={data?.games?.trending || null}
+            loading={loading}
+          />
+
+          {/* Categories */}
+          <CategoriesGrid categories={data?.categories || null} />
+
+          {/* Organizers */}
+          <OrganizersSection
+            organizers={data?.topOrganizers || null}
+            loading={loading}
+          />
+
+          {/* Teams */}
+          <TeamsSection
+            teams={data?.topTeams || null}
+            loading={loading}
+          />
+
+          {/* Winners */}
+          <WinnersSection
+            winners={data?.recentWinners || null}
+            loading={loading}
+          />
+
+          {/* Reviews */}
+          {featureFlags.reviews && (
+            <ReviewsSection
+              reviews={data?.recentReviews || null}
+              loading={loading}
+            />
           )}
-        </section>
 
-        {/* Features Section */}
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card text-center">
-            <div className="text-4xl mb-4">🎯</div>
-            <h3 className="text-lg font-semibold mb-2">Увлекательные задания</h3>
-            <p className="text-text-secondary">
-              Разнообразные типы миссий: от логических загадок до поиска локаций
-            </p>
-          </div>
-          <div className="card text-center">
-            <div className="text-4xl mb-4">👥</div>
-            <h3 className="text-lg font-semibold mb-2">Командная игра</h3>
-            <p className="text-text-secondary">
-              Играйте вместе с друзьями в режиме реального времени
-            </p>
-          </div>
-          <div className="card text-center">
-            <div className="text-4xl mb-4">🏆</div>
-            <h3 className="text-lg font-semibold mb-2">Соревновательный дух</h3>
-            <p className="text-text-secondary">
-              Состязайтесь с другими командами за первое место
-            </p>
-          </div>
-        </section>
-      </div>
+          {/* Events Calendar */}
+          <EventsCalendar />
+
+          {/* Map Preview (Feature Flag) */}
+          <MapPreview enabled={featureFlags.mapPreview} />
+
+          {/* Why Us */}
+          <WhyUs />
+
+          {/* FAQ */}
+          <FAQBlock items={data?.faq || null} loading={loading} />
+
+          {/* CTA */}
+          <CTABlock />
+        </div>
+      </main>
+
+      <Footer featureFlags={featureFlags} stats={data?.stats || null} />
     </div>
   );
 }
