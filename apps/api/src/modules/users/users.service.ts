@@ -134,6 +134,7 @@ export class UsersService {
       theme: settings.theme || 'dark',
       notificationSettings: settings.notifications || {},
       privacySettings: settings.privacy || {},
+      toolbarSettings: settings.toolbarSettings || { size: 'medium', display: 'icon_label' },
       socialLinks: profile.socialLinks || {},
       favorites: profile.favorites || { games: [], scenarios: [], authors: [] },
       lastLoginAt: security.lastLoginAt || u.lastLoginAt || null,
@@ -272,6 +273,9 @@ export class UsersService {
     }
     if (dto.privacySettings !== undefined) {
       settings.privacy = { ...(settings.privacy || {}), ...dto.privacySettings };
+    }
+    if (dto.toolbarSettings !== undefined) {
+      settings.toolbarSettings = dto.toolbarSettings;
     }
 
     const updateData: any = { profile, settings, version: { increment: 1 } };

@@ -413,6 +413,24 @@ function ScenarioEditorInner({
 
   const isEmpty = store.scenes.length === 0;
   const hasErrors = store.validationResult.errors.length > 0;
+  const tb = store.toolbarSettings;
+
+  // Toolbar button class helper
+  const tbBtn = (extra = '') => {
+    const sizeMap = {
+      small: 'text-[10px] px-1 py-0.5',
+      medium: 'text-xs px-1.5 py-1',
+      large: 'text-sm px-2.5 py-1.5',
+    };
+    return `btn-secondary ${sizeMap[tb.size]} ${extra}`;
+  };
+
+  // Toolbar button content helper
+  const tbContent = (icon: string, label: string) => {
+    if (tb.display === 'icon') return icon;
+    if (tb.display === 'label') return label;
+    return <><span>{icon}</span><span className="ml-1">{label}</span></>;
+  };
 
   // Show templates modal on first load if empty
   useEffect(() => {
@@ -423,8 +441,10 @@ function ScenarioEditorInner({
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Top Bar — компактный как в Figma/Notion */}
-      <div className="h-11 bg-background border-b border-border flex items-center justify-between px-3">
+      {/* Top Bar — адаптивный под настройки пользователя */}
+      <div className={`bg-background border-b border-border flex items-center justify-between px-3 ${
+        tb.size === 'small' ? 'h-9' : tb.size === 'large' ? 'h-13' : 'h-11'
+      }`}>
         <div className="flex items-center gap-1.5">
           {/* Toggle header visibility */}
           {onToggleHeader && (
@@ -470,110 +490,103 @@ function ScenarioEditorInner({
             </span>
           )}
 
-          <button
-            onClick={() => { store.validate(); }}
-            className="btn-secondary text-[11px] px-1.5 py-1"
+          <button onClick={() => { store.validate(); }}
+            className={tbBtn()}
             title="Проверить сценарий"
           >
-            ✅
+            {tbContent('✅', 'Проверить')}
           </button>
 
-          <button
-            onClick={() => {
+          <button onClick={() => {
               const startScene = store.scenes.find((n) => n.title === 'Старт');
               if (startScene) {
                 store.setPreviewScene(startScene.id);
                 store.setMode('preview');
               }
             }}
-            className="btn-secondary text-[11px] px-1.5 py-1"
+            className={tbBtn()}
             title="Превью"
           >
-            👁
+            {tbContent('👁', 'Превью')}
           </button>
 
-          <button
-            onClick={() => store.startTest()}
-            className="btn-secondary text-[11px] px-1.5 py-1"
+          <button onClick={() => store.startTest()}
+            className={tbBtn()}
             title="Тестирование"
           >
-            🎮
+            {tbContent('🎮', 'Тест')}
           </button>
 
           {/* ✨ AI Доработка */}
-          <button
-            onClick={() => store.setShowAiEnhance(true)}
-            className="btn-secondary text-[11px] px-1.5 py-1 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-500/20"
+          <button onClick={() => store.setShowAiEnhance(true)}
+            className={tbBtn('bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-500/20')}
             title="Доработать сценарий с AI"
           >
-            ✨
+            {tbContent('✨', 'AI Дор')}
           </button>
 
           {/* ✨ AI Assistant (генерация) */}
-          <button
-            onClick={() => store.setShowAIAssistant(true)}
-            className="btn-secondary text-[11px] px-1.5 py-1 bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/20"
+          <button onClick={() => store.setShowAIAssistant(true)}
+            className={tbBtn('bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/20')}
             title="AI-помощник"
           >
-            🤖
+            {tbContent('🤖', 'AI')}
           </button>
 
-          <button
-            onClick={() => store.togglePanel('variables')}
-            className={`btn-secondary text-[11px] px-1.5 py-1 ${
-              store.openPanels.variables ? 'bg-primary/20' : ''
-            }`}
+          <button onClick={() => store.togglePanel('variables')}
+            className={`${tbBtn()} ${store.openPanels.variables ? 'bg-primary/20' : ''}`}
             title="Переменные"
           >
-            📊
+            {tbContent('📊', 'Перем')}
           </button>
 
-          <button
-            onClick={() => store.togglePanel('validation')}
-            className={`btn-secondary text-[11px] px-1.5 py-1 ${
-              store.openPanels.validation ? 'bg-primary/20' : ''
-            }`}
+          <button onClick={() => store.togglePanel('validation')}
+            className={`${tbBtn()} ${store.openPanels.validation ? 'bg-primary/20' : ''}`}
             title="Валидация"
           >
-            📋
+            {tbContent('📋', 'Ошибки')}
           </button>
 
           <div className="w-px h-5 bg-border mx-0.5" />
 
-          <button
-            onClick={store.undo}
+          <button onClick={store.undo}
             disabled={store.history.undoStack.length === 0}
-            className="btn-secondary text-[11px] px-1.5 py-1 disabled:opacity-30"
+            className={tbBtn('disabled:opacity-30')}
             title="Отменить (Ctrl+Z)"
           >
             ↩️
           </button>
 
-          <button
-            onClick={store.redo}
+          <button onClick={store.redo}
             disabled={store.history.redoStack.length === 0}
-            className="btn-secondary text-[11px] px-1.5 py-1 disabled:opacity-30"
+            className={tbBtn('disabled:opacity-30')}
             title="Повторить (Ctrl+Shift+Z)"
           >
             ↪️
           </button>
 
           {!isPublished && onPublish && (
-            <button
-              onClick={onPublish}
-              className="btn-primary text-[11px] px-2 py-1 bg-green-600 hover:bg-green-700"
+            <button onClick={onPublish}
+              className={`btn-primary ${tb.size === 'small' ? 'text-[10px] px-1.5 py-0.5' : tb.size === 'large' ? 'text-sm px-3 py-1.5' : 'text-xs px-2 py-1'} bg-green-600 hover:bg-green-700`}
             >
-              📢
+              {tbContent('📢', 'Опублик')}
             </button>
           )}
 
           {/* 🗑️ Очистить всё */}
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="btn-secondary text-[11px] px-1.5 py-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20"
+          <button onClick={() => setShowClearConfirm(true)}
+            className={tbBtn('text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20')}
             title="Очистить все блоки"
           >
             🗑️
+          </button>
+
+          {/* ⚙️ Настройки панели */}
+          <button onClick={() => store.setShowToolbarSettings(true)}
+            className={tbBtn()}
+            title="Настройки панели инструментов"
+          >
+            ⚙️
           </button>
 
           {/* Author Achievements */}
