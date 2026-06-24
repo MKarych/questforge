@@ -704,7 +704,7 @@ export class ExecutionEngine {
           },
         },
         context,
-        (action) => {
+        (_action) => {
           this.autoTransition(session);
         }
       );
@@ -859,7 +859,7 @@ export class ExecutionEngine {
     }
 
     // Проверка ответа
-    const isCorrect = this.checkAnswer(mission, answer);
+    const isCorrect = this.checkAnswer(mission, answer, context);
 
     if (isCorrect) {
       this.auditLogger.log(session, 'answer.correct', {
@@ -931,7 +931,7 @@ export class ExecutionEngine {
   /**
    * Проверка ответа миссии.
    */
-  private checkAnswer(mission: Mission, answer: any): boolean {
+  private checkAnswer(mission: Mission, answer: any, context?: ExecutionContext): boolean {
     const config = mission.config as any;
 
     switch (mission.type) {
@@ -979,9 +979,14 @@ export class ExecutionEngine {
         // Фото проверяется вручную или AI — всегда true для MVP
         return true;
 
-      case 'collect':
-        // Проверка наличия предмета в инвентаре
-        return sessionStorage.getItem(`item-${config?.itemId}`) !== null;
+      case 'collect': {
+        // Проверка наличия предмета в инвентаре команды
+        // Контекст всегда передаётся из executeMission
+        if (!context) return false;
+        return context.team.inventory.items.some(
+          (i) => i.id === config?.itemId && i.quantity >= (config?.quantity || 1)
+        );
+      }
 
       case 'dialogue':
         // Диалог всегда успешен для MVP

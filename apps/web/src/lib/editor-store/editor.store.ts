@@ -32,7 +32,7 @@ export interface EditorActions {
   setVersion: (v: number) => void;
 
   // Scenes
-  addScene: (type: SceneType, position: { x: number; y: number }) => void;
+  addScene: (type: SceneType, position: { x: number; y: number }, title?: string) => void;
   updateScene: (sceneId: string, data: Partial<Scene>) => void;
   removeScene: (sceneId: string) => void;
   moveScene: (sceneId: string, position: { x: number; y: number }) => void;
@@ -176,13 +176,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setVersion: (version) => set({ version }),
 
   // ==================== Scenes ====================
-  addScene: (type, position) => {
+  addScene: (type, position, title) => {
     get().pushHistory();
 
     const newScene: Scene = {
       id: uuidv4(),
       type,
-      title: BLOCK_DEFINITIONS.find(b => b.type === type)?.label || 'Новая сцена',
+      title: title || BLOCK_DEFINITIONS.find(b => b.type === type)?.label || 'Новая сцена',
       description: '',
       view: { type: 'card', config: { layout: 'vertical', interactive: true } },
       missions: [],

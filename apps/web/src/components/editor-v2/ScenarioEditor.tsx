@@ -299,15 +299,20 @@ function ScenarioEditorInner({
 
   // Drag & Drop
   const onDragStart = (event: React.DragEvent, block: BlockDefinition) => {
-    event.dataTransfer.setData('application/reactflow', block.type);
+    // Передаём label блока, чтобы onDrop мог найти точный блок
+    event.dataTransfer.setData('application/reactflow', block.label);
     event.dataTransfer.effectAllowed = 'move';
   };
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      const type = event.dataTransfer.getData('application/reactflow') as any;
-      if (!type) return;
+      const label = event.dataTransfer.getData('application/reactflow');
+      if (!label) return;
+
+      // Ищем блок по label (не по type, т.к. type может быть одинаковым у разных блоков)
+      const block = BLOCK_DEFINITIONS.find(b => b.label === label);
+      if (!block) return;
 
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
       const position = {
@@ -315,7 +320,7 @@ function ScenarioEditorInner({
         y: event.clientY - reactFlowBounds.top - 50,
       };
 
-      store.addScene(type, position);
+      store.addScene(block.type, position, block.label);
     },
     [store]
   );
