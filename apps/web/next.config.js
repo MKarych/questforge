@@ -2,7 +2,32 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost', 'api.adventure-engine.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.adventure-engine.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/**',
+      },
+    ],
   },
   async rewrites() {
     return [
