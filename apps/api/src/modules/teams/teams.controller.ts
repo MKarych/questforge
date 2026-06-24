@@ -136,6 +136,7 @@ export class TeamsController {
   // JOIN REQUEST (подать заявку)
   // ================================================================
   @Post(':id/join')
+  @Post(':id/join-request')
   async createJoinRequest(
     @Request() req: UserRequest,
     @Param('id') id: string,
@@ -148,6 +149,7 @@ export class TeamsController {
   // APPROVE JOIN REQUEST
   // ================================================================
   @Post(':id/join/:requestId/approve')
+  @Post(':id/join-request/:requestId/approve')
   async approveJoinRequest(
     @Request() req: UserRequest,
     @Param('id') id: string,
@@ -160,6 +162,7 @@ export class TeamsController {
   // REJECT JOIN REQUEST
   // ================================================================
   @Post(':id/join/:requestId/reject')
+  @Post(':id/join-request/:requestId/reject')
   async rejectJoinRequest(
     @Request() req: UserRequest,
     @Param('id') id: string,
