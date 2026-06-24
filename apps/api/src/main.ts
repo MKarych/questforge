@@ -6,6 +6,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as figlet from 'figlet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -57,7 +58,15 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   await app.listen(port);
-  console.log(`🚀 Adventure Engine API running on port ${port}`);
+  console.log('\n' + figlet.textSync('ADVENTURE ENGINE', {
+    font: 'Slant',
+    horizontalLayout: 'default',
+    verticalLayout: 'default'
+  }));
+  console.log(`🏙️  Город Приключений — Adventure Engine`);
+  console.log(`🚀 Server running on http://localhost:${port}`);
+  console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📅 Started at: ${new Date().toLocaleString()}`);
 }
 
 bootstrap();
