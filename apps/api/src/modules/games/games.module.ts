@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GamesController } from './games.controller';
 import { GamesService } from './games.service';
+import { ChatService } from './chat.service';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { GamesService } from './games.service';
     }),
   ],
   controllers: [GamesController],
-  providers: [GamesService],
-  exports: [GamesService],
+  providers: [GamesService, ChatService],
+  exports: [GamesService, ChatService],
 })
 export class GamesModule {}

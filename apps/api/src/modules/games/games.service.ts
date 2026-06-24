@@ -1237,7 +1237,18 @@ export class GamesService {
 
     validateTransition(game.status, GAME_STATUS.CANCELLED);
 
-    this.logger.log(`Game cancelled: ${gameId} by user ${userId}`);
+    // Domain Event: получаем список зарегистрированных команд для уведомления
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: { gameId },
+      select: { teamId: true },
+    });
+
+    this.logger.log(`[Domain Event] game.cancelled — game ${gameId} cancelled by user ${userId}`);
+    if (registrations.length > 0) {
+      this.logger.log(
+        `[Domain Event] game.cancelled — notifications to ${registrations.length} teams: ${registrations.map((r) => r.teamId).join(', ')}`,
+      );
+    }
 
     return this.prisma.game.update({
       where: { id: gameId },
@@ -1284,7 +1295,20 @@ export class GamesService {
       });
     }
 
-    this.logger.log(`Game rescheduled: ${gameId} by user ${userId} to ${newDate} ${newTime}`);
+    // Domain Event: получаем список зарегистрированных команд для уведомления
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: { gameId },
+      select: { teamId: true },
+    });
+
+    this.logger.log(
+      `[Domain Event] game.rescheduled — game ${gameId} rescheduled by user ${userId} to ${newDate} ${newTime} (was: ${game.date.toISOString()} ${game.time})`,
+    );
+    if (registrations.length > 0) {
+      this.logger.log(
+        `[Domain Event] game.rescheduled — notifications to ${registrations.length} teams: ${registrations.map((r) => r.teamId).join(', ')}`,
+      );
+    }
 
     return this.prisma.game.update({
       where: { id: gameId },
@@ -1376,6 +1400,161 @@ export class GamesService {
       reason: `Время старта ещё не наступило. Осталось ${Math.ceil(timeUntilStart / 1000)} сек.`,
       timeUntilStart,
     };
+  }
+
+  // ============================================================
+  // Registration Methods (Раздел 9)
+  // ============================================================
+
+  /**
+   * registerTeam: регистрация команды на игру.
+   * Проверки: статус REGISTRATION_OPEN, maxTeams, команда не зарегистрирована.
+   */
+  async registerTeam(gameId: string, teamId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    // Проверка: статус REGISTRATION_OPEN
+    if (game.status !== GAME_STATUS.REGISTRATION_OPEN) {
+      throw new BadRequestException({
+        code: 'REGISTRATION_CLOSED',
+        message: 'Регистрация на эту игру закрыта',
+      });
+    }
+
+    // Проверка: команда существует
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId, deletedAt: null },
+    });
+    if (!team) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'Команда не найдена',
+      });
+    }
+
+    // Проверка: команда не зарегистрирована
+    const existing = await this.prisma.gameRegistration.findUnique({
+      where: { gameId_teamId: { gameId, teamId } },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'TEAM_ALREADY_REGISTERED',
+        message: 'Команда уже зарегистрирована на эту игру',
+      });
+    }
+
+    // Проверка: maxTeams не превышен
+    const registrationsCount = await this.prisma.gameRegistration.count({
+      where: { gameId },
+    });
+    if (registrationsCount >= game.maxTeams) {
+      throw new BadRequestException({
+        code: 'GAME_FULL',
+        message: 'Все места заняты',
+      });
+    }
+
+    const registration = await this.prisma.gameRegistration.create({
+      data: {
+        gameId,
+        teamId,
+        status: 'REGISTERED',
+      },
+      include: {
+        team: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    this.logger.log(`Team ${teamId} registered for game ${gameId} by user ${userId}`);
+
+    return registration;
+  }
+
+  /**
+   * unregisterTeam: отмена регистрации команды.
+   */
+  async unregisterTeam(gameId: string, teamId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    const registration = await this.prisma.gameRegistration.findUnique({
+      where: { gameId_teamId: { gameId, teamId } },
+    });
+
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'Команда не зарегистрирована на эту игру',
+      });
+    }
+
+    await this.prisma.gameRegistration.delete({
+      where: { id: registration.id },
+    });
+
+    this.logger.log(`Team ${teamId} unregistered from game ${gameId} by user ${userId}`);
+  }
+
+  /**
+   * setTeamReady: команда нажимает "Готов".
+   * Проверка: команда зарегистрирована.
+   */
+  async setTeamReady(gameId: string, teamId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    const registration = await this.prisma.gameRegistration.findUnique({
+      where: { gameId_teamId: { gameId, teamId } },
+    });
+
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'Команда не зарегистрирована на эту игру',
+      });
+    }
+
+    const updated = await this.prisma.gameRegistration.update({
+      where: { id: registration.id },
+      data: {
+        status: 'READY',
+        readyAt: new Date(),
+      },
+      include: {
+        team: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    this.logger.log(`Team ${teamId} is ready for game ${gameId}`);
+
+    return updated;
+  }
+
+  /**
+   * getTeamsStatus: получить статусы всех команд.
+   */
+  async getTeamsStatus(gameId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: { gameId },
+      include: {
+        team: {
+          select: { id: true, name: true, slug: true, avatar: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return registrations.map((r) => ({
+      teamId: r.teamId,
+      team: r.team,
+      status: r.status,
+      readyAt: r.readyAt,
+      registeredAt: r.createdAt,
+    }));
   }
 
   // ============================================================
