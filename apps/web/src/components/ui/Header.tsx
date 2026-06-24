@@ -59,16 +59,30 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const userRole = user?.role || 'PLAYER';
   const isAuthPage = pathname.startsWith('/auth');
 
-  const navItems = [
+  const isOrganizer = userRole === 'ORGANIZER' || userRole === 'ADMIN';
+
+  // Основная навигация — видна всем
+  const mainNavItems = [
     { label: 'Каталог игр', href: '/games', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
     { label: 'Команды', href: '/teams', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
+  ];
+
+  // Организаторская навигация — только ORGANIZER / ADMIN
+  const organizerNavItems = [
+    { label: 'Мои игры', href: '/organizer/games', roles: ['ORGANIZER', 'ADMIN'] },
+    { label: 'Мои сценарии', href: '/organizer/scenarios', roles: ['ORGANIZER', 'ADMIN'] },
     { label: 'Создать игру', href: '/organizer/games/create', roles: ['ORGANIZER', 'ADMIN'] },
+    { label: 'Создать сценарий', href: '/organizer/scenarios/create', roles: ['ORGANIZER', 'ADMIN'] },
+  ];
+
+  // Админка — только ADMIN
+  const adminNavItems = [
     { label: 'Админка', href: '/admin', roles: ['ADMIN'] },
   ];
 
-  const visibleNavItems = navItems.filter(
-    (item) => item.roles.includes(userRole as any)
-  );
+  const visibleMainNav = mainNavItems.filter((item) => item.roles.includes(userRole as any));
+  const visibleOrganizerNav = organizerNavItems.filter((item) => item.roles.includes(userRole as any));
+  const visibleAdminNav = adminNavItems.filter((item) => item.roles.includes(userRole as any));
 
   return (
     <>
@@ -97,7 +111,8 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
             {/* Center: Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-1">
-              {visibleNavItems.map((item) => (
+              {/* Основные пункты */}
+              {visibleMainNav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -110,6 +125,46 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   {item.label}
                 </Link>
               ))}
+
+              {/* Организаторские пункты */}
+              {visibleOrganizerNav.length > 0 && (
+                <>
+                  <span className="mx-1 w-px h-5 bg-border" />
+                  {visibleOrganizerNav.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                        pathname.startsWith(item.href)
+                          ? 'text-primary bg-primary/10 font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              )}
+
+              {/* Админка */}
+              {visibleAdminNav.length > 0 && (
+                <>
+                  <span className="mx-1 w-px h-5 bg-border" />
+                  {visibleAdminNav.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                        pathname.startsWith(item.href)
+                          ? 'text-primary bg-primary/10 font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              )}
             </nav>
 
             {/* Right: Actions */}
@@ -173,8 +228,12 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-border bg-background">
             <nav className="container mx-auto px-4 py-4">
+              {/* Основные пункты */}
               <div className="flex flex-col gap-1">
-                {visibleNavItems.map((item) => (
+                <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  Основное
+                </p>
+                {visibleMainNav.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -188,6 +247,50 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   </Link>
                 ))}
               </div>
+
+              {/* Организаторские пункты */}
+              {visibleOrganizerNav.length > 0 && (
+                <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-border">
+                  <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Организатору
+                  </p>
+                  {visibleOrganizerNav.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                        pathname.startsWith(item.href)
+                          ? 'text-primary bg-primary/10 font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Админка */}
+              {visibleAdminNav.length > 0 && (
+                <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-border">
+                  <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Администрирование
+                  </p>
+                  {visibleAdminNav.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                        pathname.startsWith(item.href)
+                          ? 'text-primary bg-primary/10 font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
 
               {!user && !loading && (
                 <div className="flex gap-3 mt-4 pt-4 border-t border-border">
