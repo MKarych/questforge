@@ -711,11 +711,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   // ==================== Load ====================
   loadScenario: (data) => {
+    // Пересчитываем позиции сцен, чтобы они не накладывались
+    const scenes = data.scenes.map((scene, index) => ({
+      ...scene,
+      position: {
+        x: 100 + (index % 3) * 320,
+        y: 100 + Math.floor(index / 3) * 200,
+      },
+    }));
     set((state) => ({
       scenarioId: data.id || null,
       name: data.name,
       description: data.description || '',
-      scenes: data.scenes,
+      scenes,
       edges: data.edges,
       variables: data.variables,
       settings: data.settings,

@@ -231,17 +231,19 @@ function ScenarioEditorInner({
     [store.edges]
   );
 
+  // Используем store напрямую, без дублирования в useNodesState/useEdgesState
+  // Это гарантирует, что drag & drop работает корректно
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-  // Sync store -> React Flow
+  // Sync store -> React Flow (только при изменении количества/состава сцен, не при позиции)
   useEffect(() => {
     setNodes(rfNodes);
-  }, [rfNodes, setNodes]);
+  }, [store.scenes.length, store.scenes.map(s => s.id).join(','), setNodes]);
 
   useEffect(() => {
     setEdges(rfEdges);
-  }, [rfEdges, setEdges]);
+  }, [store.edges.length, store.edges.map(e => e.id).join(','), setEdges]);
 
   // Auto-validate on scenes/edges change
   useEffect(() => {
@@ -345,11 +347,27 @@ function ScenarioEditorInner({
       if (!block) return;
 
       const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      // Смещаем новый блок относительно предыдущих, чтобы они не накладывались
+      const existingCount = store.scenes.length;
       const position = {
-        x: event.clientX - reactFlowBounds.left - 100,
-        y: event.clientY - reactFlowBounds.top - 50,
+        x: event.clientX - reactFlowBounds.left - 100 + (existingCount % 3) * 40,
+        y: event.clientY - reactFlowBounds.top - 50 + Math.floor(existingCount / 3) * 40,
       };
 
+      store.addScene(block.type, position, block.label);
+    },
+    [store]
+  );
+
+  // Добавление блока по клику из палитры
+  const onPaletteClick = useCallback(
+    (block: BlockDefinition) => {
+      // Размещаем новый блок со смещением, чтобы не накладывался на существующие
+      const existingCount = store.scenes.length;
+      const position = {
+        x: 200 + (existingCount % 3) * 320,
+        y: 100 + Math.floor(existingCount / 3) * 200,
+      };
       store.addScene(block.type, position, block.label);
     },
     [store]
@@ -741,7 +759,7 @@ function ScenarioEditorInner({
       {/* Main Editor */}
       <div className="flex-1 flex">
         {/* Block Palette */}
-        <BlockPalette onDragStart={onDragStart} />
+        <BlockPalette onDragStart={onDragStart} onClick={onPaletteClick} />
 
         {/* Canvas */}
         <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
@@ -764,6 +782,7 @@ function ScenarioEditorInner({
             edges={edges}
             nodesDraggable={true}
             elementsSelectable={true}
+            nodeDragThreshold={1}
             onNodesChange={(changes) => {
               onNodesChange(changes);
               // Sync position changes back to store
