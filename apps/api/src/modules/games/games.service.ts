@@ -6,10 +6,13 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { validateTransition, canCancel, canReschedule } from './state-machine/game-state-machine';
+
+type GameStatus = $Enums.GameStatus;
 
 // Slug generation
 function slugify(text: string): string {
@@ -30,21 +33,21 @@ function generateShareLink(): string {
   return result;
 }
 
-// Prisma GameStatus enum values as const
+// Prisma GameStatus enum values cast helper
 const GAME_STATUS = {
-  DRAFT: 'DRAFT',
-  PENDING: 'PENDING',
-  APPROVED: 'APPROVED',
-  PUBLISHED: 'PUBLISHED',
-  REGISTRATION_OPEN: 'REGISTRATION_OPEN',
-  REGISTRATION_CLOSED: 'REGISTRATION_CLOSED',
-  LOBBY: 'LOBBY',
-  RUNNING: 'RUNNING',
-  FINISHED: 'FINISHED',
-  ARCHIVED: 'ARCHIVED',
-  CANCELLED: 'CANCELLED',
-  RESCHEDULED: 'RESCHEDULED',
-} as const;
+  DRAFT: 'DRAFT' as GameStatus,
+  PENDING: 'PENDING' as GameStatus,
+  APPROVED: 'APPROVED' as GameStatus,
+  PUBLISHED: 'PUBLISHED' as GameStatus,
+  REGISTRATION_OPEN: 'REGISTRATION_OPEN' as GameStatus,
+  REGISTRATION_CLOSED: 'REGISTRATION_CLOSED' as GameStatus,
+  LOBBY: 'LOBBY' as GameStatus,
+  RUNNING: 'RUNNING' as GameStatus,
+  FINISHED: 'FINISHED' as GameStatus,
+  ARCHIVED: 'ARCHIVED' as GameStatus,
+  CANCELLED: 'CANCELLED' as GameStatus,
+  RESCHEDULED: 'RESCHEDULED' as GameStatus,
+};
 
 @Injectable()
 export class GamesService {
@@ -1052,5 +1055,380 @@ export class GamesService {
         moderationComment: reason,
       },
     });
+  }
+
+  // ============================================================
+  // State Machine Methods (Разделы 7, 8, 10)
+  // ============================================================
+
+  /**
+   * publishGame: APPROVED → PUBLISHED
+   * Публикация игры после одобрения модератором.
+   */
+  async publishGame(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    validateTransition(game.status, GAME_STATUS.PUBLISHED);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.PUBLISHED,
+        publishedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * openRegistration: APPROVED/PUBLISHED → REGISTRATION_OPEN
+   * Открытие регистрации команд.
+   */
+  async openRegistration(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    // Разрешено из APPROVED или PUBLISHED
+    if (game.status !== GAME_STATUS.APPROVED && game.status !== GAME_STATUS.PUBLISHED) {
+      validateTransition(game.status, GAME_STATUS.REGISTRATION_OPEN);
+    }
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.REGISTRATION_OPEN,
+      },
+    });
+  }
+
+  /**
+   * closeRegistration: REGISTRATION_OPEN → REGISTRATION_CLOSED
+   * Закрытие регистрации команд.
+   */
+  async closeRegistration(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    validateTransition(game.status, GAME_STATUS.REGISTRATION_CLOSED);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.REGISTRATION_CLOSED,
+      },
+    });
+  }
+
+  /**
+   * moveToLobby: REGISTRATION_CLOSED → LOBBY
+   * Переход в лобби (ожидание старта).
+   */
+  async moveToLobby(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    validateTransition(game.status, GAME_STATUS.LOBBY);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.LOBBY,
+      },
+    });
+  }
+
+  /**
+   * startGame: LOBBY → RUNNING
+   * Запуск игры. Проверяет:
+   * - Статус LOBBY
+   * - Если autoStart = false → ручной старт (организатор)
+   * - Если autoStart = true → проверка времени
+   * - Организатор может запустить раньше, если все команды READY
+   * - После стартового времени организатор может запустить в любом случае
+   */
+  async startGame(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    validateTransition(game.status, GAME_STATUS.RUNNING);
+
+    // Вычисляем время старта: date + time
+    const startTime = this.calculateStartTime(game.date, game.time);
+
+    // Проверка: игра может стартовать только после установленной даты и времени (правило 15)
+    const now = new Date();
+    const canStartAfterTime = now >= startTime;
+
+    if (!canStartAfterTime) {
+      // Если время ещё не пришло — проверяем, можно ли запустить раньше
+      if (!game.allowEarlyStart) {
+        throw new BadRequestException({
+          code: 'CANNOT_START_BEFORE_TIME',
+          message: `Игра может стартовать не раньше ${game.time}`,
+        });
+      }
+
+      // Проверка: все команды готовы (правило 16)
+      const allReady = await this.areAllTeamsReady(gameId);
+      if (!allReady) {
+        throw new BadRequestException({
+          code: 'TEAMS_NOT_READY',
+          message: 'Не все команды готовы. Дождитесь стартового времени или подтверждения от всех команд.',
+        });
+      }
+    }
+
+    // Если autoStart = false, но время пришло — организатор может запустить вручную (правило 17)
+    // Если autoStart = true — тоже запускаем (правило 18)
+
+    this.logger.log(`Game starting: ${gameId} by user ${userId}`);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.RUNNING,
+        startedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * finishGame: RUNNING → FINISHED
+   * Завершение игры организатором.
+   */
+  async finishGame(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    validateTransition(game.status, GAME_STATUS.FINISHED);
+
+    this.logger.log(`Game finished: ${gameId} by user ${userId}`);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.FINISHED,
+        finishedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * cancelGame: любой статус → CANCELLED (кроме FINISHED, ARCHIVED)
+   * Отмена игры.
+   */
+  async cancelGame(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    if (!canCancel(game.status)) {
+      throw new BadRequestException({
+        code: 'CANNOT_CANCEL',
+        message: `Нельзя отменить игру в статусе ${game.status}`,
+      });
+    }
+
+    validateTransition(game.status, GAME_STATUS.CANCELLED);
+
+    this.logger.log(`Game cancelled: ${gameId} by user ${userId}`);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.CANCELLED,
+      },
+    });
+  }
+
+  /**
+   * rescheduleGame: PUBLISHED/REGISTRATION_OPEN/REGISTRATION_CLOSED/LOBBY → RESCHEDULED
+   * Перенос игры с новой датой/временем.
+   */
+  async rescheduleGame(gameId: string, userId: string, newDate: string, newTime: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    this.checkOwnershipOrAdmin(game, userId);
+
+    if (!canReschedule(game.status)) {
+      throw new BadRequestException({
+        code: 'CANNOT_RESCHEDULE',
+        message: `Нельзя перенести игру в статусе ${game.status}`,
+      });
+    }
+
+    validateTransition(game.status, GAME_STATUS.RESCHEDULED);
+
+    // Валидация новой даты
+    const newDateObj = new Date(newDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (newDateObj < today) {
+      throw new BadRequestException({
+        code: 'GAME_IN_PAST',
+        message: 'Новая дата игры не может быть в прошлом',
+      });
+    }
+
+    // Валидация времени
+    if (!newTime || !/^\d{2}:\d{2}$/.test(newTime)) {
+      throw new BadRequestException({
+        code: 'INVALID_TIME',
+        message: 'Время игры должно быть в формате HH:mm',
+      });
+    }
+
+    this.logger.log(`Game rescheduled: ${gameId} by user ${userId} to ${newDate} ${newTime}`);
+
+    return this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GAME_STATUS.RESCHEDULED,
+        date: newDateObj,
+        time: newTime,
+      },
+    });
+  }
+
+  /**
+   * getTimer: возвращает информацию о таймере до старта.
+   */
+  async getTimer(gameId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    const startTime = this.calculateStartTime(game.date, game.time);
+    const now = new Date();
+    const timeUntilStart = startTime.getTime() - now.getTime();
+
+    // Проверка: можно ли стартовать
+    let canStartNow = false;
+
+    if (game.status === GAME_STATUS.LOBBY) {
+      if (timeUntilStart <= 0) {
+        // Время пришло
+        canStartNow = true;
+      } else if (game.allowEarlyStart) {
+        // Проверяем, все ли команды готовы
+        const allReady = await this.areAllTeamsReady(gameId);
+        canStartNow = allReady;
+      }
+    }
+
+    return {
+      canStart: canStartNow,
+      timeUntilStart: Math.max(0, timeUntilStart),
+      status: game.status,
+      startTime: startTime.toISOString(),
+      now: now.toISOString(),
+    };
+  }
+
+  /**
+   * canStart: проверяет, можно ли запустить игру.
+   */
+  async canStart(gameId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    if (game.status !== GAME_STATUS.LOBBY) {
+      return {
+        canStart: false,
+        reason: `Игра в статусе ${game.status}. Ожидается статус LOBBY.`,
+      };
+    }
+
+    const startTime = this.calculateStartTime(game.date, game.time);
+    const now = new Date();
+    const timeUntilStart = startTime.getTime() - now.getTime();
+
+    if (timeUntilStart <= 0) {
+      return {
+        canStart: true,
+        reason: null,
+        timeUntilStart: 0,
+      };
+    }
+
+    // Время ещё не пришло
+    if (game.allowEarlyStart) {
+      const allReady = await this.areAllTeamsReady(gameId);
+      if (allReady) {
+        return {
+          canStart: true,
+          reason: null,
+          timeUntilStart,
+        };
+      }
+      return {
+        canStart: false,
+        reason: 'Время старта ещё не наступило. Не все команды готовы.',
+        timeUntilStart,
+      };
+    }
+
+    return {
+      canStart: false,
+      reason: `Время старта ещё не наступило. Осталось ${Math.ceil(timeUntilStart / 1000)} сек.`,
+      timeUntilStart,
+    };
+  }
+
+  // ============================================================
+  // Private helpers
+  // ============================================================
+
+  private async findGameOrThrow(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId, deletedAt: null },
+    });
+
+    if (!game) {
+      throw new NotFoundException({
+        code: 'GAME_NOT_FOUND',
+        message: 'Игра не найдена',
+      });
+    }
+
+    return game;
+  }
+
+  private async checkOwnershipOrAdmin(game: { organizerId: string }, userId: string): Promise<void> {
+    if (game.organizerId !== userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      if (user?.role !== 'ADMIN') {
+        throw new ForbiddenException({
+          code: 'NOT_OWNER',
+          message: 'Только организатор может выполнить это действие',
+        });
+      }
+    }
+  }
+
+  private calculateStartTime(date: Date, time: string): Date {
+    const [hours, minutes] = time.split(':').map(Number);
+    const startTime = new Date(date);
+    startTime.setHours(hours, minutes, 0, 0);
+    return startTime;
+  }
+
+  private async areAllTeamsReady(gameId: string): Promise<boolean> {
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: { gameId },
+      select: { status: true },
+    });
+
+    if (registrations.length === 0) {
+      return false;
+    }
+
+    return registrations.every((r) => r.status === 'READY');
   }
 }
