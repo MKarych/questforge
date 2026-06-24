@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { AssetManager, Asset, AssetType, getAssetManager } from '@/lib/asset-manager/asset-manager';
+import { Asset, AssetType, getAssetManager } from '@/lib/asset-manager/asset-manager';
 
 interface AssetPanelProps {
   onSelectAsset?: (asset: Asset) => void;

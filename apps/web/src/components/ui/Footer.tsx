@@ -45,7 +45,7 @@ export default function Footer({ featureFlags, stats }: FooterProps) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Image
-                src="/images/logo/logo.png"
+                src="/images/logo/logo-horizontal-full.png"
                 alt="Город Приключений"
                 width={28}
                 height={28}

@@ -29,7 +29,7 @@ function HeroContent({ hero }: { hero: HeroBlockProps['hero'] }) {
       <div className="relative z-10 flex flex-col items-center text-center px-4 py-16 md:py-24">
         <div className="flex items-center gap-3 mb-6">
           <Image
-            src="/images/logo/logo.png"
+            src="/images/logo/logo-horizontal-full.png"
             alt="Adventure Engine"
             width={48}
             height={48}

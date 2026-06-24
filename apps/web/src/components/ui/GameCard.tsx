@@ -6,7 +6,7 @@ import Image from 'next/image';
 import type { GameCard as GameCardType } from '@/lib/api/client';
 import ImageModal from './ImageModal';
 
-const DEFAULT_LOGO = '/images/logo/logo.png';
+const DEFAULT_LOGO = '/images/logo/logo-horizontal-full.png';
 
 interface GameCardProps {
   game: GameCardType;

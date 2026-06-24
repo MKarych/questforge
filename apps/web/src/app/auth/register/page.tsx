@@ -51,7 +51,7 @@ export default function RegisterPage() {
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-white mb-2">Город Приключений</h1>
             <Image
-              src="/images/logo/logo.png"
+              src="/images/logo/logo-horizontal-full.png"
               alt="Adventure Engine"
               width={120}
               height={40}
