@@ -1420,6 +1420,41 @@ export class TeamsService {
     return { message: 'Команда удалена' };
   }
 
+  async adminRestoreTeam(actorId: string, teamId: string) {
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Команда не найдена');
+    }
+
+    if (team.status !== TeamStatus.DELETED) {
+      throw new ConflictException('Команда не была удалена');
+    }
+
+    await this.prisma.team.update({
+      where: { id: teamId },
+      data: {
+        status: TeamStatus.ACTIVE,
+        deletedAt: null,
+        version: { increment: 1 },
+      },
+    });
+
+    await this.createAuditLog({
+      teamId,
+      actorId,
+      action: 'ADMIN_RESTORE_TEAM',
+      entity: 'Team',
+      entityId: teamId,
+      oldValue: { status: TeamStatus.DELETED, deletedAt: team.deletedAt?.toISOString() },
+      newValue: { status: TeamStatus.ACTIVE, deletedAt: null },
+    });
+
+    return { message: 'Команда восстановлена' };
+  }
+
   // ================================================================
   // HELPERS
   // ================================================================

@@ -16,6 +16,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { HomeModule } from './modules/home/home.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AchievementsModule } from './modules/achievements/achievements.module';
+import { ActivityFeedModule } from './modules/activity-feed/activity-feed.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -49,6 +51,8 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     UploadModule,
     HomeModule,
     NotificationsModule,
+    AchievementsModule,
+    ActivityFeedModule,
     EngineModule,
   ],
   controllers: [AppController],

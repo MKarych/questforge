@@ -181,4 +181,11 @@ export class AdminController {
     const actorId = req.user?.userId || req.user?.sub;
     return this.teamsService.adminDeleteTeam(actorId, id);
   }
+
+  @Post('teams/:id/restore')
+  @Roles('ADMIN')
+  async restoreTeam(@Param('id') id: string, @Request() req: any) {
+    const actorId = req.user?.userId || req.user?.sub;
+    return this.teamsService.adminRestoreTeam(actorId, id);
+  }
 }

@@ -62,7 +62,7 @@ export class UsersService {
       city: profile.city || u.city || '',
       rating: rep.rating || u.rating || 0,
       trustScore: rep.trustScore || 0,
-      achievements: rep.achievements || u.achievements || [],
+      achievements: rep.achievements || u.legacyAchievements || [],
       gamesPlayed: user._count.captainTeams,
       gamesCreated: u.gamesCreated,
       gamesConducted: u.gamesConducted,
@@ -121,7 +121,7 @@ export class UsersService {
       version: u.version,
       rating: rep.rating || u.rating || 0,
       trustScore: rep.trustScore || 0,
-      achievements: rep.achievements || u.achievements || [],
+      achievements: rep.achievements || u.legacyAchievements || [],
       gamesPlayed: user._count.captainTeams,
       gamesCreated: u.gamesCreated,
       gamesConducted: u.gamesConducted,
@@ -197,7 +197,7 @@ export class UsersService {
       version: u.version,
       rating: rep.rating || u.rating || 0,
       trustScore: rep.trustScore || 0,
-      achievements: rep.achievements || u.achievements || [],
+      achievements: rep.achievements || u.legacyAchievements || [],
       gamesPlayed: user._count.captainTeams,
       gamesCreated: u.gamesCreated,
       gamesConducted: u.gamesConducted,
@@ -705,7 +705,7 @@ export class UsersService {
   async getUserAchievements(userId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
-      select: { reputationData: true, achievements: true },
+      select: { reputationData: true, legacyAchievements: true },
     });
 
     if (!user) {
@@ -713,13 +713,13 @@ export class UsersService {
     }
 
     const rep = (user as any).reputationData || {};
-    return rep.achievements || user.achievements || [];
+    return rep.achievements || user.legacyAchievements || [];
   }
 
   async addAchievement(userId: string, achievement: Achievement) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId },
-      select: { reputationData: true, achievements: true },
+      select: { reputationData: true, legacyAchievements: true },
     });
 
     if (!user) {
@@ -728,7 +728,7 @@ export class UsersService {
 
     const u: any = user;
     const rep = { ...((u.reputationData as any) || {}) };
-    const achievements = rep.achievements || (u.achievements as unknown as Achievement[]) || [];
+    const achievements = rep.achievements || (u.legacyAchievements as unknown as Achievement[]) || [];
 
     if (achievements.some((a: Achievement) => a.type === achievement.type)) {
       return achievements;
@@ -739,7 +739,7 @@ export class UsersService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { reputationData: rep, achievements: updated as any },
+      data: { reputationData: rep, legacyAchievements: updated as any },
     });
 
     await this.eventBus.publish({
@@ -768,7 +768,7 @@ export class UsersService {
         gamesConducted: true,
         scenariosCreated: true,
         reputationData: true,
-        achievements: true,
+        legacyAchievements: true,
         _count: { select: { captainTeams: true } },
       },
     });
@@ -777,7 +777,7 @@ export class UsersService {
 
     const u: any = user;
     const rep = { ...((u.reputationData as any) || {}) };
-    const achievements = rep.achievements || (u.achievements as unknown as Achievement[]) || [];
+    const achievements = rep.achievements || (u.legacyAchievements as unknown as Achievement[]) || [];
     const newAchievements: Achievement[] = [];
     const roles: string[] = u.roles || [];
 

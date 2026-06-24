@@ -68,7 +68,7 @@ model User {
   scenariosCreated Int              @default(0) @map("scenarios_created")
   rating           Float            @default(0)
   reputation       Int              @default(0)
-  achievements     Json             @default("[]") @db.Json
+  legacyAchievements Json           @default("[]") @map("achievements") @db.Json
   lastLoginAt      DateTime?        @map("last_login_at")
   bio              String?
   city             String?          @db.VarChar(100)
@@ -102,6 +102,7 @@ model User {
   gameComments           GameComment[]
   gameQuestions          GameQuestion[]
   notifications          Notification[]
+  achievements           UserAchievement[]
 
   @@index([email])
   @@index([username])
@@ -149,6 +150,25 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@index([entity, entityId])
+}
+
+// ============================================================
+// USER ACHIEVEMENT (достижения пользователя)
+// ============================================================
+
+model UserAchievement {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  type        String   @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  icon        String   @default("🏆") @db.VarChar(50)
+  unlockedAt  DateTime @default(now()) @map("unlocked_at")
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@index([type])
 }
 
 // ============================================================

@@ -166,7 +166,7 @@ export class AuthService {
       rating: rep.rating || u.rating || 0,
       trustScore: rep.trustScore || 0,
       reputation: u.reputation || 0,
-      achievements: rep.achievements || u.achievements || [],
+      achievements: rep.achievements || u.legacyAchievements || [],
       gamesCreated: u.gamesCreated,
       scenariosCreated: u.scenariosCreated,
       gamesConducted: u.gamesConducted,
