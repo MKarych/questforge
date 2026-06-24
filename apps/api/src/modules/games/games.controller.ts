@@ -2,13 +2,12 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   UseGuards,
-  Req,
   Request,
   UploadedFile,
   UseInterceptors,
@@ -18,7 +17,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { GamesService } from './games.service';
+import { ChatService } from './chat.service';
 import { CreateGameDto } from './dto/create-game.dto';
+import { UpdateGameDto } from './dto/update-game.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -37,10 +38,13 @@ type DiskStorageFile = {
 
 @Controller('games')
 export class GamesController {
-  constructor(private readonly gamesService: GamesService) {}
+  constructor(
+    private readonly gamesService: GamesService,
+    private readonly chatService: ChatService,
+  ) {}
 
   // ============================================================
-  // Public endpoints (no auth required)
+  // 29.1. Публичные эндпоинты (no auth)
   // ============================================================
 
   @Get('public')
@@ -74,28 +78,8 @@ export class GamesController {
     return this.gamesService.findOnePublic(id);
   }
 
-  @Get()
-  async findAll(
-    @Query('status') status?: string,
-    @Query('city') city?: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-  ) {
-    return this.gamesService.findAll({
-      status,
-      city,
-      limit: Number(limit) || 20,
-      offset: Number(offset) || 0,
-    });
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') gameId: string) {
-    return this.gamesService.findOne(gameId);
-  }
-
-  @Get(':id/reviews')
-  async getReviews(
+  @Get('public/:id/reviews')
+  async getPublicReviews(
     @Param('id') gameId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
@@ -106,134 +90,33 @@ export class GamesController {
     });
   }
 
-  @Get(':id/teams')
-  async getTeams(
+  @Get('public/:id/comments')
+  async getPublicComments(
     @Param('id') gameId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return this.gamesService.getTeams(gameId, {
+    return this.gamesService.getComments(gameId, {
       limit: Number(limit) || 20,
       offset: Number(offset) || 0,
     });
   }
 
-  // ============================================================
-  // Protected endpoints (auth required)
-  // ============================================================
-
-  @Post()
+  @Post('public/:id/comments')
   @UseGuards(JwtAuthGuard)
-  async create(@Request() req: any, @Body() dto: CreateGameDto) {
-    return this.gamesService.create(req.user.userId, dto);
-  }
-
-  @Put(':id')
-  @UseGuards(JwtAuthGuard)
-  async update(
-    @Request() req: any,
+  async addPublicComment(
     @Param('id') gameId: string,
-    @Body() dto: Partial<CreateGameDto>,
-  ) {
-    return this.gamesService.update(req.user.userId, gameId, dto);
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  async remove(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.remove(req.user.userId, gameId);
-  }
-
-  @Post(':id/submit')
-  @UseGuards(JwtAuthGuard)
-  async submitForModeration(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.submitForModeration(req.user.userId, gameId);
-  }
-
-  @Post(':id/start')
-  @UseGuards(JwtAuthGuard)
-  async startGame(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.startGame(req.user.userId, gameId);
-  }
-
-  @Post(':id/finish')
-  @UseGuards(JwtAuthGuard)
-  async finishGame(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.finishGame(req.user.userId, gameId);
-  }
-
-  @Post(':id/publish')
-  @UseGuards(JwtAuthGuard)
-  async publishGame(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.publishGame(req.user.userId, gameId);
-  }
-
-  @Post(':id/upload-cover')
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './public/uploads/covers',
-        filename: (_req: any, file: DiskStorageFile, callback: FileCallback) => {
-          const ext = extname(file.originalname);
-          const filename = `${uuidv4()}${ext}`;
-          callback(null, filename);
-        },
-      }),
-      fileFilter: (_req: any, file: DiskStorageFile, callback: (error: Error | null, acceptFile: boolean) => void) => {
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (allowedMimeTypes.includes(file.mimetype)) {
-          callback(null, true);
-        } else {
-          callback(new ForbiddenException('Разрешены только изображения: jpg, png, webp'), false);
-        }
-      },
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5 MB
-      },
-    }),
-  )
-  async uploadCover(
-    @Req() req: Request,
-    @Param('id') gameId: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    const userId = (req as any).user?.userId;
-    return this.gamesService.uploadCover(userId, gameId, file);
-  }
-  // ============================================================
-  // Admin endpoints (moderation)
-  // ============================================================
-
-  @Get('admin/pending')
-  @Roles('ADMIN', 'MODERATOR')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async findPendingGames(
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-  ) {
-    return this.gamesService.findPendingGames({
-      limit: Number(limit) || 20,
-      offset: Number(offset) || 0,
-    });
-  }
-
-  @Post(':id/moderate')
-  @Roles('ADMIN', 'MODERATOR')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async moderateGame(
-    @Param('id') gameId: string,
-    @Body() body: { status: 'APPROVED' | 'REJECTED'; comment?: string },
+    @Body() body: { text: string },
     @Request() req: any,
   ) {
-    return this.gamesService.moderateGame(gameId, body.status, body.comment, req.user.userId);
+    return this.gamesService.addComment(gameId, req.user.userId, body.text);
   }
 
   // ============================================================
-  // Team registration
+  // 29.2. Приватные эндпоинты (auth required)
   // ============================================================
 
-  @Post(':id/register-team')
+  @Post(':id/register')
   @UseGuards(JwtAuthGuard)
   async registerTeam(
     @Param('id') gameId: string,
@@ -241,5 +124,251 @@ export class GamesController {
     @Request() req: any,
   ) {
     return this.gamesService.registerTeam(gameId, body.teamId, req.user.userId);
+  }
+
+  @Post(':id/unregister')
+  @UseGuards(JwtAuthGuard)
+  async unregisterTeam(
+    @Param('id') gameId: string,
+    @Body() body: { teamId: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.unregisterTeam(gameId, body.teamId, req.user.userId);
+  }
+
+  @Get(':id/teams')
+  @UseGuards(JwtAuthGuard)
+  async getTeams(@Param('id') gameId: string) {
+    return this.gamesService.getTeams(gameId);
+  }
+
+  @Post(':id/ready')
+  @UseGuards(JwtAuthGuard)
+  async setTeamReady(
+    @Param('id') gameId: string,
+    @Body() body: { teamId: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.setTeamReady(gameId, body.teamId, req.user.userId);
+  }
+
+  @Get(':id/teams-status')
+  @UseGuards(JwtAuthGuard)
+  async getTeamsStatus(@Param('id') gameId: string) {
+    return this.gamesService.getTeamsStatus(gameId);
+  }
+
+  // Questions
+  @Post(':id/questions')
+  @UseGuards(JwtAuthGuard)
+  async askQuestion(
+    @Param('id') gameId: string,
+    @Body() body: { text: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.addComment(gameId, req.user.userId, body.text);
+  }
+
+  @Get(':id/questions')
+  @UseGuards(JwtAuthGuard)
+  async getQuestions(@Param('id') gameId: string) {
+    return this.gamesService.getComments(gameId, { limit: 50, offset: 0 });
+  }
+
+  // Chat
+  @Get(':id/chat')
+  @UseGuards(JwtAuthGuard)
+  async getChatMessages(@Param('id') gameId: string, @Request() req: any) {
+    return this.chatService.getChatMessages(gameId, req.user.userId);
+  }
+
+  @Post(':id/chat')
+  @UseGuards(JwtAuthGuard)
+  async sendChatMessage(
+    @Param('id') gameId: string,
+    @Body() body: { text: string },
+    @Request() req: any,
+  ) {
+    return this.chatService.sendMessage(gameId, req.user.userId, body.text);
+  }
+
+  @Get(':id/chat/organizer')
+  @UseGuards(JwtAuthGuard)
+  async getOrganizerMessages(@Param('id') gameId: string, @Request() req: any) {
+    return this.chatService.getChatMessages(gameId, req.user.userId);
+  }
+
+  @Post(':id/chat/organizer')
+  @UseGuards(JwtAuthGuard)
+  async sendOrganizerMessage(
+    @Param('id') gameId: string,
+    @Body() body: { text: string },
+    @Request() req: any,
+  ) {
+    return this.chatService.sendOrganizerMessage(gameId, req.user.userId, body.text);
+  }
+
+  // ============================================================
+  // 29.3. Организаторские эндпоинты (auth required)
+  // ============================================================
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  async createGame(@Request() req: any, @Body() dto: CreateGameDto) {
+    return this.gamesService.createGame(dto, req.user.userId);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async findMyGames(@Request() req: any) {
+    return this.gamesService.findMyGames(req.user.userId);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async findOne(@Param('id') gameId: string) {
+    return this.gamesService.findOne(gameId);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateGame(
+    @Request() req: any,
+    @Param('id') gameId: string,
+    @Body() dto: UpdateGameDto,
+  ) {
+    return this.gamesService.updateGame(gameId, dto, req.user.userId);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async deleteGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.deleteGame(gameId, req.user.userId);
+  }
+
+  @Post(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  async cancelGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.cancelGame(gameId, req.user.userId);
+  }
+
+  @Post(':id/reschedule')
+  @UseGuards(JwtAuthGuard)
+  async rescheduleGame(
+    @Request() req: any,
+    @Param('id') gameId: string,
+    @Body() body: { date: string; time: string },
+  ) {
+    return this.gamesService.rescheduleGame(gameId, req.user.userId, body.date, body.time);
+  }
+
+  @Post(':id/publish')
+  @UseGuards(JwtAuthGuard)
+  async publishGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.publishGame(gameId, req.user.userId);
+  }
+
+  @Post(':id/open-registration')
+  @UseGuards(JwtAuthGuard)
+  async openRegistration(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.openRegistration(gameId, req.user.userId);
+  }
+
+  @Post(':id/close-registration')
+  @UseGuards(JwtAuthGuard)
+  async closeRegistration(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.closeRegistration(gameId, req.user.userId);
+  }
+
+  @Post(':id/start')
+  @UseGuards(JwtAuthGuard)
+  async startGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.startGame(gameId, req.user.userId);
+  }
+
+  @Get(':id/can-start')
+  @UseGuards(JwtAuthGuard)
+  async canStart(@Param('id') gameId: string) {
+    return this.gamesService.canStart(gameId);
+  }
+
+  @Get(':id/timer')
+  @UseGuards(JwtAuthGuard)
+  async getTimer(@Param('id') gameId: string) {
+    return this.gamesService.getTimer(gameId);
+  }
+
+  @Post(':id/finish')
+  @UseGuards(JwtAuthGuard)
+  async finishGame(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.finishGame(gameId, req.user.userId);
+  }
+
+  @Post(':id/submit')
+  @UseGuards(JwtAuthGuard)
+  async submitForModeration(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.submitForModeration(gameId, req.user.userId);
+  }
+
+  // @Post(':id/upload-cover')
+  // @UseGuards(JwtAuthGuard)
+  // @UseInterceptors(
+  //   FileInterceptor('file', {
+  //     storage: diskStorage({
+  //       destination: './public/uploads/covers',
+  //       filename: (_req: any, file: DiskStorageFile, callback: FileCallback) => {
+  //         const ext = extname(file.originalname);
+  //         const filename = `${uuidv4()}${ext}`;
+  //         callback(null, filename);
+  //       },
+  //     }),
+  //     fileFilter: (_req: any, file: DiskStorageFile, callback: (error: Error | null, acceptFile: boolean) => void) => {
+  //       const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  //       if (allowedMimeTypes.includes(file.mimetype)) {
+  //         callback(null, true);
+  //       } else {
+  //         callback(new ForbiddenException('Разрешены только изображения: jpg, png, webp'), false);
+  //       }
+  //     },
+  //     limits: {
+  //       fileSize: 5 * 1024 * 1024, // 5 MB
+  //     },
+  //   }),
+  // )
+  // async uploadCover(
+  //   @Request() req: any,
+  //   @Param('id') gameId: string,
+  //   @UploadedFile() file: Express.Multer.File,
+  // ) {
+  //   return this.gamesService.uploadCover(req.user.userId, gameId, file);
+  // }
+
+  // ============================================================
+  // 29.4. Админские эндпоинты (ADMIN/MODERATOR only)
+  // ============================================================
+
+  @Get('admin/pending')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async findPendingGames() {
+    return this.gamesService.findPendingGames();
+  }
+
+  @Post('admin/:id/approve')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async approveGame(@Param('id') gameId: string, @Request() req: any) {
+    return this.gamesService.approveGame(gameId, req.user.userId);
+  }
+
+  @Post('admin/:id/reject')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async rejectGame(
+    @Param('id') gameId: string,
+    @Body() body: { reason: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.rejectGame(gameId, req.user.userId, body.reason);
   }
 }
