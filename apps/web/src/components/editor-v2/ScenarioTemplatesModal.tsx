@@ -6,9 +6,10 @@ import { getResolvedTemplates, ScenarioTemplate } from '@/lib/scenario-templates
 interface ScenarioTemplatesModalProps {
   onSelect: (template: ScenarioTemplate) => void;
   onClose: () => void;
+  onDontShowAgain?: () => void;
 }
 
-export default function ScenarioTemplatesModal({ onSelect, onClose }: ScenarioTemplatesModalProps) {
+export default function ScenarioTemplatesModal({ onSelect, onClose, onDontShowAgain }: ScenarioTemplatesModalProps) {
   const [templates] = useState(() => getResolvedTemplates());
 
   return (
@@ -42,9 +43,23 @@ export default function ScenarioTemplatesModal({ onSelect, onClose }: ScenarioTe
 
         {/* Footer */}
         <div className="p-4 border-t border-border flex justify-between items-center">
-          <button onClick={onClose} className="btn-secondary text-sm">
-            Начать с пустого
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="btn-secondary text-sm">
+              Начать с пустого
+            </button>
+            {onDontShowAgain && (
+              <button
+                onClick={() => {
+                  onDontShowAgain();
+                  onClose();
+                }}
+                className="text-[11px] text-text-secondary hover:text-text-primary transition-colors px-2 py-1 rounded hover:bg-background-modifier-hover"
+                title="Больше не показывать это окно при создании нового сценария"
+              >
+                🙈 Больше не показывать
+              </button>
+            )}
+          </div>
           <p className="text-[11px] text-text-secondary">
             💡 Шаблоны можно менять как угодно после создания
           </p>

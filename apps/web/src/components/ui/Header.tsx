@@ -14,6 +14,8 @@ import ThemeSwitcher from '@/components/header/ThemeSwitcher';
 import LanguageSwitcher from '@/components/header/LanguageSwitcher';
 import UserMenu from '@/components/header/UserMenu';
 
+const API_BASE = '/api';
+
 interface HeaderProps {
   systemStatus?: SystemStatus | null;
   featureFlags?: {
@@ -28,6 +30,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const [searchOpen, setSearchOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userTier, setUserTier] = useState<string | null>(null);
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -43,12 +46,32 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
       }
     }
 
+    async function loadUserTier() {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/billing/limits`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const data = json.data || json;
+          setUserTier(data.tier);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     if (token) {
       loadProfile();
+      loadUserTier();
     } else {
       setLoading(false);
     }
   }, [pathname]);
+
+  const isFreeTier = userTier === 'FREE' || userTier === null;
 
   // Закрываем мобильное меню при смене страницы
   useEffect(() => {
@@ -186,6 +209,20 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
             {/* Right: Actions */}
             <div className="flex items-center gap-1">
+              {/* PRO Button — только для авторизованных */}
+              {user && (
+                <Link
+                  href="/upgrade"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 mr-1 ${
+                    isFreeTier
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm hover:shadow-md hover:from-amber-600 hover:to-yellow-600 animate-pulse-slow'
+                      : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                  }`}
+                >
+                  <span>💎</span>
+                  <span className="hidden sm:inline">PRO</span>
+                </Link>
+              )}
               {/* Search */}
               {featureFlags.search && (
                 <>

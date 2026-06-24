@@ -18,6 +18,7 @@ import { HomeModule } from './modules/home/home.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { ActivityFeedModule } from './modules/activity-feed/activity-feed.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -53,6 +54,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     NotificationsModule,
     AchievementsModule,
     ActivityFeedModule,
+    BillingModule,
     EngineModule,
   ],
   controllers: [AppController],

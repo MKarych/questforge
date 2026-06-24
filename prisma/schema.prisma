@@ -103,6 +103,9 @@ model User {
   gameQuestions          GameQuestion[]
   notifications          Notification[]
   achievements           UserAchievement[]
+  userLimits             UserLimits?
+  ledgerEntries          LedgerEntry[]
+  payments               Payment[]
 
   @@index([email])
   @@index([username])
@@ -783,8 +786,99 @@ model OrganizerApplication {
 }
 
 // ============================================================
+// USER LIMITS (Entitlements / Монетизация)
+// ============================================================
+
+model UserLimits {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  tier      Tier     @default(FREE)
+
+  // AI-помощник
+  aiGenerationsToday Int  @default(0) @map("ai_generations_today")
+  aiGenerationsLimit Int  @default(3) @map("ai_generations_limit")
+  aiGenerationsResetAt DateTime? @map("ai_generations_reset_at")
+
+  // Лимиты организатора
+  gamesLimit Int @default(1) @map("games_limit")
+  teamsLimit Int @default(10) @map("teams_limit")
+
+  // Аналитика
+  analyticsLevel String @default("basic") @map("analytics_level") @db.VarChar(20)
+
+  // Доступ к маркетплейсу
+  marketplaceAccess Boolean @default(false) @map("marketplace_access")
+  exportEnabled     Boolean @default(false) @map("export_enabled")
+
+  // Срок действия тарифа
+  expiresAt DateTime? @map("expires_at")
+
+  // Audit
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("user_limits")
+}
+
+// ============================================================
+// BILLING LEDGER (Финансовая книга — v2)
+// ============================================================
+
+model LedgerEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(50) // payment | refund | payout | commission | adjustment
+  amount    Decimal  @db.Decimal(10, 2)
+  currency  String   @default("RUB") @db.VarChar(10)
+  relatedId String?  @map("related_id") @db.VarChar(255)
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("ledger_entries")
+}
+
+// ============================================================
+// PAYMENT (Платежи — v2 full)
+// ============================================================
+
+model Payment {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  tier          Tier
+  amount        Decimal   @db.Decimal(10, 2)
+  currency      String    @default("RUB") @db.VarChar(10)
+  status        String    @default("pending") @db.VarChar(50) // pending | paid | failed | refunded
+  provider      String?   @db.VarChar(50) // stripe | yookassa | test
+  providerId    String?   @map("provider_id") @db.VarChar(255)
+  paidAt        DateTime? @map("paid_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+// ============================================================
 // ENUMS
 // ============================================================
+
+enum Tier {
+  FREE
+  PRO
+  BUSINESS
+}
 
 enum Role {
   PLAYER

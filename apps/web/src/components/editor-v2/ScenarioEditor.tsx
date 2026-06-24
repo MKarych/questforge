@@ -170,6 +170,7 @@ function ScenarioEditorInner({
   const store = useEditorStore();
   const initialized = useRef(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showTemplatesOnStart, setShowTemplatesOnStart] = useState(true);
 
   // Initialize store with initial data
   useEffect(() => {
@@ -185,6 +186,23 @@ function ScenarioEditorInner({
     if (scenarioId) {
       store.setScenarioId(scenarioId);
     }
+  }, []);
+
+  // Load showTemplatesOnStart preference from user profile
+  useEffect(() => {
+    async function loadPreference() {
+      try {
+        const { getProfile } = await import('@/lib/api/client');
+        const response = await getProfile();
+        const user = (response as any)?.data;
+        if (user?.toolbarSettings?.showTemplatesOnStart === false) {
+          setShowTemplatesOnStart(false);
+        }
+      } catch {
+        // Use default (true)
+      }
+    }
+    loadPreference();
   }, []);
 
   // Convert Scene[] to React Flow Node[]
@@ -432,12 +450,12 @@ function ScenarioEditorInner({
     return <><span>{icon}</span><span className="ml-1">{label}</span></>;
   };
 
-  // Show templates modal on first load if empty
+  // Show templates modal on first load if empty and user hasn't disabled it
   useEffect(() => {
-    if (isEmpty && store.scenes.length === 0 && !store.showTemplates) {
+    if (isEmpty && store.scenes.length === 0 && !store.showTemplates && showTemplatesOnStart) {
       store.setShowTemplates(true);
     }
-  }, []);
+  }, [showTemplatesOnStart]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -483,11 +501,17 @@ function ScenarioEditorInner({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Validation indicator */}
+          {/* Validation indicator — кликабельный, открывает панель ошибок */}
           {hasErrors && (
-            <span className="text-[10px] text-error bg-error/10 px-1.5 py-0.5 rounded">
+            <button
+              onClick={() => {
+                store.setPanel('validation', true);
+              }}
+              className="text-[10px] text-error bg-error/10 hover:bg-error/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+              title={`${store.validationResult.errors.filter(e => e.severity === 'error').length} ошибок, ${store.validationResult.errors.filter(e => e.severity === 'warning').length} предупреждений`}
+            >
               ⚠️{store.validationResult.errors.length}
-            </span>
+            </button>
           )}
 
           <button onClick={() => { store.validate(); }}
@@ -582,11 +606,12 @@ function ScenarioEditorInner({
           </button>
 
           {/* ⚙️ Настройки панели */}
-          <button onClick={() => store.setShowToolbarSettings(true)}
-            className={tbBtn()}
+          <button
+            onClick={() => store.setShowToolbarSettings(true)}
+            className={tbBtn('relative z-10')}
             title="Настройки панели инструментов"
           >
-            ⚙️
+            {tbContent('⚙️', 'Настр')}
           </button>
 
           {/* Author Achievements */}
@@ -617,25 +642,98 @@ function ScenarioEditorInner({
         </div>
       </div>
 
-      {/* Validation Errors Bar */}
-      {hasErrors && store.openPanels.validation && (
-        <div className="bg-error/10 border-b border-error/30 px-4 py-2 max-h-32 overflow-y-auto">
-          <div className="flex items-center gap-2 text-error text-sm mb-1">
-            <span>⚠️</span>
-            <span>
-              {store.validationResult.errors.filter((e) => e.severity === 'error').length} ошибок,{' '}
-              {store.validationResult.errors.filter((e) => e.severity === 'warning').length} предупреждений
-            </span>
-          </div>
-          <div className="space-y-1">
-            {store.validationResult.errors.map((err, idx) => (
-              <div key={idx} className="text-xs text-text-secondary flex items-center gap-2">
-                <span className={err.severity === 'error' ? 'text-error' : 'text-yellow-500'}>
-                  {err.severity === 'error' ? '❌' : '⚠️'}
-                </span>
-                <span>{err.message}</span>
+      {/* Validation Modal */}
+      {store.openPanels.validation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-scale-in overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{hasErrors ? '⚠️' : '✅'}</span>
+                <h2 className="text-base font-semibold text-text-primary">
+                  {hasErrors ? 'Результаты проверки' : 'Проверка пройдена'}
+                </h2>
               </div>
-            ))}
+              <button
+                onClick={() => store.setPanel('validation', false)}
+                className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-background-modifier-hover"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {!hasErrors ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <span className="text-5xl mb-4">✅</span>
+                  <p className="text-base font-medium text-text-primary mb-1">Всё хорошо</p>
+                  <p className="text-sm text-text-secondary">Ошибок и предупреждений нет</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Errors section */}
+                  {store.validationResult.errors.filter(e => e.severity === 'error').length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-500 mb-2 flex items-center gap-1.5">
+                        <span>🔴</span>
+                        <span>Ошибки ({store.validationResult.errors.filter(e => e.severity === 'error').length})</span>
+                      </h3>
+                      <div className="space-y-1.5">
+                        {store.validationResult.errors
+                          .filter(e => e.severity === 'error')
+                          .map((err, idx) => (
+                            <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-red-500/5 border border-red-500/10">
+                              <span className="text-sm mt-0.5">❌</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary">{err.message}</p>
+                                {err.sceneId && (
+                                  <p className="text-xs text-text-secondary mt-0.5">Сцена: {err.sceneId}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warnings section */}
+                  {store.validationResult.errors.filter(e => e.severity === 'warning').length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-yellow-500 mb-2 flex items-center gap-1.5">
+                        <span>🟡</span>
+                        <span>Предупреждения ({store.validationResult.errors.filter(e => e.severity === 'warning').length})</span>
+                      </h3>
+                      <div className="space-y-1.5">
+                        {store.validationResult.errors
+                          .filter(e => e.severity === 'warning')
+                          .map((err, idx) => (
+                            <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+                              <span className="text-sm mt-0.5">⚠️</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary">{err.message}</p>
+                                {err.sceneId && (
+                                  <p className="text-xs text-text-secondary mt-0.5">Сцена: {err.sceneId}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end p-3 border-t border-border">
+              <button
+                onClick={() => store.setPanel('validation', false)}
+                className="px-4 py-2 text-sm font-medium bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -799,6 +897,20 @@ function ScenarioEditorInner({
             store.setShowTemplates(false);
             store.addAuthorAchievement('first_scenario');
           }}
+          onDontShowAgain={async () => {
+            setShowTemplatesOnStart(false);
+            try {
+              const { updateUserSettings } = await import('@/lib/api/client');
+              await updateUserSettings({
+                toolbarSettings: {
+                  ...store.toolbarSettings,
+                  showTemplatesOnStart: false,
+                },
+              });
+            } catch {
+              // Не удалось сохранить настройку
+            }
+          }}
           onClose={() => store.setShowTemplates(false)}
         />
       )}
@@ -895,6 +1007,18 @@ function ScenarioEditorInner({
             });
           }}
           onClose={() => store.setShowAiEnhance(false)}
+        />
+      )}
+
+      {/* Toolbar Settings Modal */}
+      {store.showToolbarSettings && (
+        <ToolbarSettingsModal
+          settings={store.toolbarSettings}
+          onSave={(settings) => {
+            store.setToolbarSettings(settings);
+            store.saveToolbarSettings();
+          }}
+          onClose={() => store.setShowToolbarSettings(false)}
         />
       )}
 

@@ -688,6 +688,10 @@ class ApiClient {
     return this.request<ApiResponse<User>>('/auth/me');
   }
 
+  async updateUserSettings(settings: Record<string, unknown>): Promise<ApiResponse<User>> {
+    return this.patch<ApiResponse<User>>('/users/me', settings);
+  }
+
   // ==================== Games (Public) ====================
 
   async getPublicGames(params?: {
@@ -1177,6 +1181,7 @@ export const login = (credentials: LoginRequest) => apiClient.login(credentials)
 export const register = (userData: RegisterRequest) => apiClient.register(userData);
 export const logout = () => apiClient.logout();
 export const getProfile = () => apiClient.getProfile();
+export const updateUserSettings = (settings: Record<string, unknown>) => apiClient.updateUserSettings(settings);
 
 // Teams
 export const createTeam = (data: CreateTeamRequest) => apiClient.createTeam(data);

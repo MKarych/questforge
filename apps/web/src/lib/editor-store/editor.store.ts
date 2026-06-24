@@ -123,6 +123,8 @@ export interface EditorActions {
   setShowToolbarSettings: (show: boolean) => void;
   setLivePreviewScene: (sceneId: string | null) => void;
   setToolbarSettings: (settings: ToolbarSettings) => void;
+  loadToolbarSettings: () => Promise<void>;
+  saveToolbarSettings: () => Promise<void>;
   clearAll: () => void;
   addAuthorAchievement: (achievementId: string) => void;
   dismissNewAchievements: () => void;
@@ -738,6 +740,27 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setShowToolbarSettings: (show) => set({ showToolbarSettings: show }),
   setLivePreviewScene: (sceneId) => set({ livePreviewSceneId: sceneId }),
   setToolbarSettings: (settings) => set({ toolbarSettings: settings }),
+  loadToolbarSettings: async () => {
+    try {
+      const { getProfile } = await import('@/lib/api/client');
+      const response = await getProfile();
+      const user = (response as any)?.data;
+      if (user?.toolbarSettings) {
+        set({ toolbarSettings: user.toolbarSettings });
+      }
+    } catch {
+      // Не удалось загрузить настройки — используем значения по умолчанию
+    }
+  },
+  saveToolbarSettings: async () => {
+    try {
+      const { updateUserSettings } = await import('@/lib/api/client');
+      const state = get();
+      await updateUserSettings({ toolbarSettings: state.toolbarSettings });
+    } catch {
+      // Не удалось сохранить настройки
+    }
+  },
 
   // ==================== Clear All ====================
   clearAll: () => {

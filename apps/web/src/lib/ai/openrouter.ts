@@ -1,11 +1,12 @@
 // ============================================================
 // OpenRouter AI Client
 // Используется для AI-доработки сценариев
-// Бесплатно — 3 генерации в день
+// Лимиты проверяются через API /billing/ai-check
 // ============================================================
 
 const OPENROUTER_API_KEY = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const API_BASE = '/api';
 
 const STORAGE_KEY = 'questforge_ai_usage';
 
@@ -13,6 +14,14 @@ interface AiUsageData {
   generationsUsed: number;
   date: string; // ISO date string (YYYY-MM-DD)
   lastGenerationAt: string | null;
+}
+
+interface AiCheckResult {
+  allowed: boolean;
+  remaining: number;
+  limit: number;
+  tier: string;
+  error?: string;
 }
 
 function getTodayKey(): string {
@@ -24,7 +33,6 @@ function loadUsage(): AiUsageData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw) as AiUsageData;
-      // Сброс если новый день
       if (data.date !== getTodayKey()) {
         const reset: AiUsageData = { generationsUsed: 0, date: getTodayKey(), lastGenerationAt: null };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
@@ -44,6 +52,90 @@ function saveUsage(data: AiUsageData): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+/**
+ * Получить лимиты AI-генераций через API.
+ * Если API недоступен — использует localStorage (3 генерации, FREE).
+ */
+async function fetchAiLimitsFromApi(): Promise<AiCheckResult | null> {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) return null;
+
+    const response = await fetch(`${API_BASE}/billing/ai-check`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    // TransformInterceptor оборачивает в { success, data }
+    return json.data || json;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Инкрементировать счётчик AI-генераций на сервере.
+ */
+async function incrementAiGenerationsOnServer(): Promise<boolean> {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) return false;
+
+    const response = await fetch(`${API_BASE}/billing/ai-increment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Проверить, может ли пользователь использовать AI.
+ * Сначала пытается через API, затем fallback на localStorage.
+ */
+export async function canUseAiAsync(): Promise<boolean> {
+  const apiLimits = await fetchAiLimitsFromApi();
+  if (apiLimits) {
+    return apiLimits.allowed;
+  }
+  // Fallback на localStorage
+  return getAiGenerationsRemaining() > 0;
+}
+
+/**
+ * Получить количество оставшихся генераций.
+ */
+export async function getAiGenerationsRemainingAsync(): Promise<{ remaining: number; limit: number; tier: string }> {
+  const apiLimits = await fetchAiLimitsFromApi();
+  if (apiLimits) {
+    return {
+      remaining: apiLimits.remaining,
+      limit: apiLimits.limit,
+      tier: apiLimits.tier,
+    };
+  }
+  // Fallback
+  return {
+    remaining: getAiGenerationsRemaining(),
+    limit: getAiGenerationsLimit(),
+    tier: 'FREE',
+  };
+}
+
+/**
+ * Получить лимит генераций (синхронно, из localStorage).
+ */
 export function getAiGenerationsRemaining(): number {
   const usage = loadUsage();
   return Math.max(0, 3 - usage.generationsUsed);
@@ -61,13 +153,26 @@ export function canUseAi(): boolean {
   return getAiGenerationsRemaining() > 0;
 }
 
+/**
+ * Генерация сценария через OpenRouter.
+ * Проверяет лимиты через API перед генерацией.
+ */
 export async function generateScenario(
   prompt: string,
   currentScenarioJson: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  // Проверка лимита
-  if (!canUseAi()) {
-    return { success: false, error: '❌ Лимит генераций исчерпан. Купите PRO для большего количества.' };
+  // Проверка лимита через API
+  const apiLimits = await fetchAiLimitsFromApi();
+
+  if (apiLimits) {
+    if (!apiLimits.allowed) {
+      return { success: false, error: apiLimits.error || '❌ Лимит генераций исчерпан. Купите PRO для большего количества.' };
+    }
+  } else {
+    // Fallback на localStorage
+    if (!canUseAi()) {
+      return { success: false, error: '❌ Лимит генераций исчерпан. Купите PRO для большего количества.' };
+    }
   }
 
   try {
@@ -130,11 +235,14 @@ export async function generateScenario(
 
     const parsed = JSON.parse(jsonStr);
 
-    // Сохраняем использование
+    // Сохраняем использование (локально + сервер)
     const usage = loadUsage();
     usage.generationsUsed += 1;
     usage.lastGenerationAt = new Date().toISOString();
     saveUsage(usage);
+
+    // Инкрементим на сервере
+    await incrementAiGenerationsOnServer();
 
     return { success: true, data: parsed };
   } catch (err: any) {
