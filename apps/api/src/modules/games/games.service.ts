@@ -103,7 +103,7 @@ export class GamesService {
       });
     }
 
-    // 6. Сценарий должен быть опубликован
+    // 6. Если сценарий указан — проверяем, что он существует и опубликован
     if (data.scenarioId) {
       const scenario = await this.prisma.scenario.findUnique({
         where: { id: data.scenarioId },
@@ -121,11 +121,6 @@ export class GamesService {
           message: 'Сценарий должен быть опубликован',
         });
       }
-    } else {
-      throw new BadRequestException({
-        code: 'SCENARIO_REQUIRED',
-        message: 'Нельзя создать игру без сценария',
-      });
     }
 
     // 7. Город и описание обязательны
