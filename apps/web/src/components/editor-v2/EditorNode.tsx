@@ -102,17 +102,23 @@ const EditorNodeComponent = ({ id, data, selected }: NodeProps<Scene>) => {
         </div>
       )}
 
+      {/* Handle для соединений — isConnectable={false} чтобы не перехватывать drag узла */}
+      {/* Соединения создаются через onConnect (клик на source + клик на target) с connectOnClick={true} */}
+      {/* Handle для соединений — isConnectable={false} чтобы не перехватывать drag узла */}
+      {/* Соединения создаются через onConnect (клик на source + клик на target) с connectOnClick={true} */}
       <Handle
         type="target"
         position={Position.Top}
         id={`${id}-target`}
-        className="!bg-primary !w-3 !h-3 !border-2 !border-white"
+        className="!bg-primary !w-2 !h-2 !border !border-white"
+        isConnectable={false}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id={`${id}-source`}
-        className="!bg-primary !w-3 !h-3 !border-2 !border-white"
+        className="!bg-primary !w-2 !h-2 !border !border-white"
+        isConnectable={false}
       />
     </div>
   );

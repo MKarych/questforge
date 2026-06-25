@@ -16,6 +16,7 @@ import ReactFlow, {
   Edge,
   Node,
   SelectionMode,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
@@ -231,19 +232,34 @@ function ScenarioEditorInner({
     [store.edges]
   );
 
-  // Используем store напрямую, без дублирования в useNodesState/useEdgesState
-  // Это гарантирует, что drag & drop работает корректно
+  // Используем useNodesState/useEdgesState для управления узлами в React Flow
+  // Инициализируем один раз — React Flow сам управляет состоянием узлов
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-  // Sync store -> React Flow (только при изменении количества/состава сцен, не при позиции)
+  // Синхронизация store -> React Flow ТОЛЬКО при загрузке нового сценария
+  // (когда flowKey меняется). При добавлении/удалении сцен через onDrop/onPaletteClick
+  // мы добавляем/удаляем узлы напрямую через setNodes.
+  // При drag позиция сохраняется в store через onNodeDragStop.
+  const scenesKey = useMemo(
+    () => store.scenes.map(s => `${s.id}:${s.type}`).join(','),
+    [store.scenes]
+  );
   useEffect(() => {
+    console.log('[Sync] scenesKey changed:', scenesKey, 'nodes:', rfNodes.length);
     setNodes(rfNodes);
-  }, [store.scenes.length, store.scenes.map(s => s.id).join(','), setNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenesKey, setNodes]);
 
+  const edgesKey = useMemo(
+    () => store.edges.map(e => `${e.id}:${e.source}:${e.target}`).join(','),
+    [store.edges]
+  );
   useEffect(() => {
+    console.log('[Sync] edgesKey changed:', edgesKey, 'edges:', rfEdges.length);
     setEdges(rfEdges);
-  }, [store.edges.length, store.edges.map(e => e.id).join(','), setEdges]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgesKey, setEdges]);
 
   // Auto-validate on scenes/edges change
   useEffect(() => {
@@ -354,9 +370,23 @@ function ScenarioEditorInner({
         y: event.clientY - reactFlowBounds.top - 50 + Math.floor(existingCount / 3) * 40,
       };
 
+      // Добавляем в store
       store.addScene(block.type, position, block.label);
+      // Добавляем в React Flow напрямую (useEffect сбросит позиции при drag)
+      const newScene = store.scenes[store.scenes.length - 1];
+      if (newScene) {
+        setNodes((nds) => [
+          ...nds,
+          {
+            id: newScene.id,
+            type: newScene.type,
+            position: newScene.position,
+            data: newScene,
+          },
+        ]);
+      }
     },
-    [store]
+    [store, setNodes]
   );
 
   // Добавление блока по клику из палитры
@@ -369,8 +399,21 @@ function ScenarioEditorInner({
         y: 100 + Math.floor(existingCount / 3) * 200,
       };
       store.addScene(block.type, position, block.label);
+      // Добавляем в React Flow напрямую
+      const newScene = store.scenes[store.scenes.length - 1];
+      if (newScene) {
+        setNodes((nds) => [
+          ...nds,
+          {
+            id: newScene.id,
+            type: newScene.type,
+            position: newScene.position,
+            data: newScene,
+          },
+        ]);
+      }
     },
-    [store]
+    [store, setNodes]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -399,6 +442,14 @@ function ScenarioEditorInner({
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       store.setLivePreviewScene(node.id);
+    },
+    [store]
+  );
+
+  // Сохраняем финальную позицию узла после завершения drag
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      store.moveScene(node.id, node.position);
     },
     [store]
   );
@@ -783,14 +834,12 @@ function ScenarioEditorInner({
             nodesDraggable={true}
             elementsSelectable={true}
             nodeDragThreshold={1}
+            connectOnClick={true}
+            connectionMode={ConnectionMode.Strict}
+            // Handle имеет isConnectable={false} — соединения только через onConnect
             onNodesChange={(changes) => {
               onNodesChange(changes);
-              // Sync position changes back to store
-              for (const change of changes) {
-                if (change.type === 'position' && change.position && change.id) {
-                  store.moveScene(change.id, change.position);
-                }
-              }
+              // НЕ синхронизируем позицию здесь — финальная позиция в onNodeDragStop
             }}
             onEdgesChange={(changes) => {
               onEdgesChange(changes);
@@ -804,6 +853,7 @@ function ScenarioEditorInner({
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
+            onNodeDragStop={onNodeDragStop}
             onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
