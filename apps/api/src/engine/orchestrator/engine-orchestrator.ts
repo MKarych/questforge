@@ -566,28 +566,83 @@ export class EngineOrchestrator {
       include: { scenario: true },
     });
 
-    if (!game?.scenario) return null;
+    if (!game) {
+      this.logger.warn(`loadNode: game ${gameId} not found`);
+      return null;
+    }
+
+    if (!game.scenario) {
+      this.logger.warn(`loadNode: game ${gameId} has no scenario attached`);
+      return null;
+    }
+
+    this.logger.debug(
+      `loadNode: game=${gameId}, scenario=${game.scenario.id}, nodes type=${typeof game.scenario.nodes}`,
+    );
 
     const nodes = this.parseNodes(game.scenario.nodes);
-    return nodes.find((n) => n.id === nodeId) || null;
+    this.logger.debug(`loadNode: parsed ${nodes.length} nodes, looking for nodeId=${nodeId}`);
+
+    const found = nodes.find((n) => n.id === nodeId) || null;
+    if (!found) {
+      this.logger.warn(
+        `loadNode: node ${nodeId} not found among ${nodes.length} nodes in game ${gameId}`,
+      );
+    }
+
+    return found;
   }
 
   private parseNodes(nodes: unknown): ScenarioNode[] {
-    if (!nodes) return [];
-    if (Array.isArray(nodes)) return nodes as ScenarioNode[];
+    if (!nodes) {
+      this.logger.warn(`parseNodes: nodes is null/undefined`);
+      return [];
+    }
+
+    // Case 1: Already an array
+    if (Array.isArray(nodes)) {
+      this.logger.debug(`parseNodes: array (${nodes.length} nodes)`);
+      return nodes as ScenarioNode[];
+    }
+
+    // Case 2: JSON string
     if (typeof nodes === 'string') {
       try {
-        return JSON.parse(nodes);
-      } catch {
+        const parsed = JSON.parse(nodes);
+        if (Array.isArray(parsed)) {
+          this.logger.debug(`parseNodes: parsed string -> array (${parsed.length} nodes)`);
+          return parsed as ScenarioNode[];
+        }
+        this.logger.warn(`parseNodes: parsed string is not array, type=${typeof parsed}`);
+        return [];
+      } catch (e) {
+        this.logger.warn(`parseNodes: failed to parse JSON string: ${(e as Error).message}`);
         return [];
       }
     }
+
+    // Case 3: Plain object (may contain nodes array or be a serialized wrapper)
     if (typeof nodes === 'object') {
       const obj = nodes as Record<string, unknown>;
-      return Array.isArray(obj.nodes)
-        ? (obj.nodes as ScenarioNode[])
-        : (obj as unknown as ScenarioNode[]);
+
+      // Check for wrapped format: { nodes: [...] }
+      if (obj.nodes && Array.isArray(obj.nodes)) {
+        this.logger.debug(`parseNodes: object with .nodes array (${obj.nodes.length} nodes)`);
+        return obj.nodes as ScenarioNode[];
+      }
+
+      // Check if object has numeric keys (array-like object from serialization)
+      const keys = Object.keys(obj);
+      if (keys.length > 0 && keys.every((k) => /^\d+$/.test(k))) {
+        this.logger.debug(`parseNodes: array-like object with ${keys.length} items`);
+        return Object.values(obj) as ScenarioNode[];
+      }
+
+      this.logger.warn(`parseNodes: unknown object format, keys=${keys.join(',')}`);
+      return [];
     }
+
+    this.logger.warn(`parseNodes: unexpected type=${typeof nodes}`);
     return [];
   }
 
