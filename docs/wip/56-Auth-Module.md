@@ -122,12 +122,40 @@ AuthService.verifyEmail(token: string)
 
 Эндпоинт: GET /auth/verify-email?token=...
 
-3.5. Эндпоинты API
+3.5. Обновление токена (Refresh Token)
+AuthService.refreshToken(refreshToken: string)
+
+Проверить refreshToken в JWT
+Если невалиден — ошибка 401
+Сгенерировать новые access и refresh токены
+Вернуть { token, refreshToken }
+
+Эндпоинт: POST /auth/refresh
+
+Тело: { refreshToken: string }
+
+3.6. Запрос на сброс пароля (Forgot Password)
+AuthService.forgotPassword(email: string)
+
+Найти пользователя по email
+Сгенерировать resetToken (crypto.randomBytes)
+Сохранить токен (заглушка — пока только лог в консоль)
+Вернуть сообщение об успехе (даже если пользователь не найден — в целях безопасности)
+
+Эндпоинт: POST /auth/forgot-password
+
+Тело: { email: string }
+
+Ответ: { message: "Если аккаунт с таким email существует, мы отправили ссылку для восстановления пароля" }
+
+3.7. Эндпоинты API
 Метод	URL	Описание	Тело запроса
 POST	/auth/register	Регистрация	RegisterDto
 POST	/auth/login	Логин	LoginDto
 GET	/auth/verify-email	Подтверждение почты	?token=...
+POST	/auth/refresh	Обновление access токена	{ refreshToken }
 GET	/auth/me	Текущий пользователь (JWT)	—
+POST	/auth/forgot-password	Запрос на сброс пароля	{ email }
 POST	/auth/logout	Выход	—
 4. Фронтенд (Next.js)
 4.1. Страница регистрации (/auth/register)

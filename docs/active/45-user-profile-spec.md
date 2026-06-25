@@ -35,50 +35,81 @@ markdown
 
 ```typescript
 interface Identity {
-  uuid: string;              // UUID v7
-  username: string;          // @alex_quest
-  slug: string;              // alex-quest
+  uuid: string;              // UUID (PostgreSQL)
+  username: string;          // Уникальный логин
+  slug: string;              // alex-quest (URL-friendly)
   email: string;             // Уникальный
-  roles: Role[];             // PLAYER, AUTHOR, ORGANIZER
-  status: AccountStatus;     // ACTIVE, BANNED, DELETED
-  verified: Verification;    // email, phone, telegram
+  roles: Role[];             // PLAYER, AUTHOR, ORGANIZER, ADMIN, MODERATOR
+  status: UserStatus;        // ACTIVE, INACTIVE, BANNED
+  verified: Json;            // { email: bool, phone: bool, telegram: bool }
+  isEmailVerified: boolean;  // Отдельное поле для email
+  verificationToken: string; // Токен верификации email
   createdAt: Date;
   version: number;           // Для optimistic locking
 }
-4. Profile (Изменяемая часть)
-typescript
+```
+
+## 4. Profile (Хранится в JSON-поле `profile`)
+
+```typescript
 interface Profile {
   avatar: string;            // URL на S3/MinIO
-  bio: string;              // 500 символов
+  bio: string;              // О себе
   city: string;
-  socialLinks: SocialLinks;  // TG, VK, Discord, YouTube, GitHub
-  favorites: Favorites;      // Избранные игры, сценарии, авторы
-  lastSeenAt: Date;
+  socialLinks: {             // { tg?: string, vk?: string, discord?: string, youtube?: string, github?: string }
+    tg?: string;
+    vk?: string;
+    discord?: string;
+    youtube?: string;
+    github?: string;
+  };
+  favorites: {               // { games?: string[], scenarios?: string[], authors?: string[] }
+    games?: string[];
+    scenarios?: string[];
+    authors?: string[];
+  };
   metadata: Record<string, unknown>; // Произвольные данные
 }
-5. Settings и Security (Инфраструктурные сущности)
-5.1. Settings
-typescript
+```
+
+## 5. Settings и Security (Хранятся в JSON-полях)
+
+### 5.1. Settings (JSON-поле `settings`)
+
+```typescript
 interface Settings {
   language: 'ru' | 'en';
-  timezone: string;
+  timezone: string;          // Europe/Moscow
   theme: 'dark' | 'light';
-  notifications: NotificationSettings; // email, telegram, push
-  privacy: PrivacySettings;            // Кто видит город, контакты, игры
+  notifications: {           // { email?: boolean, telegram?: boolean, push?: boolean }
+    email?: boolean;
+    telegram?: boolean;
+    push?: boolean;
+  };
+  privacy: {                 // { showCity?: boolean, showContacts?: boolean, showStats?: boolean, showAchievements?: boolean }
+    showCity?: boolean;
+    showContacts?: boolean;
+    showStats?: boolean;
+    showAchievements?: boolean;
+  };
 }
-5.2. Security
-typescript
+```
+
+### 5.2. Security (JSON-поле `security`)
+
+```typescript
 interface Security {
-  passwordHash: string;
   lastLoginAt: Date;
   failedLoginAttempts: number;
-  activeSessions: Session[];
-  trustedDevices: Device[];
   passwordChangedAt: Date;
+  trustedDevices: Device[];  // [{ deviceId, userAgent, lastActive }]
 }
-6. Reputation (Вычисляется системой)
-typescript
-interface Reputation {
+```
+
+## 6. Reputation (Хранится в JSON-поле `reputationData`)
+
+```typescript
+interface ReputationData {
   rating: number;            // 4.9
   trustScore: number;        // 0-100%
   reviewsCount: number;
@@ -86,42 +117,38 @@ interface Reputation {
   completedGames: number;
   achievements: Achievement[];
 }
-7. AI Profile (Метаданные для агентов)
+```
+
+## 7. AI Profile (JSON-поле `aiProfile`)
+
 Этот раздел — самый важный для будущего. Агенты будут читать его, чтобы персонализировать работу.
 
-typescript
+```typescript
 interface AIProfile {
-  preferences: AIPreferences;
-  memory: AIMemory;
-  history: AIHistory;
-  context: AIContext;
+  preferences: {             // { genres?: string[], averageTeamSize?: number, averageGameDuration?: number, favoriteDifficulty?: 'easy' | 'medium' | 'hard' }
+    genres?: string[];
+    averageTeamSize?: number;
+    averageGameDuration?: number;
+    favoriteDifficulty?: 'easy' | 'medium' | 'hard';
+  };
+  memory: {                  // { knownFacts?: string[], lastConversation?: string, memoryVersion?: number }
+    knownFacts?: string[];
+    lastConversation?: string;
+    memoryVersion?: number;
+  };
+  history: {                 // { recommendedScenarios?: string[], previousActions?: string[], feedback?: string[] }
+    recommendedScenarios?: string[];
+    previousActions?: string[];
+    feedback?: string[];
+  };
+  context: {                 // { lastAgentAction?: string, activeGoals?: string[], personality?: string }
+    lastAgentAction?: string;
+    activeGoals?: string[];
+    personality?: string;
+  };
   embeddings: number[];
 }
-
-interface AIPreferences {
-  genres: string[];
-  averageTeamSize: number;
-  averageGameDuration: number;
-  favoriteDifficulty: 'easy' | 'medium' | 'hard';
-}
-
-interface AIMemory {
-  knownFacts: string[];
-  lastConversation: string;
-  memoryVersion: number;
-}
-
-interface AIHistory {
-  recommendedScenarios: string[];
-  previousActions: string[];
-  feedback: string[];
-}
-
-interface AIContext {
-  lastAgentAction: string;
-  activeGoals: string[];
-  personality: string;
-}
+```
 8. Domain Events
 Каждое изменение публикует событие.
 
