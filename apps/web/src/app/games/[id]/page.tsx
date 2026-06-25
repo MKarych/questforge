@@ -8,6 +8,10 @@ import {
   getPublicGame,
   getMyTeams,
   registerTeam,
+  registerTeamByName,
+  addReview,
+  startGame,
+  getGameRegistrations,
   getPublicComments,
   addPublicComment,
   deletePublicComment,
@@ -47,6 +51,21 @@ export default function GameDetailsPage() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  // Register by name state
+  const [teamName, setTeamName] = useState('');
+  const [registeringByName, setRegisteringByName] = useState(false);
+
+  // Review state
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+
+  // Organizer state
+  const [registrations, setRegistrations] = useState<Array<{ teamId: string; team: { id: string; name: string; slug: string; avatar: string | null }; status: string; readyAt: string | null; registeredAt: string }>>([]);
+  const [startingGame, setStartingGame] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const gameId = params.id;
 
@@ -105,6 +124,79 @@ export default function GameDetailsPage() {
     loadGame();
     loadComments();
   }, [gameId, loadComments]);
+
+  // Load registrations if user is organizer
+  useEffect(() => {
+    if (game && currentUser && game.organizer.id === currentUser.id) {
+      loadRegistrations();
+    }
+  }, [game, currentUser]);
+
+  const loadRegistrations = async () => {
+    if (!game) return;
+    try {
+      const response = await getGameRegistrations(game.id);
+      setRegistrations(response.data || []);
+    } catch {
+      // Not available
+    }
+  };
+
+  const handleRegisterByName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamName.trim() || !game) return;
+
+    setRegisteringByName(true);
+    setError(null);
+    try {
+      const response = await registerTeamByName(game.id, teamName.trim());
+      setSuccess(`Команда "${response.data.team.name}" зарегистрирована на игру!`);
+      setTeamName('');
+      // Reload registrations
+      loadRegistrations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка регистрации команды');
+    } finally {
+      setRegisteringByName(false);
+    }
+  };
+
+  const handleAddReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!game) return;
+
+    setSubmittingReview(true);
+    setError(null);
+    try {
+      await addReview(game.id, reviewRating, reviewText.trim() || undefined);
+      setReviewSuccess('Отзыв оставлен! Спасибо!');
+      setReviewRating(5);
+      setReviewText('');
+      // Reload game to show new review
+      const response = await getPublicGame(game.id);
+      setGame(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка при отправке отзыва');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleStartGame = async () => {
+    if (!game) return;
+
+    setStartingGame(true);
+    setStartError(null);
+    try {
+      const response = await startGame(game.id);
+      setGame((prev) => prev ? { ...prev, status: response.data.status } : prev);
+      setSuccess('Игра запущена!');
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Ошибка запуска игры');
+    } finally {
+      setStartingGame(false);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,26 +426,84 @@ export default function GameDetailsPage() {
               <p className="text-text-secondary">{game.description || 'Описание игры'}</p>
             </div>
 
-            {/* Reviews */}
-            {game.reviews.length > 0 && (
+            {/* Reviews — только после завершения игры */}
+            {game.status === 'FINISHED' && (
               <div className="mt-8">
                 <h2 className="text-xl font-semibold mb-4 text-text-primary">Отзывы</h2>
-                <div className="space-y-4">
-                  {game.reviews.map((review) => (
-                    <div key={review.id} className="card">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-text-primary">{review.user.name}</span>
-                        <div className="flex items-center gap-1 text-warning">
-                          <span>★</span>
-                          <span className="font-medium">{review.rating}</span>
-                        </div>
+                
+                {/* Форма добавления отзыва (для участников, не организатора) */}
+                {currentUser && game.organizer.id !== currentUser.id && (
+                  <form onSubmit={handleAddReview} className="card p-4 mb-6">
+                    <h3 className="font-medium text-text-primary mb-3">Оставить отзыв</h3>
+                    
+                    {reviewSuccess && (
+                      <div className="p-3 rounded-lg bg-success/10 text-success text-sm mb-3">
+                        {reviewSuccess}
                       </div>
-                      {review.text && (
-                        <p className="text-text-secondary text-sm">{review.text}</p>
-                      )}
+                    )}
+                    
+                    <div className="mb-3">
+                      <label className="label">Оценка</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className={`text-2xl transition-colors ${
+                              star <= reviewRating ? 'text-warning' : 'text-text-muted'
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    
+                    <div className="mb-3">
+                      <label className="label">Комментарий (необязательно)</label>
+                      <textarea
+                        value={reviewText}
+                        onChange={(e) => setReviewText(e.target.value)}
+                        placeholder="Поделитесь впечатлениями об игре..."
+                        className="input-field min-h-[80px] resize-y"
+                        maxLength={2000}
+                      />
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="btn-primary disabled:opacity-50"
+                    >
+                      {submittingReview ? 'Отправка...' : 'Отправить отзыв'}
+                    </button>
+                  </form>
+                )}
+                
+                {/* Список отзывов */}
+                {game.reviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {game.reviews.map((review) => (
+                      <div key={review.id} className="card">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-text-primary">{review.user.name}</span>
+                          <div className="flex items-center gap-1 text-warning">
+                            <span>★</span>
+                            <span className="font-medium">{review.rating}</span>
+                          </div>
+                        </div>
+                        {review.text && (
+                          <p className="text-text-secondary text-sm">{review.text}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-text-muted text-center py-4">
+                    Пока нет отзывов. Будьте первым!
+                  </p>
+                )}
               </div>
             )}
 
@@ -529,72 +679,170 @@ export default function GameDetailsPage() {
                   </svg>
                   <span className="text-sm">{game.organizer.name}</span>
                 </div>
+                <div className="flex items-center gap-2 text-text-secondary">
+                  <span className="text-lg">📋</span>
+                  <span className="text-sm">{game.status === 'REGISTRATION_OPEN' ? 'Регистрация открыта' : game.status === 'RUNNING' ? 'Идёт игра' : game.status === 'FINISHED' ? 'Завершена' : game.status === 'LOBBY' ? 'Ожидание старта' : game.status}</span>
+                </div>
               </div>
 
-              {success ? (
-                <div className="text-center">
-                  <div className="p-3 rounded-lg bg-success/10 text-success text-sm mb-3">
-                    {success}
-                  </div>
-                  <p className="text-text-secondary text-xs">
-                    Перенаправление в лобби...
-                  </p>
-                </div>
-              ) : myTeams.length > 0 ? (
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div>
-                    <label className="label">Выберите команду</label>
-                    <select
-                      value={selectedTeamId}
-                      onChange={(e) => setSelectedTeamId(e.target.value)}
-                      className="input-field"
-                      required
-                    >
-                      <option value="">-- Выберите команду --</option>
-                      {myTeams.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name} {team.myRole === 'captain' ? '👑' : ''} ({team.membersCount} уч.)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {error && (
-                    <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
-                      {error}
+              {/* Блок организатора */}
+              {currentUser && game.organizer.id === currentUser.id && (
+                <div className="mb-6 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                  <h3 className="font-medium text-text-primary text-sm mb-2">👑 Панель организатора</h3>
+                  
+                  {/* Список зарегистрированных команд */}
+                  {registrations.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-text-secondary mb-1">Команды ({registrations.length}):</p>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {registrations.map((reg) => (
+                          <div key={reg.teamId} className="flex items-center justify-between text-xs p-1.5 rounded bg-surface">
+                            <span className="text-text-primary truncate">{reg.team.name}</span>
+                            <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] ${
+                              reg.status === 'READY' ? 'bg-success/20 text-success' : 'bg-text-muted/20 text-text-muted'
+                            }`}>
+                              {reg.status === 'READY' ? 'Готовы' : 'Ожидание'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={joining || !selectedTeamId}
-                    className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {joining ? 'Регистрация...' : 'Зарегистрироваться на игру'}
-                  </button>
-
-                  <div className="text-center">
-                    <Link
-                      href="/teams/create"
-                      className="text-primary hover:text-primary-hover text-sm"
-                    >
-                      + Создать новую команду
-                    </Link>
-                  </div>
-                </form>
-              ) : (
-                <div className="text-center space-y-4">
-                  <p className="text-text-secondary text-sm">
-                    У вас пока нет команд. Создайте команду, чтобы участвовать в игре.
-                  </p>
-                  <Link
-                    href="/teams/create"
-                    className="btn-primary w-full inline-block"
-                  >
-                    Создать команду
-                  </Link>
+                  
+                  {/* Кнопка запуска игры */}
+                  {(game.status === 'LOBBY' || game.status === 'REGISTRATION_OPEN' || game.status === 'REGISTRATION_CLOSED') && (
+                    <div>
+                      {startError && (
+                        <div className="p-2 rounded bg-error/10 text-error text-xs mb-2">
+                          {startError}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleStartGame}
+                        disabled={startingGame || registrations.length === 0}
+                        className="btn-primary w-full text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={registrations.length === 0 ? 'Нужна хотя бы одна команда' : 'Запустить игру'}
+                      >
+                        {startingGame ? 'Запуск...' : registrations.length === 0 ? 'Нет команд для старта' : '🚀 Запустить игру'}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {game.status === 'RUNNING' && (
+                    <p className="text-xs text-success text-center">✅ Игра запущена</p>
+                  )}
+                  {game.status === 'FINISHED' && (
+                    <p className="text-xs text-text-muted text-center">📊 Игра завершена</p>
+                  )}
                 </div>
               )}
+
+              {/* Регистрация команды — для игроков, не организаторов */}
+              {!currentUser || game.organizer.id !== currentUser.id ? (
+                <>
+                  {success ? (
+                    <div className="text-center">
+                      <div className="p-3 rounded-lg bg-success/10 text-success text-sm mb-3">
+                        {success}
+                      </div>
+                      <p className="text-text-secondary text-xs">
+                        Перенаправление в лобби...
+                      </p>
+                    </div>
+                  ) : game.status === 'REGISTRATION_OPEN' ? (
+                    <div className="space-y-4">
+                      {/* Регистрация через существующую команду */}
+                      {myTeams.length > 0 && (
+                        <form onSubmit={handleRegister} className="space-y-3">
+                          <div>
+                            <label className="label">Выберите команду</label>
+                            <select
+                              value={selectedTeamId}
+                              onChange={(e) => setSelectedTeamId(e.target.value)}
+                              className="input-field"
+                              required
+                            >
+                              <option value="">-- Выберите команду --</option>
+                              {myTeams.map((team) => (
+                                <option key={team.id} value={team.id}>
+                                  {team.name} {team.myRole === 'captain' ? '👑' : ''} ({team.membersCount} уч.)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={joining || !selectedTeamId}
+                            className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {joining ? 'Регистрация...' : 'Зарегистрироваться'}
+                          </button>
+                        </form>
+                      )}
+
+                      {/* Регистрация новой команды по названию */}
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-surface" />
+                        </div>
+                        <div className="relative flex justify-center text-xs">
+                          <span className="bg-card px-2 text-text-muted">или</span>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleRegisterByName} className="space-y-3">
+                        <div>
+                          <label className="label">Название команды</label>
+                          <input
+                            type="text"
+                            value={teamName}
+                            onChange={(e) => setTeamName(e.target.value)}
+                            placeholder="Введите название команды"
+                            className="input-field"
+                            maxLength={100}
+                            required
+                          />
+                        </div>
+
+                        {error && (
+                          <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                            {error}
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={registeringByName || !teamName.trim()}
+                          className="btn-secondary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {registeringByName ? 'Регистрация...' : 'Зарегистрировать команду'}
+                        </button>
+                      </form>
+                    </div>
+                  ) : game.status === 'RUNNING' ? (
+                    <div className="text-center">
+                      <p className="text-text-secondary text-sm mb-3">Игра уже началась!</p>
+                      <Link
+                        href={`/play/${game.shareLink}`}
+                        className="btn-primary w-full inline-block"
+                      >
+                        🎮 Перейти к игре
+                      </Link>
+                    </div>
+                  ) : game.status === 'FINISHED' ? (
+                    <div className="text-center">
+                      <p className="text-text-secondary text-sm">Игра завершена</p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-text-secondary text-sm">
+                        {game.status === 'LOBBY' ? 'Ожидание старта...' : 'Регистрация скоро откроется'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : null}
 
               <p className="text-xs text-text-muted text-center mt-4">
                 Нажимая кнопку, вы соглашаетесь с правилами игры

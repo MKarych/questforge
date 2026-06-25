@@ -1262,6 +1262,18 @@ export class GamesService {
 
     validateTransition(game.status, GAME_STATUS.RUNNING);
 
+    // Проверка: минимум 1 зарегистрированная команда
+    const registrationsCount = await this.prisma.gameRegistration.count({
+      where: { gameId },
+    });
+
+    if (registrationsCount === 0) {
+      throw new BadRequestException({
+        code: 'NO_TEAMS_REGISTERED',
+        message: 'Необходимо зарегистрировать хотя бы одну команду перед запуском игры',
+      });
+    }
+
     // Вычисляем время старта: date + time
     const startTime = this.calculateStartTime(game.date, game.time);
 
@@ -1578,6 +1590,100 @@ export class GamesService {
   }
 
   /**
+   * registerTeamByName: регистрация команды по названию (создаёт новую команду).
+   * Проверки: статус REGISTRATION_OPEN, maxTeams, команда с таким названием не зарегистрирована.
+   */
+  async registerTeamByName(gameId: string, teamName: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    // Проверка: статус REGISTRATION_OPEN
+    if (game.status !== GAME_STATUS.REGISTRATION_OPEN) {
+      throw new BadRequestException({
+        code: 'REGISTRATION_CLOSED',
+        message: 'Регистрация на эту игру закрыта',
+      });
+    }
+
+    // Проверка: название команды не пустое
+    if (!teamName || teamName.trim().length === 0) {
+      throw new BadRequestException({
+        code: 'TEAM_NAME_REQUIRED',
+        message: 'Название команды обязательно',
+      });
+    }
+
+    // Проверка: maxTeams не превышен
+    const registrationsCount = await this.prisma.gameRegistration.count({
+      where: { gameId },
+    });
+    if (registrationsCount >= game.maxTeams) {
+      throw new BadRequestException({
+        code: 'GAME_FULL',
+        message: 'Все места заняты',
+      });
+    }
+
+    // Проверка: команда с таким названием уже зарегистрирована на эту игру
+    const existingTeamByName = await this.prisma.team.findFirst({
+      where: {
+        name: teamName.trim(),
+        deletedAt: null,
+        registrations: {
+          some: { gameId },
+        },
+      },
+    });
+    if (existingTeamByName) {
+      throw new BadRequestException({
+        code: 'TEAM_NAME_ALREADY_REGISTERED',
+        message: 'Команда с таким названием уже зарегистрирована на эту игру',
+      });
+    }
+
+    // Создаём новую команду
+    const slug = slugify(teamName);
+    const team = await this.prisma.team.create({
+      data: {
+        name: teamName.trim(),
+        slug,
+        captainId: userId,
+        members: {
+          create: {
+            userId,
+            role: 'CAPTAIN',
+          },
+        },
+      },
+    });
+
+    // Регистрируем команду на игру
+    const registration = await this.prisma.gameRegistration.create({
+      data: {
+        gameId,
+        teamId: team.id,
+        status: 'REGISTERED',
+      },
+      include: {
+        team: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    // Также добавляем в gameTeams
+    await this.prisma.gameTeam.create({
+      data: {
+        gameId,
+        teamId: team.id,
+      },
+    });
+
+    this.logger.log(`Team "${team.name}" (${team.id}) registered for game ${gameId} by user ${userId}`);
+
+    return registration;
+  }
+
+  /**
    * unregisterTeam: отмена регистрации команды.
    */
   async unregisterTeam(gameId: string, teamId: string, userId: string) {
@@ -1660,6 +1766,104 @@ export class GamesService {
       readyAt: r.readyAt,
       registeredAt: r.createdAt,
     }));
+  }
+
+  // ============================================================
+  // Review Methods (Раздел 1 — Отзывы)
+  // ============================================================
+
+  /**
+   * addReview: добавить отзыв на игру.
+   * Правила:
+   * - Отзыв доступен только после завершения игры (status: FINISHED)
+   * - Игроки, участвовавшие в игре, могут оставить отзыв
+   * - Организатор не может оставить отзыв на свою игру
+   */
+  async addReview(gameId: string, userId: string, rating: number, text?: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    // Проверка: игра завершена
+    if (game.status !== GAME_STATUS.FINISHED) {
+      throw new BadRequestException({
+        code: 'GAME_NOT_FINISHED',
+        message: 'Отзыв можно оставить только после завершения игры',
+      });
+    }
+
+    // Проверка: организатор не может оставить отзыв на свою игру
+    if (game.organizerId === userId) {
+      throw new ForbiddenException({
+        code: 'ORGANIZER_CANNOT_REVIEW',
+        message: 'Организатор не может оставить отзыв на свою игру',
+      });
+    }
+
+    // Проверка: пользователь участвовал в игре (через команду)
+    const userTeams = await this.prisma.teamMember.findMany({
+      where: { userId },
+      select: { teamId: true },
+    });
+
+    const userTeamIds = userTeams.map((t) => t.teamId);
+
+    if (userTeamIds.length === 0) {
+      throw new ForbiddenException({
+        code: 'NOT_PARTICIPANT',
+        message: 'Только участники игры могут оставить отзыв',
+      });
+    }
+
+    const registration = await this.prisma.gameRegistration.findFirst({
+      where: {
+        gameId,
+        teamId: { in: userTeamIds },
+      },
+    });
+
+    if (!registration) {
+      throw new ForbiddenException({
+        code: 'NOT_PARTICIPANT',
+        message: 'Только участники игры могут оставить отзыв',
+      });
+    }
+
+    // Проверка: пользователь уже оставил отзыв
+    const existingReview = await this.prisma.review.findFirst({
+      where: { gameId, userId },
+    });
+
+    if (existingReview) {
+      throw new BadRequestException({
+        code: 'ALREADY_REVIEWED',
+        message: 'Вы уже оставили отзыв на эту игру',
+      });
+    }
+
+    // Валидация рейтинга
+    if (rating < 1 || rating > 5) {
+      throw new BadRequestException({
+        code: 'INVALID_RATING',
+        message: 'Рейтинг должен быть от 1 до 5',
+      });
+    }
+
+    const review = await this.prisma.review.create({
+      data: {
+        gameId,
+        userId,
+        rating,
+        text: text || null,
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    this.logger.log(`Review added: game ${gameId} by user ${userId}, rating ${rating}`);
+
+    return review;
   }
 
   // ============================================================

@@ -234,6 +234,9 @@ export default function PlayFinishPage() {
               <Link href={`/play/${shareLink}`} className="btn-secondary">
                 🔄 Играть снова
               </Link>
+              <Link href={`/games/${shareLink}`} className="btn-secondary">
+                ⭐ Оставить отзыв
+              </Link>
               <Link href="/games" className="btn-primary">
                 🎮 Другие игры
               </Link>

@@ -326,7 +326,35 @@ export class GamesController {
   }
 
   // ============================================================
-  // 29.4. Админские эндпоинты (ADMIN/MODERATOR only)
+  // 29.4. Отзывы (Reviews)
+  // ============================================================
+
+  @Post(':id/reviews')
+  @UseGuards(JwtAuthGuard)
+  async addReview(
+    @Param('id') gameId: string,
+    @Body() body: { rating: number; text?: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.addReview(gameId, req.user.userId, body.rating, body.text);
+  }
+
+  // ============================================================
+  // 29.5. Регистрация команды по названию
+  // ============================================================
+
+  @Post(':id/register-by-name')
+  @UseGuards(JwtAuthGuard)
+  async registerTeamByName(
+    @Param('id') gameId: string,
+    @Body() body: { teamName: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.registerTeamByName(gameId, body.teamName, req.user.userId);
+  }
+
+  // ============================================================
+  // 29.6. Админские эндпоинты (ADMIN/MODERATOR only)
   // ============================================================
 
   @Get('admin/all')

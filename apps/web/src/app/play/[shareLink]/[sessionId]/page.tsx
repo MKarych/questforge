@@ -17,36 +17,6 @@ interface PlaySessionPageParams {
   sessionId: string;
 }
 
-// Mock node data - in real implementation this comes from backend
-const MOCK_NODE_DATA: Record<string, NodeData> = {
-  'node-1': {
-    id: 'node-1',
-    type: 'TEXT',
-    title: 'Первое задание',
-    description: 'Найдите код на памятнике. Посмотрите на постамент с северной стороны.',
-    timeout: 120,
-    maxAttempts: 3,
-    hints: [
-      { level: 1, text: 'Посмотрите на постамент', penalty: -2, unlockedAt: 30 },
-      { level: 2, text: 'Код выгравирован на бронзовой табличке', penalty: -5, unlockedAt: 60 },
-      { level: 3, text: 'Код состоит из 4 цифр', penalty: -10, unlockedAt: 90 },
-    ],
-  },
-  'node-2': {
-    id: 'node-2',
-    type: 'CODE',
-    title: 'Второе задание',
-    description: 'Введите координаты места, где был сделан первый снимок.',
-    timeout: 180,
-    maxAttempts: 3,
-    hints: [
-      { level: 1, text: 'Это место в центре города', penalty: -2, unlockedAt: 30 },
-      { level: 2, text: 'Рядом с главной площадью', penalty: -5, unlockedAt: 60 },
-      { level: 3, text: '55.7558, 37.6173', penalty: -10, unlockedAt: 90 },
-    ],
-  },
-};
-
 export default function PlaySessionPage() {
   const params = useParams<PlaySessionPageParams>();
   const router = useRouter();
@@ -58,7 +28,7 @@ export default function PlaySessionPage() {
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [currentNodeData, setCurrentNodeData] = useState<NodeData | null>(null);
-  const [totalNodes] = useState(10);
+  const [totalNodes, setTotalNodes] = useState(1);
   const [currentNodeIndex, setCurrentNodeIndex] = useState(1);
   const [hintPenalty, setHintPenalty] = useState(0);
   const [transitionFeedback, setTransitionFeedback] = useState<{ type: 'success' | 'error'; message: string; points: number } | null>(null);
@@ -66,25 +36,29 @@ export default function PlaySessionPage() {
   useEffect(() => {
     async function loadState() {
       try {
+        // Загружаем состояние сессии
         const response = await getSessionState(sessionId);
-        setSessionState(response.data);
+        const state = response.data;
+        setSessionState(state);
         
-        // Load node data (in real implementation from backend)
-        const nodeData = MOCK_NODE_DATA[response.data.currentNodeId] || {
-          id: response.data.currentNodeId,
-          type: 'TEXT',
-          title: `Задание`,
-          description: 'Текст задания загружается из сценария...',
-          timeout: 120,
-          maxAttempts: 3,
-          hints: [
-            { level: 1, text: 'Подсказка 1', penalty: -2, unlockedAt: 30 },
-            { level: 2, text: 'Подсказка 2', penalty: -5, unlockedAt: 60 },
-            { level: 3, text: 'Подсказка 3', penalty: -10, unlockedAt: 90 },
+        // Создаём NodeData из состояния сессии (если есть currentNode)
+        const nodeData: NodeData = {
+          id: state.currentNodeId,
+          type: (state as any).currentNodeType || 'TEXT',
+          title: (state as any).currentNodeTitle || `Задание ${state.history.length + 1}`,
+          description: (state as any).currentNodeDescription || 'Загрузка задания...',
+          timeout: (state as any).currentNodeTimeout || 120,
+          maxAttempts: (state as any).currentNodeMaxAttempts || 3,
+          hints: (state as any).currentNodeHints || [
+            { level: 1, text: 'Используйте подсказку', penalty: -2, unlockedAt: 30 },
+            { level: 2, text: 'Подумайте ещё', penalty: -5, unlockedAt: 60 },
+            { level: 3, text: 'Ответ: попробуйте поискать вокруг', penalty: -10, unlockedAt: 90 },
           ],
         };
         
         setCurrentNodeData(nodeData);
+        setTotalNodes(Math.max(state.history.length + 1, (state as any).totalNodes || 1));
+        setCurrentNodeIndex(state.history.length + 1);
       } catch (err) {
         console.error('Failed to load session state:', err);
       } finally {

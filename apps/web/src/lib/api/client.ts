@@ -1038,6 +1038,30 @@ class ApiClient {
     });
   }
 
+  async registerTeamByName(gameId: string, teamName: string): Promise<ApiResponse<{ id: string; teamId: string; gameId: string; team: { id: string; name: string; slug: string }; status: string }>> {
+    return this.request(`/games/${gameId}/register-by-name`, {
+      method: 'POST',
+      body: JSON.stringify({ teamName }),
+    });
+  }
+
+  async addReview(gameId: string, rating: number, text?: string): Promise<ApiResponse<{ id: string; rating: number; text: string | null; createdAt: string; user: { id: string; name: string; avatarUrl: string | null } }>> {
+    return this.request(`/games/${gameId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, text }),
+    });
+  }
+
+  async startGame(gameId: string): Promise<ApiResponse<{ id: string; status: string; startedAt: string }>> {
+    return this.request(`/games/${gameId}/start`, {
+      method: 'POST',
+    });
+  }
+
+  async getGameRegistrations(gameId: string): Promise<ApiResponse<Array<{ teamId: string; team: { id: string; name: string; slug: string; avatar: string | null }; status: string; readyAt: string | null; registeredAt: string }>>> {
+    return this.request(`/games/${gameId}/teams-status`);
+  }
+
   // ==================== Admin ====================
 
   async getAdminStats(): Promise<ApiResponse<{
@@ -1307,6 +1331,10 @@ export const removeMember = (teamId: string, userId: string) => apiClient.remove
 export const getMyTeam = () => apiClient.getMyTeam();
 export const getMyTeams = () => apiClient.getMyTeams();
 export const registerTeam = (gameId: string, teamId: string) => apiClient.registerTeam(gameId, teamId);
+export const registerTeamByName = (gameId: string, teamName: string) => apiClient.registerTeamByName(gameId, teamName);
+export const addReview = (gameId: string, rating: number, text?: string) => apiClient.addReview(gameId, rating, text);
+export const startGame = (gameId: string) => apiClient.startGame(gameId);
+export const getGameRegistrations = (gameId: string) => apiClient.getGameRegistrations(gameId);
 export const getPublicComments = (gameId: string, limit?: number, offset?: number) => apiClient.getPublicComments(gameId, limit, offset);
 export const addPublicComment = (gameId: string, text: string) => apiClient.addPublicComment(gameId, text);
 export const deletePublicComment = (gameId: string, commentId: string) => apiClient.deletePublicComment(gameId, commentId);
