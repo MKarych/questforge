@@ -873,7 +873,7 @@ export class GamesService {
   async getComments(gameId: string, params: { limit?: number; offset?: number }) {
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
-        where: { gameId },
+        where: { gameId, deletedAt: null },
         take: params.limit || 20,
         skip: params.offset || 0,
         orderBy: { createdAt: 'desc' },
@@ -881,12 +881,14 @@ export class GamesService {
           id: true,
           text: true,
           createdAt: true,
+          updatedAt: true,
+          userId: true,
           user: {
             select: { id: true, name: true, avatarUrl: true },
           },
         },
       }),
-      this.prisma.comment.count({ where: { gameId } }),
+      this.prisma.comment.count({ where: { gameId, deletedAt: null } }),
     ]);
 
     return {
@@ -911,6 +913,60 @@ export class GamesService {
         userId,
         text,
       },
+      include: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+  }
+
+  async deleteComment(commentId: string, userId: string, userRole: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true, userId: true },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Комментарий не найден');
+    }
+
+    // ADMIN и MODERATOR могут удалять любые комментарии
+    // Автор может удалять только свой комментарий
+    const isModerator = userRole === 'ADMIN' || userRole === 'MODERATOR';
+    const isOwner = comment.userId === userId;
+
+    if (!isModerator && !isOwner) {
+      throw new ForbiddenException('Недостаточно прав для удаления комментария');
+    }
+
+    // Soft delete
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { success: true };
+  }
+
+  async updateComment(commentId: string, userId: string, text: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true, userId: true },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Комментарий не найден');
+    }
+
+    // Только автор может редактировать свой комментарий
+    if (comment.userId !== userId) {
+      throw new ForbiddenException('Недостаточно прав для редактирования комментария');
+    }
+
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { text },
       include: {
         user: {
           select: { id: true, name: true, avatarUrl: true },

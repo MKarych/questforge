@@ -1,10 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getPublicGame, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
+import {
+  getPublicGame,
+  getMyTeams,
+  registerTeam,
+  getPublicComments,
+  addPublicComment,
+  deletePublicComment,
+  updatePublicComment,
+  type GameDetails,
+  type MyTeam,
+  type Comment,
+} from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import ImageModal from '@/components/ui/ImageModal';
 
@@ -27,7 +38,43 @@ export default function GameDetailsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Comments state
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsTotal, setCommentsTotal] = useState(0);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
   const gameId = params.id;
+
+  // Load comments
+  const loadComments = useCallback(async () => {
+    try {
+      const response = await getPublicComments(gameId);
+      setComments(response.data?.data || []);
+      setCommentsTotal(response.data?.meta?.total || 0);
+    } catch {
+      // Comments are optional
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [gameId]);
+
+  // Check current user
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser({ id: payload.userId || payload.sub, role: payload.role || 'PLAYER' });
+      }
+    } catch {
+      // Not logged in
+    }
+  }, []);
 
   useEffect(() => {
     async function loadGame() {
@@ -56,7 +103,8 @@ export default function GameDetailsPage() {
     }
 
     loadGame();
-  }, [gameId]);
+    loadComments();
+  }, [gameId, loadComments]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +123,110 @@ export default function GameDetailsPage() {
       setError(err instanceof Error ? err.message : 'Не удалось зарегистрироваться на игру');
       setJoining(false);
     }
+  };
+
+  // Add comment
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommentText.trim()) return;
+
+    setSubmittingComment(true);
+    try {
+      const response = await addPublicComment(gameId, newCommentText.trim());
+      setComments((prev) => [response.data, ...prev]);
+      setCommentsTotal((prev) => prev + 1);
+      setNewCommentText('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отправить комментарий');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Delete comment
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить комментарий?')) return;
+
+    try {
+      await deletePublicComment(gameId, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setCommentsTotal((prev) => prev - 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось удалить комментарий');
+    }
+  };
+
+  // Start editing comment
+  const handleStartEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  // Save edited comment
+  const handleSaveEdit = async (commentId: string) => {
+    if (!editingCommentText.trim()) return;
+
+    try {
+      const response = await updatePublicComment(gameId, commentId, editingCommentText.trim());
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, text: response.data.text } : c)),
+      );
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отредактировать комментарий');
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  // Check if user can delete comment (ADMIN or MODERATOR)
+  const canDeleteComment = (comment: Comment) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'ADMIN' || currentUser.role === 'MODERATOR') return true;
+    return comment.userId === currentUser.id;
+  };
+
+  // Check if user can edit comment (only author)
+  const canEditComment = (comment: Comment) => {
+    if (!currentUser) return false;
+    return comment.userId === currentUser.id;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatCommentDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHour = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+
+    if (diffMin < 1) return 'только что';
+    if (diffMin < 60) return `${diffMin} мин. назад`;
+    if (diffHour < 24) return `${diffHour} ч. назад`;
+    if (diffDay < 7) return `${diffDay} дн. назад`;
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (loading) {
@@ -112,18 +264,6 @@ export default function GameDetailsPage() {
   if (!game) {
     return null;
   }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const formatPrice = (price: number) => {
     return price === 0 ? 'Бесплатно' : `${price} ₽`;
@@ -216,6 +356,154 @@ export default function GameDetailsPage() {
                 </div>
               </div>
             )}
+
+            {/* Comments Section */}
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4 text-text-primary">
+                Обсуждение {commentsTotal > 0 && <span className="text-text-muted">({commentsTotal})</span>}
+              </h2>
+
+              {/* Comment form for authorized users */}
+              {currentUser ? (
+                <form onSubmit={handleAddComment} className="mb-6">
+                  <textarea
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    placeholder="Напишите комментарий..."
+                    className="input-field min-h-[80px] resize-y mb-3"
+                    maxLength={2000}
+                    required
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-muted">
+                      {newCommentText.length}/2000
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={submittingComment || !newCommentText.trim()}
+                      className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submittingComment ? 'Отправка...' : 'Отправить'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="card p-6 mb-6 text-center">
+                  <p className="text-text-secondary mb-4">
+                    💬 Чтобы оставить комментарий, войдите в аккаунт.
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Link href="/auth/login" className="btn-primary">
+                      Войти
+                    </Link>
+                    <Link href="/auth/register" className="btn-secondary">
+                      Зарегистрироваться
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {/* Comments list */}
+              {commentsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse card p-4">
+                      <div className="h-4 bg-surface rounded w-1/4 mb-2" />
+                      <div className="h-3 bg-surface rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-surface rounded w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-text-muted text-center py-8">
+                  Пока нет комментариев. Будьте первым!
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="card p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium text-primary">
+                            {comment.user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="font-medium text-text-primary text-sm">
+                              {comment.user.name}
+                            </span>
+                            <span className="text-text-muted text-xs ml-2">
+                              {formatCommentDate(comment.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1">
+                          {canEditComment(comment) && editingCommentId !== comment.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(comment)}
+                              className="p-1 text-text-muted hover:text-primary transition-colors"
+                              title="Редактировать"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          )}
+                          {canDeleteComment(comment) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="p-1 text-text-muted hover:text-error transition-colors"
+                              title="Удалить"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Edit mode */}
+                      {editingCommentId === comment.id ? (
+                        <div className="mt-2">
+                          <textarea
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            className="input-field min-h-[60px] resize-y mb-2"
+                            maxLength={2000}
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(comment.id)}
+                              disabled={!editingCommentText.trim()}
+                              className="btn-primary text-sm disabled:opacity-50"
+                            >
+                              Сохранить
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="btn-secondary text-sm"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-text-secondary text-sm mt-1 whitespace-pre-wrap">
+                          {comment.text}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}

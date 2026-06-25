@@ -192,7 +192,10 @@ export interface Comment {
   id: string;
   text: string;
   createdAt: string;
+  updatedAt: string;
+  userId: string;
   user: {
+    id: string;
     name: string;
     avatarUrl: string | null;
   };
@@ -730,6 +733,33 @@ class ApiClient {
     return this.request(`/games/public/${id}`);
   }
 
+  async getPublicComments(gameId: string, limit?: number, offset?: number): Promise<ApiResponse<{ data: Comment[]; meta: { total: number; limit: number; offset: number } }>> {
+    const queryParams = new URLSearchParams();
+    if (limit) queryParams.append('limit', limit.toString());
+    if (offset) queryParams.append('offset', offset.toString());
+    return this.request(`/games/public/${gameId}/comments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+  }
+
+  async addPublicComment(gameId: string, text: string): Promise<ApiResponse<Comment>> {
+    return this.request(`/games/public/${gameId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  async deletePublicComment(gameId: string, commentId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(`/games/public/${gameId}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updatePublicComment(gameId: string, commentId: string, text: string): Promise<ApiResponse<Comment>> {
+    return this.request(`/games/public/${gameId}/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ text }),
+    });
+  }
+
   // ==================== Games (Organizer) ====================
 
   async createGame(data: CreateGameRequest): Promise<ApiResponse<CreateGameResponse>> {
@@ -1257,6 +1287,10 @@ export const removeMember = (teamId: string, userId: string) => apiClient.remove
 export const getMyTeam = () => apiClient.getMyTeam();
 export const getMyTeams = () => apiClient.getMyTeams();
 export const registerTeam = (gameId: string, teamId: string) => apiClient.registerTeam(gameId, teamId);
+export const getPublicComments = (gameId: string, limit?: number, offset?: number) => apiClient.getPublicComments(gameId, limit, offset);
+export const addPublicComment = (gameId: string, text: string) => apiClient.addPublicComment(gameId, text);
+export const deletePublicComment = (gameId: string, commentId: string) => apiClient.deletePublicComment(gameId, commentId);
+export const updatePublicComment = (gameId: string, commentId: string, text: string) => apiClient.updatePublicComment(gameId, commentId, text);
 export const getTeamPrivate = (id: string) => apiClient.getTeamPrivate(id);
 export const updateTeam = (id: string, data: UpdateTeamRequest) => apiClient.updateTeam(id, data);
 export const deleteTeam = (id: string) => apiClient.deleteTeam(id);

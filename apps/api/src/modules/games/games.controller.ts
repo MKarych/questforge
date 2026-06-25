@@ -112,6 +112,27 @@ export class GamesController {
     return this.gamesService.addComment(gameId, req.user.userId, body.text);
   }
 
+  @Delete('public/:id/comments/:commentId')
+  @UseGuards(JwtAuthGuard)
+  async deletePublicComment(
+    @Param('id') gameId: string,
+    @Param('commentId') commentId: string,
+    @Request() req: any,
+  ) {
+    return this.gamesService.deleteComment(commentId, req.user.userId, req.user.role);
+  }
+
+  @Patch('public/:id/comments/:commentId')
+  @UseGuards(JwtAuthGuard)
+  async updatePublicComment(
+    @Param('id') gameId: string,
+    @Param('commentId') commentId: string,
+    @Body() body: { text: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.updateComment(commentId, req.user.userId, body.text);
+  }
+
   // ============================================================
   // 29.2. Приватные эндпоинты (auth required)
   // ============================================================
