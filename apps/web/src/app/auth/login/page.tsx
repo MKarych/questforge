@@ -9,7 +9,7 @@ import Header from '@/components/ui/Header';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [loginField, setLoginField] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +20,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await login({ email, password });
-      router.push('/organizer/dashboard');
+      await login({ login: loginField, password });
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка входа');
     } finally {
@@ -53,12 +53,12 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Email</label>
+                <label className="label">Логин или Email</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  type="text"
+                  value={loginField}
+                  onChange={(e) => setLoginField(e.target.value)}
+                  placeholder="Ваш логин или email"
                   className="input-field"
                   required
                   autoFocus
@@ -90,6 +90,15 @@ export default function LoginPage() {
               >
                 {loading ? 'Вход...' : 'Войти'}
               </button>
+
+              <div className="text-center">
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-sm text-primary hover:text-primary-hover"
+                >
+                  Забыли пароль?
+                </Link>
+              </div>
             </form>
 
             <div className="mt-6 pt-6 border-t border-border text-center">

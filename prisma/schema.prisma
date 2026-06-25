@@ -24,6 +24,10 @@ model User {
   verified  Json     @default("{}") @map("verified") // { email: bool, phone: bool, telegram: bool }
   version   Int      @default(1) // Optimistic locking
 
+  // === AUTH ===
+  isEmailVerified   Boolean  @default(false) @map("is_email_verified")
+  verificationToken String?  @unique @map("verification_token") @db.VarChar(255)
+
   // === PROFILE (JSON) ===
   // { avatar, bio, city, socialLinks: { tg, vk, discord, youtube, github }, favorites: { games, scenarios, authors }, metadata }
   profile   Json     @default("{}") @map("profile")

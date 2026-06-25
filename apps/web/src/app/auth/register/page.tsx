@@ -1,24 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { register } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
+function generateCaptcha(): { a: number; b: number } {
+  return {
+    a: Math.floor(Math.random() * 10) + 1,
+    b: Math.floor(Math.random() * 10) + 1,
+  };
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [captcha, setCaptcha] = useState(generateCaptcha());
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshCaptcha = () => {
+    setCaptcha(generateCaptcha());
+    setCaptchaAnswer('');
+  };
+
+  useEffect(() => {
+    refreshCaptcha();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       setError('Пароли не совпадают');
       return;
@@ -29,14 +49,34 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!agreeToTerms) {
+      setError('Необходимо согласиться с условиями использования');
+      return;
+    }
+
+    const answer = parseInt(captchaAnswer, 10);
+    if (isNaN(answer) || answer !== captcha.a + captcha.b) {
+      setError('Неверный ответ капчи');
+      refreshCaptcha();
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      await register({ name, email, password });
-      router.push('/organizer/dashboard');
+      await register({
+        name,
+        username,
+        email,
+        password,
+        agreeToTerms: true,
+        captchaAnswer: answer,
+      });
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка регистрации');
+      refreshCaptcha();
     } finally {
       setLoading(false);
     }
@@ -66,6 +106,20 @@ export default function RegisterPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
+                <label className="label">Логин</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Ваш логин"
+                  className="input-field"
+                  required
+                  minLength={3}
+                  autoFocus
+                />
+              </div>
+
+              <div>
                 <label className="label">Имя</label>
                 <input
                   type="text"
@@ -74,7 +128,6 @@ export default function RegisterPage() {
                   placeholder="Ваше имя"
                   className="input-field"
                   required
-                  autoFocus
                 />
               </div>
 
@@ -114,6 +167,54 @@ export default function RegisterPage() {
                   required
                   minLength={6}
                 />
+              </div>
+
+              {/* Captcha */}
+              <div className="p-4 rounded-lg bg-surface-secondary border border-border">
+                <label className="label mb-2">Решите пример:</label>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-lg font-bold text-text-primary">
+                    {captcha.a} + {captcha.b} = ?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    className="text-sm text-primary hover:text-primary-hover"
+                    title="Обновить пример"
+                  >
+                    🔄
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  value={captchaAnswer}
+                  onChange={(e) => setCaptchaAnswer(e.target.value)}
+                  placeholder="Ответ"
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              {/* Agree to terms checkbox */}
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="agreeToTerms"
+                  checked={agreeToTerms}
+                  onChange={(e) => setAgreeToTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border bg-surface-primary text-primary focus:ring-primary"
+                  required
+                />
+                <label htmlFor="agreeToTerms" className="text-sm text-text-secondary">
+                  Я соглашаюсь с{' '}
+                  <Link href="/terms" className="text-primary hover:text-primary-hover">
+                    Условиями использования
+                  </Link>{' '}
+                  и даю согласие на обработку персональных данных согласно{' '}
+                  <Link href="/privacy" className="text-primary hover:text-primary-hover">
+                    Политике конфиденциальности
+                  </Link>.
+                </label>
               </div>
 
               {error && (

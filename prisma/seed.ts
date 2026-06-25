@@ -84,8 +84,12 @@ async function main() {
   // ============================================================
   const users: Record<string, any> = {};
   const userData = [
+    // Базовые пользователи (по одному на каждую роль)
     { email: 'admin@test.com', name: 'Админ', role: 'ADMIN', username: 'admin', slug: 'admin' },
     { email: 'moderator@test.com', name: 'Модератор', role: 'MODERATOR', username: 'moderator', slug: 'moderator' },
+    { email: 'organizer@test.com', name: 'Организатор', role: 'ORGANIZER', username: 'organizer', slug: 'organizer' },
+    { email: 'player@test.com', name: 'Игрок', role: 'PLAYER', username: 'player', slug: 'player' },
+    // Дополнительные пользователи
     { email: 'organizer1@test.com', name: 'Иван Петров', role: 'ORGANIZER', username: 'ivan_petrov', slug: 'ivan-petrov' },
     { email: 'organizer2@test.com', name: 'Мария Смирнова', role: 'ORGANIZER', username: 'maria_smirnova', slug: 'maria-smirnova' },
     { email: 'player1@test.com', name: 'Алексей', role: 'PLAYER', username: 'alexey', slug: 'alexey' },
@@ -107,6 +111,8 @@ async function main() {
         slug: u.slug,
         role: u.role as Role,
         status: UserStatus.ACTIVE,
+        isEmailVerified: true,
+        verificationToken: null,
         profile: {
           avatar: `https://placehold.co/128x128/EEE/999?text=${u.username.substring(0, 2)}`,
         },

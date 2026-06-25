@@ -262,6 +262,7 @@ export interface User {
   email: string;
   username: string;
   name: string;
+  isEmailVerified: boolean;
   slug: string;
   avatarUrl: string | null;
   avatar: string | null;
@@ -311,14 +312,17 @@ export interface AuthTokens {
 }
 
 export interface LoginRequest {
-  email: string;
+  login: string;
   password: string;
 }
 
 export interface RegisterRequest {
+  username: string;
+  name: string;
   email: string;
   password: string;
-  name: string;
+  agreeToTerms: boolean;
+  captchaAnswer?: number;
 }
 
 export interface CreateSessionRequest {

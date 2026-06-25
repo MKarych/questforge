@@ -460,7 +460,7 @@ function ScenarioEditorInner({
 
   // Сохраняем финальную позицию узла после завершения drag
   const onNodeDragStart = useCallback(
-    (_: React.MouseEvent, node: Node) => {
+    (_: React.MouseEvent, _node: Node) => {
       // Drag начался — React Flow сам обновляет позицию узла в useNodesState
     },
     []

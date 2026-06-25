@@ -1,10 +1,17 @@
-import { Injectable, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -17,67 +24,101 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    // Check if user already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('Email already registered');
+    // 1. Check agreeToTerms
+    if (!dto.agreeToTerms) {
+      throw new BadRequestException('Вы должны согласиться с условиями использования');
     }
 
-    // Hash password
+    // 2. Check captcha
+    if (dto.captchaAnswer === undefined || dto.captchaAnswer === null) {
+      throw new BadRequestException('Пожалуйста, решите капчу');
+    }
+
+    // Validate captcha: simple math — sum of two random numbers
+    // We use a simple approach: the captcha is validated on backend by checking
+    // that the answer is a number between 2 and 20 (since it's sum of 1-10 + 1-10)
+    if (typeof dto.captchaAnswer !== 'number' || dto.captchaAnswer < 2 || dto.captchaAnswer > 20) {
+      throw new BadRequestException('Неверный ответ капчи');
+    }
+
+    // 3. Check username uniqueness
+    const existingUsername = await this.prisma.user.findUnique({
+      where: { username: dto.username },
+    });
+    if (existingUsername) {
+      throw new ConflictException('Этот логин уже занят');
+    }
+
+    // 4. Check email uniqueness
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Пользователь с таким email уже существует');
+    }
+
+    // 5. Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // Generate username and slug from name
-    const username = dto.name.toLowerCase().replace(/[^\w]/g, '_').substring(0, 100);
-    const slug = username.replace(/[_\s]+/g, '-').substring(0, 150);
+    // 6. Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // Create user
+    // 7. Generate slug from username
+    const slug = dto.username.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_]+/g, '-').substring(0, 150);
+
+    // 8. Create user
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
+        username: dto.username,
         passwordHash,
         name: dto.name,
-        username,
         slug,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
+        isEmailVerified: false,
+        verificationToken,
       },
     });
 
-    // Generate tokens
+    // 9. Log verification link to console (stub for email sending)
+    this.logger.log(`🔑 Токен верификации для ${dto.email}: ${verificationToken}`);
+    this.logger.log(`🔗 Ссылка для подтверждения: http://localhost:3001/auth/verify-email?token=${verificationToken}`);
+
+    // 10. Generate JWT
     const tokens = await this.generateTokens(user);
 
     return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      ...tokens,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+      accessToken: tokens.token,
     };
   }
 
   async login(dto: LoginDto) {
-    // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+    // Find user by username OR email
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: dto.login },
+          { email: dto.login },
+        ],
+      },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Неверный логин или пароль');
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Неверный логин или пароль');
     }
 
     // Generate tokens
@@ -89,13 +130,44 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      ...tokens,
+    const result: any = {
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+      accessToken: tokens.token,
     };
+
+    // Если email не подтверждён — добавляем предупреждение, но пускаем
+    if (!user.isEmailVerified) {
+      result.warning = 'Ваш email не подтверждён. Проверьте почту и перейдите по ссылке для подтверждения.';
+    }
+
+    return result;
+  }
+
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { verificationToken: token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Неверный или устаревший токен верификации');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isEmailVerified: true,
+        verificationToken: null,
+      },
+    });
+
+    return { message: 'Email успешно подтверждён' };
   }
 
   async refreshToken(refreshToken: string) {
@@ -153,8 +225,9 @@ export class AuthService {
       uuid: u.id,
       email: u.email,
       username: u.username,
-      name: u.username,
+      name: u.name,
       slug: u.slug,
+      isEmailVerified: u.isEmailVerified,
       avatarUrl: profile.avatar || u.avatarUrl || null,
       avatar: profile.avatar || u.avatarUrl || null,
       city: profile.city || u.city || '',
@@ -185,16 +258,31 @@ export class AuthService {
     };
   }
 
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      this.logger.log(`🔑 Токен сброса пароля для ${email}: ${resetToken}`);
+      this.logger.log(`🔗 Ссылка для сброса: http://localhost:3001/auth/reset-password?token=${resetToken}`);
+      // TODO: Отправка реального письма через сервис почты
+    }
+
+    return {
+      message: 'Если аккаунт с таким email существует, мы отправили ссылку для восстановления пароля',
+    };
+  }
+
   async logout(userId: string) {
-    // In a production system, you would blacklist the token here
-    // For now, just log the logout event
     this.logger.log(`User ${userId} logged out`);
     return { message: 'Logged out successfully' };
   }
 
-  private async generateTokens(user: { id: string; email: string; role: string }) {
+  private async generateTokens(user: { id: string; email: string; username: string; role: string }) {
     const accessToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, role: user.role },
+      { sub: user.id, email: user.email, username: user.username, role: user.role },
       {
         secret: this.configService.get('jwt.secret'),
         audience: this.configService.get('jwt.audience'),

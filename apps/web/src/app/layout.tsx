@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import ScrollToTopWrapper from '@/components/ui/ScrollToTopWrapper';
+import CookieBanner from '@/components/ui/CookieBanner';
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -116,6 +117,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-text-primary antialiased">
         {children}
         <ScrollToTopWrapper />
+        <CookieBanner />
       </body>
     </html>
   );
