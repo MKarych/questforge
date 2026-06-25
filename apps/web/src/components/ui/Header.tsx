@@ -100,6 +100,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   // Основная навигация — видна всем
   const mainNavItems = [
     { label: 'Каталог игр', href: '/games', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
+    { label: 'Маркетплейс', href: '/marketplace', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
     { label: 'Команды', href: '/teams', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
   ];
 
