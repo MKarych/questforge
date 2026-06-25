@@ -991,7 +991,7 @@ class ApiClient {
   }
 
   async registerTeam(gameId: string, teamId: string): Promise<ApiResponse<{ id: string; teamId: string; gameId: string; team: { id: string; name: string; captainId: string }; joinedAt: string }>> {
-    return this.request(`/games/${gameId}/register-team`, {
+    return this.request(`/games/${gameId}/register`, {
       method: 'POST',
       body: JSON.stringify({ teamId }),
     });

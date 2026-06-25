@@ -38,10 +38,6 @@ a {
   text-decoration: none;
 }
 
-a:hover {
-  color: var(--primary-hover);
-}
-
 button {
   cursor: pointer;
   border: none;

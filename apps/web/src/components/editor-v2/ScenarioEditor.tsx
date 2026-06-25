@@ -498,12 +498,13 @@ function ScenarioEditorInner({
     const validation = store.validationResult;
 
     if (validation.valid && onSave) {
+      const startScene = store.scenes.find((s) => s.title === 'Старт') || store.scenes[0];
       onSave({
         name: store.name,
         description: store.description,
         nodes: store.scenes,
         edges: store.edges,
-        startNodeId: store.scenes.find((s) => s.title === 'Старт')?.id,
+        startNodeId: startScene?.id,
         settings: store.settings,
         variables: store.variables,
       });

@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { getProfile, type User, type SystemStatus } from '@/lib/api/client';
 import SystemStatusBar from '@/components/header/SystemStatusBar';
-import Breadcrumbs from '@/components/header/Breadcrumbs';
 import SearchBar from '@/components/header/SearchBar';
 import CommandPalette from '@/components/header/CommandPalette';
 import NotificationBell from '@/components/header/NotificationBell';
@@ -97,8 +95,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const userRole = user?.role || 'PLAYER';
   const isAuthPage = pathname.startsWith('/auth');
 
-  const isOrganizer = userRole === 'ORGANIZER' || userRole === 'ADMIN';
-
   // Основная навигация — видна всем
   const mainNavItems = [
     { label: 'Каталог игр', href: '/games', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
@@ -151,26 +147,17 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
       <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            {/* Left: Logo + Breadcrumbs */}
+            {/* Left: Brand Name */}
             <div className="flex items-center gap-4">
-              <Link href="/" className="flex items-center gap-2 shrink-0">
-                <Image
-                  src="/images/logo/logo-horizontal-full.png"
-                  alt="Город Приключений"
-                  width={32}
-                  height={32}
-                  className="h-8 w-auto"
-                  priority
-                />
-                <span className="text-lg font-bold text-text-primary hidden sm:block">
+              <Link href="/" className="flex items-center gap-2 shrink-0 group">
+                <span className="text-xl font-bold text-primary hover:text-primary/80 transition-colors duration-200">
                   Город Приключений
                 </span>
               </Link>
-              <Breadcrumbs />
             </div>
 
-            {/* Center: Desktop Navigation (md+) — показываем на md и выше */}
-            <nav className="hidden md:flex items-center gap-1">
+            {/* Center: Desktop Navigation (lg+) — только на десктопе */}
+            <nav className="hidden lg:flex items-center gap-1">
               {visibleMainNav.map((item) => renderNavLink(item))}
 
               {/* Организаторские пункты — только на десктопе (lg+) */}
@@ -190,8 +177,8 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
               )}
             </nav>
 
-            {/* Right: Actions — скрываем на md, показываем на lg+ */}
-            <div className="hidden lg:flex items-center gap-1">
+            {/* Right: Actions — показываем на md+ (планшеты и десктоп) */}
+            <div className="hidden md:flex items-center gap-1">
               {/* PRO Button — только для авторизованных */}
               {user && (
                 <Link
@@ -243,8 +230,8 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
               )}
             </div>
 
-            {/* Mobile: только гамбургер (на < md) */}
-            <div className="md:hidden flex items-center gap-1">
+            {/* Mobile/Tablet: гамбургер (на < lg) — показываем на телефонах и планшетах */}
+            <div className="flex lg:hidden items-center gap-1">
               {/* Кнопка PRO на мобилке — только иконка */}
               {user && (
                 <Link
@@ -273,33 +260,36 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Mobile Menu — оверлей + панель */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            {/* Затемнение */}
-            <div
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setMobileMenuOpen(false)}
-            />
+      {/* Mobile Menu — вынесен за пределы header чтобы избежать проблем с z-index и sticky */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[100] lg:hidden">
+          {/* Затемнение */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
 
-            {/* Панель меню */}
-            <div
-              ref={menuRef}
-              className="fixed right-0 top-0 h-full w-80 max-w-[85vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
-            >
-              <div className="flex items-center justify-between px-4 h-16 border-b border-border">
-                <span className="text-sm font-semibold text-text-primary">Меню</span>
-                <button
-                  className="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-surface-elevated"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Закрыть меню"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+          {/* Панель меню */}
+          <div
+            ref={menuRef}
+            className="fixed right-0 top-0 h-full w-80 max-w-[85vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
+          >
+            <div className="flex items-center justify-between px-4 h-16 border-b border-border">
+              <span className="text-lg font-bold text-primary">
+                Город Приключений
+              </span>
+              <button
+                className="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-surface-elevated"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Закрыть меню"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
               <nav className="px-4 py-4">
                 {/* Профиль / Вход */}
@@ -478,7 +468,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             </div>
           </div>
         )}
-      </header>
 
       {/* SearchBar (глобально) */}
       <div className="relative z-50">

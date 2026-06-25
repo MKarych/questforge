@@ -35,14 +35,18 @@ export class SessionsService {
     }
 
     // Get start node from scenario
-    const startNodeId = game.scenario?.startNodeId || 'node-1';
     const nodes = game.scenario?.nodes ? this.parseNodes(game.scenario.nodes) : [];
-    const hasStartNode = nodes.some((n) => n.id === startNodeId);
+    let startNodeId = game.scenario?.startNodeId || '';
 
-    if (!hasStartNode) {
-      throw new BadRequestException(
-        `Start node ${startNodeId} not found in scenario`,
-      );
+    // If startNodeId is not set or not found in nodes, use the first node as fallback
+    if (!startNodeId || !nodes.some((n) => n.id === startNodeId)) {
+      if (nodes.length > 0) {
+        startNodeId = nodes[0].id;
+      } else {
+        throw new BadRequestException(
+          `No nodes found in scenario for game ${game.id}`,
+        );
+      }
     }
 
     let teamId: string;

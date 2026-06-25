@@ -28,9 +28,10 @@ function eid(): string {
 }
 
 function makeScene(type: SceneType, title: string, description: string, missions: any[] = [], metadata?: any): Scene {
-  const idx = sceneCounter++;
+  const id = sid();
+  const idx = sceneCounter;
   return {
-    id: sid(),
+    id,
     type,
     title,
     description,

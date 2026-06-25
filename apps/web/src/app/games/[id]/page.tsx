@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getPublicGame, getMyTeams, startSession, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { getPublicGame, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import ImageModal from '@/components/ui/ImageModal';
 
@@ -58,27 +58,21 @@ export default function GameDetailsPage() {
     loadGame();
   }, [gameId]);
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeamId || !game) return;
 
     setJoining(true);
     setError(null);
     try {
-      // Start session with existing team — backend will register team on game if needed
-      const team = myTeams.find(t => t.id === selectedTeamId);
-      const sessionResponse = await startSession({
-        gameId: game.id,
-        teamName: team?.name || 'Команда',
-        teamId: selectedTeamId,
-      });
+      const response = await registerTeam(game.id, selectedTeamId);
       localStorage.setItem('currentTeamId', selectedTeamId);
-      setSuccess('Команда зарегистрирована! Перенаправляем...');
+      setSuccess(`Команда "${response.data.team.name}" зарегистрирована на игру!`);
       setTimeout(() => {
-        router.push(`/play/${game.shareLink}/${sessionResponse.data.sessionId}`);
-      }, 1000);
+        router.push(`/play/${game.shareLink}`);
+      }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось присоединиться к игре');
+      setError(err instanceof Error ? err.message : 'Не удалось зарегистрироваться на игру');
       setJoining(false);
     }
   };
@@ -255,11 +249,11 @@ export default function GameDetailsPage() {
                     {success}
                   </div>
                   <p className="text-text-secondary text-xs">
-                    Перенаправление в игру...
+                    Перенаправление в лобби...
                   </p>
                 </div>
               ) : myTeams.length > 0 ? (
-                <form onSubmit={handleJoin} className="space-y-4">
+                <form onSubmit={handleRegister} className="space-y-4">
                   <div>
                     <label className="label">Выберите команду</label>
                     <select
@@ -288,7 +282,7 @@ export default function GameDetailsPage() {
                     disabled={joining || !selectedTeamId}
                     className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {joining ? 'Присоединение...' : 'Начать игру'}
+                    {joining ? 'Регистрация...' : 'Зарегистрироваться на игру'}
                   </button>
 
                   <div className="text-center">
