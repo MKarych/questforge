@@ -101,12 +101,7 @@ export default function Footer({ featureFlags, stats }: FooterProps) {
               </li>
               <li>
                 <Link href="/organizer" className="text-sm text-text-muted hover:text-text-primary transition-colors">
-                  Как создать игру
-                </Link>
-              </li>
-              <li>
-                <Link href="/become-organizer" className="text-sm text-text-muted hover:text-text-primary transition-colors">
-                  Как стать организатором
+                  Стать организатором
                 </Link>
               </li>
             </ul>
