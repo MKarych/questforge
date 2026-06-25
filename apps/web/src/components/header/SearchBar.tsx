@@ -2,17 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-
-interface SearchResult {
-  id: string;
-  type: 'game' | 'team' | 'organizer' | 'city' | 'tag';
-  label: string;
-  description?: string;
-  href: string;
-}
-
-// Мок-данные для поиска (пока без API)
-const MOCK_RESULTS: SearchResult[] = [];
+import { apiClient, SearchResultItem } from '@/lib/api/client';
 
 interface SearchBarProps {
   isOpen: boolean;
@@ -22,7 +12,7 @@ interface SearchBarProps {
 export default function SearchBar({ isOpen, onClose }: SearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>(MOCK_RESULTS);
+  const [results, setResults] = useState<SearchResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,10 +45,25 @@ export default function SearchBar({ isOpen, onClose }: SearchBarProps) {
     }
 
     setIsSearching(true);
-    const timer = setTimeout(() => {
-      // TODO: заменить на реальный API поиска
-      setResults([]);
-      setIsSearching(false);
+    setSelectedIndex(-1);
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await apiClient.search(query.trim(), 10);
+        if (response.success) {
+          const allResults = [
+            ...response.data.games,
+            ...response.data.users,
+            ...response.data.teams,
+          ];
+          setResults(allResults);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 300);
 
     return () => clearTimeout(timer);
@@ -158,13 +163,19 @@ export default function SearchBar({ isOpen, onClose }: SearchBarProps) {
                     setQuery('');
                   }}
                 >
-                  <span className="text-lg">
-                    {result.type === 'game' && '🎮'}
-                    {result.type === 'team' && '👥'}
-                    {result.type === 'organizer' && '👤'}
-                    {result.type === 'city' && '📍'}
-                    {result.type === 'tag' && '🏷️'}
-                  </span>
+                  {result.imageUrl ? (
+                    <img
+                      src={result.imageUrl}
+                      alt=""
+                      className="w-8 h-8 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <span className="text-lg shrink-0">
+                      {result.type === 'game' && '🎮'}
+                      {result.type === 'user' && '👤'}
+                      {result.type === 'team' && '👥'}
+                    </span>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-text-primary truncate">
                       {result.label}
@@ -177,10 +188,8 @@ export default function SearchBar({ isOpen, onClose }: SearchBarProps) {
                   </div>
                   <span className="text-xs text-text-muted uppercase shrink-0">
                     {result.type === 'game' && 'Игра'}
+                    {result.type === 'user' && 'Пользователь'}
                     {result.type === 'team' && 'Команда'}
-                    {result.type === 'organizer' && 'Организатор'}
-                    {result.type === 'city' && 'Город'}
-                    {result.type === 'tag' && 'Тег'}
                   </span>
                 </button>
               </li>

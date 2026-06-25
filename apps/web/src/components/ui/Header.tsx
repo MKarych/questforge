@@ -483,11 +483,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
           </div>
         )}
 
-      {/* SearchBar (глобально) */}
-      <div className="relative z-50">
-        <SearchBar isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-      </div>
-
       {/* Command Palette (глобально) */}
       <CommandPalette user={user} />
     </>

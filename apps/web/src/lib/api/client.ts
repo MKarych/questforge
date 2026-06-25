@@ -551,6 +551,17 @@ export interface ApiResponse<T> {
   };
 }
 
+// ==================== Search ====================
+
+export interface SearchResultItem {
+  id: string;
+  type: 'game' | 'user' | 'team';
+  label: string;
+  description?: string;
+  href: string;
+  imageUrl?: string;
+}
+
 // API Client Class
 class ApiClient {
   private baseUrl: string;
@@ -1245,6 +1256,18 @@ class ApiClient {
     total: number;
   }>> {
     return this.request('/support/stats');
+  }
+  // ==================== Search ====================
+
+  async search(q: string, limit = 10): Promise<ApiResponse<{
+    games: SearchResultItem[];
+    users: SearchResultItem[];
+    teams: SearchResultItem[];
+  }>> {
+    const params = new URLSearchParams();
+    if (q) params.append('q', q);
+    params.append('limit', limit.toString());
+    return this.request(`/search?${params.toString()}`);
   }
 }
 
