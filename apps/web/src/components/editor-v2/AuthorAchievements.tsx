@@ -33,7 +33,7 @@ export default function AuthorAchievements({ unlockedIds, newAchievements, onDis
             style={{ width: `${progress}%` }}
           />
         </div>
-        {/* New achievements badge */}
+        {/* New achievements badge — рядом с кубком 🏆 */}
         {newAchievements.length > 0 && (
           <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-[8px] text-white font-bold flex items-center justify-center animate-bounce">
             {newAchievements.length}

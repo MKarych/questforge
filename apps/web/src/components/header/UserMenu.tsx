@@ -34,7 +34,7 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
       await logout();
     } finally {
       setIsOpen(false);
-      router.push('/');
+      window.location.reload();
     }
   };
 
