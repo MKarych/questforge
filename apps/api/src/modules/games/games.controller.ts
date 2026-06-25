@@ -301,6 +301,12 @@ export class GamesController {
     return this.gamesService.closeRegistration(gameId, req.user.userId);
   }
 
+  @Post(':id/move-to-lobby')
+  @UseGuards(JwtAuthGuard)
+  async moveToLobby(@Request() req: any, @Param('id') gameId: string) {
+    return this.gamesService.moveToLobby(gameId, req.user.userId);
+  }
+
   @Post(':id/start')
   @UseGuards(JwtAuthGuard)
   async startGame(@Request() req: any, @Param('id') gameId: string) {
