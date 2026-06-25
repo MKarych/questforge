@@ -16,12 +16,16 @@ type GameStatus = $Enums.GameStatus;
 
 // Slug generation
 function slugify(text: string): string {
-  return text
+  const base = text
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .substring(0, 150);
+    .substring(0, 100);
+
+  // Добавляем короткий уникальный суффикс, чтобы избежать конфликтов
+  const suffix = Math.random().toString(36).substring(2, 8);
+  return `${base}-${suffix}`;
 }
 
 function generateShareLink(): string {
