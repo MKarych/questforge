@@ -280,9 +280,8 @@ export class GamesService {
         imageUrl: data.imageUrl || null,
         bannerUrl: data.bannerUrl || null,
         tags: data.tags || [],
-        status: GAME_STATUS.PUBLISHED,
+        status: GAME_STATUS.DRAFT,
         version: 1,
-        publishedAt: new Date(),
         autoStart: data.autoStart ?? false,
         autoStartDelay: data.autoStartDelay ?? 0,
         allowEarlyStart: data.allowEarlyStart ?? true,
@@ -630,7 +629,11 @@ export class GamesService {
     }
 
     const game = await this.prisma.game.findUnique({
-      where: { id: gameId, deletedAt: null },
+      where: {
+        id: gameId,
+        deletedAt: null,
+        status: { notIn: [$Enums.GameStatus.DRAFT, $Enums.GameStatus.CANCELLED, $Enums.GameStatus.ARCHIVED, $Enums.GameStatus.HIDDEN, $Enums.GameStatus.BLOCKED] },
+      },
       include: {
         organizer: {
           select: {
