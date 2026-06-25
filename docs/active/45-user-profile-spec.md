@@ -1,9 +1,9 @@
 markdown
-# 45. User Profile Spec: Архитектурный контракт (v2.0)
+# 45. User Profile Spec: Архитектурный контракт (v3.0)
 
-> **Дата:** 24.06.2026  
+> **Дата:** 27.06.2026  
 > **Статус:** Утвержден (Архитектурный фундамент)  
-> **Версия:** 2.0  
+> **Версия:** 3.0  
 > **Цель:** Описать доменную модель пользователя как ядра платформы. Задать правила для всех сервисов и агентов на 5-10 лет вперед.
 
 ---
@@ -12,7 +12,7 @@ markdown
 
 **User — это Aggregate Root.**
 
-Никакой сервис, никакой агент, никакой модуль не имеет права изменять пользователя напрямую. ВСЕ изменения проходят через **User Service**.
+Никакой сервис, никакой агент, никакой модуль не tiene право изменять пользователя напрямую. ВСЕ изменения проходят через **User Service**.
 
 ---
 
@@ -27,6 +27,7 @@ markdown
 | **Reputation** | `rating`, `trustScore`, `reviewsCount` | Вычисляется системой | Reputation Service |
 | **AI Profile** | `preferences`, `history`, `embeddings`, `context` | Относится к AI | AI Service |
 | **Privacy** | Кто видит город, контакты, статистику, достижения | Редко | User Service |
+| **Social** | Друзья, заявки, чаты, блокировки | Регулярно | User Service |
 | **Capabilities** | Что может пользователь (HOST_EVENTS, CREATE_SCENARIOS) | Вычисляется системой | Permissions Service |
 
 ---
@@ -47,11 +48,8 @@ interface Identity {
   createdAt: Date;
   version: number;           // Для optimistic locking
 }
-```
-
-## 4. Profile (Хранится в JSON-поле `profile`)
-
-```typescript
+4. Profile (Хранится в JSON-поле profile)
+typescript
 interface Profile {
   avatar: string;            // URL на S3/MinIO
   bio: string;              // О себе
@@ -70,13 +68,9 @@ interface Profile {
   };
   metadata: Record<string, unknown>; // Произвольные данные
 }
-```
-
-## 5. Settings и Security (Хранятся в JSON-полях)
-
-### 5.1. Settings (JSON-поле `settings`)
-
-```typescript
+5. Settings и Security (Хранятся в JSON-полях)
+5.1. Settings (JSON-поле settings)
+typescript
 interface Settings {
   language: 'ru' | 'en';
   timezone: string;          // Europe/Moscow
@@ -93,22 +87,16 @@ interface Settings {
     showAchievements?: boolean;
   };
 }
-```
-
-### 5.2. Security (JSON-поле `security`)
-
-```typescript
+5.2. Security (JSON-поле security)
+typescript
 interface Security {
   lastLoginAt: Date;
   failedLoginAttempts: number;
   passwordChangedAt: Date;
   trustedDevices: Device[];  // [{ deviceId, userAgent, lastActive }]
 }
-```
-
-## 6. Reputation (Хранится в JSON-поле `reputationData`)
-
-```typescript
+6. Reputation (Хранится в JSON-поле reputationData)
+typescript
 interface ReputationData {
   rating: number;            // 4.9
   trustScore: number;        // 0-100%
@@ -117,13 +105,10 @@ interface ReputationData {
   completedGames: number;
   achievements: Achievement[];
 }
-```
-
-## 7. AI Profile (JSON-поле `aiProfile`)
-
+7. AI Profile (JSON-поле aiProfile)
 Этот раздел — самый важный для будущего. Агенты будут читать его, чтобы персонализировать работу.
 
-```typescript
+typescript
 interface AIProfile {
   preferences: {             // { genres?: string[], averageTeamSize?: number, averageGameDuration?: number, favoriteDifficulty?: 'easy' | 'medium' | 'hard' }
     genres?: string[];
@@ -148,7 +133,42 @@ interface AIProfile {
   };
   embeddings: number[];
 }
-```
+7.5. Social (Новый раздел — Социальные связи)
+typescript
+interface Social {
+  friends: Friend[];         // Список друзей
+  friendRequests: FriendRequest[]; // Входящие/исходящие заявки
+  blockedUsers: string[];    // Чёрный список (uuid)
+  recentChats: ChatPreview[]; // Последние чаты для быстрого доступа
+}
+7.5.1. Friend (Друг)
+typescript
+interface Friend {
+  userId: string;            // uuid друга
+  addedAt: Date;             // Когда стали друзьями
+  lastInteraction: Date;     // Последнее сообщение/действие
+  mutualFriends: number;     // Количество общих друзей
+}
+7.5.2. FriendRequest (Заявка в друзья)
+typescript
+interface FriendRequest {
+  id: string;
+  fromUserId: string;        // Кто отправил
+  toUserId: string;          // Кому отправил
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+  message?: string;          // Сопроводительное сообщение
+  createdAt: Date;
+  updatedAt: Date;
+}
+7.5.3. ChatPreview (Превью чата)
+typescript
+interface ChatPreview {
+  chatId: string;
+  withUserId: string;
+  lastMessage: string;
+  lastMessageAt: Date;
+  unreadCount: number;
+}
 8. Domain Events
 Каждое изменение публикует событие.
 
@@ -163,17 +183,15 @@ enum UserDomainEvent {
   AchievementUnlocked = 'achievement.unlocked',
   EmailVerified = 'email.verified',
   ProfilePrivacyChanged = 'privacy.changed',
+  
+  // Новые события
+  FriendRequestSent = 'friend.request.sent',
+  FriendRequestAccepted = 'friend.request.accepted',
+  FriendRequestRejected = 'friend.request.rejected',
+  FriendRemoved = 'friend.removed',
+  UserBlocked = 'user.blocked',
+  UserUnblocked = 'user.unblocked',
 }
-Пример использования:
-
-text
-AchievementUnlocked
-  ↓
-AI Agent
-  ↓
-Поздравляет пользователя
-  ↓
-Предлагает новый сценарий
 9. API DTO (Разделение ответственности)
 Всегда разделяем, что видят разные пользователи.
 
@@ -188,6 +206,9 @@ interface PublicUser {
   city: string;
   rating: number;
   achievements: Achievement[];
+  friendsCount: number;      // Количество друзей
+  isFriend: boolean;         // Для текущего пользователя
+  isBlocked: boolean;        // Для текущего пользователя
 }
 9.2. PrivateUser
 typescript
@@ -196,6 +217,7 @@ interface PrivateUser extends PublicUser {
   settings: Settings;
   security: Security;
   favorites: Favorites;
+  social: Social;
 }
 9.3. AdminUser
 typescript
@@ -207,8 +229,6 @@ interface AdminUser extends PrivateUser {
   metadata: Record<string, unknown>;
 }
 10. Capabilities (Автоматически вычисляемые права)
-Не путать с Permissions (что дали админы). Capabilities вычисляет система.
-
 typescript
 enum Capability {
   HOST_EVENTS = 'HOST_EVENTS',
@@ -237,7 +257,7 @@ interface Metadata {
 12. Data Ownership (Кто владеет данными)
 Сервис	Владеет
 Identity Service	uuid, email, username, slug, roles, status
-User Service	profile, settings, privacy, favorites
+User Service	profile, settings, privacy, favorites, social
 Auth Service	password, sessions, devices, failedAttempts
 Reputation Service	rating, trustScore, reviews, achievements
 AI Service	aiProfile, preferences, memory, history
@@ -257,6 +277,19 @@ GET	/users/:id/scenarios	Сценарии автора
 GET	/users/:id/favorites	Избранное
 POST	/users/:id/follow	Подписаться
 DELETE	/users/:id/follow	Отписаться
+Новые эндпоинты для социальных функций
+Метод	URL	Описание
+POST	/users/:id/friend-request	Отправить заявку в друзья
+PATCH	/users/friend-requests/:id	Принять/отклонить заявку
+DELETE	/users/:id/friend	Удалить из друзей
+GET	/users/me/friends	Список друзей
+GET	/users/:id/friends	Публичный список друзей
+GET	/users/me/friend-requests	Мои заявки
+POST	/users/:id/chat	Отправить ЛС (только друзьям)
+GET	/users/me/chats	Список чатов
+GET	/users/:id/chat	История переписки
+POST	/users/:id/block	Заблокировать пользователя
+DELETE	/users/:id/block	Разблокировать
 14. Жизненный цикл пользователя
 text
 REGISTERED
@@ -305,8 +338,16 @@ Metadata допускает расширение без миграций.
 
 Все изменения логируются (Audit Log).
 
+Личные сообщения (ЛС) доступны только между друзьями.
+
+Исключение: организатору можно написать, если вы играли в его игре (были зарегистрированы на неё).
+
+Заявка в друзья может быть отправлена только один раз.
+
+Заблокированный пользователь не может отправить заявку или сообщение.
+
 16. Чек-лист для реализации (для Габена)
-Разделить модели на Identity, Profile, Settings, Security, Reputation, AI Profile
+Разделить модели на Identity, Profile, Settings, Security, Reputation, AI Profile, Social
 
 Реализовать User Service как Aggregate Root
 
@@ -328,6 +369,10 @@ Metadata допускает расширение без миграций.
 
 Перенести настройки приватности и уведомлений в отдельные сущности
 
-Дата: 24.06.2026
+Реализовать социальный слой: друзья, заявки, чаты, блокировки
+
+Настроить правила ЛС: только друзьям, организаторам — исключение
+
+Дата: 27.06.2026
 Статус: Утвержден
 Класс: Архитектурный контракт (10/10)
