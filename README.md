@@ -100,16 +100,13 @@ npm install
 cp .env.example .env
 
 # 4. Запустить инфраструктуру
-docker-compose -f infrastructure/docker/docker-compose.yml up -d
+npm run docker:up
 
 # 5. Накатить миграции
-npx prisma migrate dev --name init
+npm run db:migrate
 
-# 6. Запустить бэкенд
-cd apps/api && npm run dev
-
-# 7. Запустить фронтенд (в другом терминале)
-cd apps/web && npm run dev
+# 6. Запустить всё (API + Frontend)
+npm run dev
 ```
 
 **После запуска:**
@@ -122,13 +119,21 @@ cd apps/web && npm run dev
 
 ## 📁 Документация
 
-Вся документация в папке `/docs`. Полный навигатор: [docs/DOCS-INDEX.md](./docs/DOCS-INDEX.md)
+Вся документация в папке [`/docs`](./docs/).
+
+**Начните здесь:**
+- [📚 Навигатор по документации](./docs/DOCS-INDEX.md) — полный структурированный список всех документов
+- [⚙️ Установка и запуск](./docs/SETUP.md) — локальный запуск проекта
+- [🛡️ Правила разработки](./docs/10-development-rules.md) — для разработчиков и AI-агентов
 
 **Ключевые документы:**
-- [API спецификация](./docs/05-api-specification.md)
-- [UX гайдлайны](./docs/09-ux-guidelines.md)
-- [Конструктор сценариев](./docs/30-builder-spec.md)
-- [Схема БД](./docs/32-database-schema.md)
+- [🏗️ Архитектура](./docs/28-system-architecture.md)
+- [🗄️ Схема БД](./docs/32-database-schema.md)
+- [🔌 API спецификация](./docs/05-api-specification.md)
+- [🎮 Игровой движок](./docs/50-runtime-engine-spec.md)
+- [🧩 Конструктор сценариев](./docs/49-scenario-editor-ultimate-spec.md)
+- [👥 Основные модули](./docs/45-user-profile-spec.md), [Команды](./docs/46-team-module-spec.md), [Игры](./docs/47-game-module-spec.md)
+- [📱 Мобильный рантайм](./docs/52-mobile-runtime-spec.md)
 
 ---
 
