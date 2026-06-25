@@ -1119,6 +1119,57 @@ class ApiClient {
   async deleteAdminTeam(id: string): Promise<ApiResponse<{ message: string }>> {
     return this.request(`/admin/teams/${id}`, { method: 'DELETE' });
   }
+
+  // ==================== Support ====================
+
+  async createSupportTicket(data: {
+    email: string;
+    name: string;
+    category: string;
+    message: string;
+    attachments?: string[];
+  }): Promise<ApiResponse<any>> {
+    return this.request('/support', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSupportTickets(params?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ items: any[]; total: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const query = queryParams.toString();
+    return this.request(`/support${query ? `?${query}` : ''}`);
+  }
+
+  async getSupportTicket(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/support/${id}`);
+  }
+
+  async updateSupportTicket(id: string, data: {
+    status?: string;
+    response?: string;
+  }): Promise<ApiResponse<any>> {
+    return this.request(`/support/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSupportStats(): Promise<ApiResponse<{
+    new: number;
+    inProgress: number;
+    closed: number;
+    total: number;
+  }>> {
+    return this.request('/support/stats');
+  }
 }
 
 // ==================== Home Page ====================

@@ -110,6 +110,8 @@ model User {
   userLimits             UserLimits?
   ledgerEntries          LedgerEntry[]
   payments               Payment[]
+  supportTickets         SupportTicket[]
+  assignedSupportTickets SupportTicket[] @relation("SupportAssignee")
 
   @@index([email])
   @@index([username])
@@ -117,6 +119,41 @@ model User {
   @@index([status])
   @@index([city])
   @@index([rating])
+}
+
+// ============================================================
+// SUPPORT TICKETS
+// ============================================================
+
+enum SupportTicketStatus {
+  NEW
+  IN_PROGRESS
+  CLOSED
+}
+
+model SupportTicket {
+  id          String               @id @default(uuid()) @db.Uuid
+  userId      String?              @map("user_id") @db.Uuid
+  email       String               @db.VarChar(255)
+  name        String               @db.VarChar(200)
+  category    String               @db.VarChar(100)
+  message     String               @db.Text
+  attachments Json                 @default("[]")
+  status      SupportTicketStatus  @default(NEW)
+  assignedTo  String?              @map("assigned_to") @db.Uuid
+  response    String?              @db.Text
+  resolvedAt  DateTime?            @map("resolved_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  user      User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignee  User? @relation("SupportAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([userId])
+  @@index([assignedTo])
+  @@index([createdAt])
+  @@map("support_tickets")
 }
 
 // ============================================================
