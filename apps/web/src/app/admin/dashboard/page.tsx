@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import AdminNav from '@/components/admin/AdminNav';
 
 interface AdminStats {
   totalUsers: number;
@@ -91,46 +92,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          <Link
-            href="/admin/dashboard"
-            className="px-4 py-2 rounded-lg bg-primary text-white font-medium"
-          >
-            📊 Дашборд
-          </Link>
-          <Link
-            href="/admin/games/pending"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            🎮 Модерация игр
-          </Link>
-          <Link
-            href="/admin/organizers/applications"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📋 Заявки организаторов
-          </Link>
-          <Link
-            href="/admin/support"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📬 Поддержка
-          </Link>
-          {isAdmin && (
-            <Link
-              href="/admin/users"
-              className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-            >
-              👥 Пользователи
-            </Link>
-          )}
-          <Link
-            href="/admin/teams"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            👥 Команды
-          </Link>
-        </div>
+        <AdminNav userRole={userRole} />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
