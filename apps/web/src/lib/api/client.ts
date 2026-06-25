@@ -780,7 +780,7 @@ class ApiClient {
     if (params?.offset) queryParams.append('offset', params.offset.toString());
 
     const query = queryParams.toString();
-    return this.request(`/games${query ? `?${query}` : ''}`);
+    return this.request(`/games/me${query ? `?${query}` : ''}`);
   }
 
   async getGame(id: string): Promise<ApiResponse<GameDetails>> {

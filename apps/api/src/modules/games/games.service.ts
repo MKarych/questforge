@@ -980,7 +980,7 @@ export class GamesService {
   // ============================================================
 
   async findMyGames(organizerId: string) {
-    return this.prisma.game.findMany({
+    const games = await this.prisma.game.findMany({
       where: { organizerId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -993,6 +993,37 @@ export class GamesService {
         },
       },
     });
+
+    return {
+      data: games.map((g) => ({
+        id: g.id,
+        title: g.title,
+        description: g.description,
+        city: g.city,
+        date: g.date,
+        time: g.time,
+        duration: g.duration,
+        price: g.price,
+        maxTeams: g.maxTeams,
+        shareLink: g.shareLink,
+        status: g.status,
+        imageUrl: g.imageUrl,
+        publishedAt: g.publishedAt,
+        organizer: {
+          id: g.organizerId,
+          name: '',
+          avatarUrl: null,
+        },
+        averageRating: 0,
+        reviewsCount: g._count.reviews,
+        teamsCount: g._count.gameTeams,
+      })),
+      meta: {
+        total: games.length,
+        limit: games.length,
+        offset: 0,
+      },
+    };
   }
 
   async submitForModeration(gameId: string, userId: string) {
