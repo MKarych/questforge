@@ -694,7 +694,7 @@ export class UsersService {
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
-        include: { _count: { select: { games: true, purchases: true } } },
+        include: { _count: { select: { games: true } } },
       }),
       this.prisma.scenario.count({ where: { authorId: userId, deletedAt: null } }),
     ]);

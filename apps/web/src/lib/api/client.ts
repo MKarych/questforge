@@ -725,6 +725,22 @@ class ApiClient {
     return this.request<T>(endpoint);
   }
 
+  /**
+   * GET-запрос с query-параметрами. Строит URLSearchParams из переданного объекта.
+   */
+  async getWithParams<T>(endpoint: string, params?: Record<string, string | number | undefined>): Promise<T> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
+      }
+    }
+    const query = queryParams.toString();
+    return this.request<T>(`${endpoint}${query ? `?${query}` : ''}`);
+  }
+
   async post<T>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
@@ -1516,3 +1532,141 @@ export const getBlockedUsers = () => apiClient.getBlockedUsers();
 export const sendMessage = (userId: string, text: string) => apiClient.sendMessage(userId, text);
 export const getChats = () => apiClient.getChats();
 export const getChatHistory = (userId: string) => apiClient.getChatHistory(userId);
+
+// ==================== Marketplace ====================
+export interface MarketplaceListingDto {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  licenseType: string;
+  category: string;
+  tags: string[];
+  status: string;
+  views: number;
+  favorites: number;
+  sales: number;
+  avgRating: number;
+  reviewsCount: number;
+  imageUrl: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+  author: { id: string; username: string; avatarUrl: string | null };
+  scenario: { id: string; name: string; version: number };
+}
+
+export interface MarketplaceSearchParams {
+  search?: string;
+  category?: string;
+  licenseType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const searchMarketplace = (params?: MarketplaceSearchParams) =>
+  apiClient.getWithParams<ApiResponse<{ items: MarketplaceListingDto[]; total: number }>>('/marketplace', params as any);
+
+export const getMarketplaceListing = (id: string) =>
+  apiClient.get<ApiResponse<MarketplaceListingDto>>(`/marketplace/${id}`);
+
+export const incrementListingViews = (id: string) =>
+  apiClient.post<ApiResponse<{ success: boolean }>>(`/marketplace/${id}/views`, {});
+
+export const getMarketplaceCategories = () =>
+  apiClient.get<ApiResponse<string[]>>('/marketplace/categories');
+
+export const getMarketplaceTypes = () =>
+  apiClient.get<ApiResponse<string[]>>('/marketplace/types');
+
+export const getListingReviews = (id: string, params?: { status?: string; limit?: number; offset?: number }) =>
+  apiClient.getWithParams<ApiResponse<any>>(`/marketplace/${id}/reviews`, params as any);
+
+export const createListing = (data: any) =>
+  apiClient.post<ApiResponse<MarketplaceListingDto>>('/marketplace', data);
+
+export const updateListing = (id: string, data: any) =>
+  apiClient.patch<ApiResponse<MarketplaceListingDto>>(`/marketplace/${id}`, data);
+
+export const publishListing = (id: string) =>
+  apiClient.post<ApiResponse<MarketplaceListingDto>>(`/marketplace/${id}/publish`, {});
+
+export const unpublishListing = (id: string) =>
+  apiClient.post<ApiResponse<MarketplaceListingDto>>(`/marketplace/${id}/unpublish`, {});
+
+export const getMyListings = () =>
+  apiClient.get<ApiResponse<MarketplaceListingDto[]>>('/marketplace/me/listings');
+
+export const getMySales = () =>
+  apiClient.get<ApiResponse<any[]>>('/marketplace/me/sales');
+
+export const getMyEarnings = () =>
+  apiClient.get<ApiResponse<any>>('/marketplace/me/earnings');
+
+export const purchaseListing = (id: string, data: { licenseType?: string; promoCode?: string }) =>
+  apiClient.post<ApiResponse<any>>(`/marketplace/${id}/purchase`, data);
+
+export const addFavoriteListing = (id: string) =>
+  apiClient.post<ApiResponse<any>>(`/marketplace/${id}/favorite`, {});
+
+export const removeFavoriteListing = (id: string) =>
+  apiClient.delete<ApiResponse<{ success: boolean }>>(`/marketplace/${id}/favorite`);
+
+export const getMyFavorites = () =>
+  apiClient.get<ApiResponse<MarketplaceListingDto[]>>('/marketplace/me/favorites');
+
+export const getMyPurchases = (params?: { limit?: number; offset?: number }) =>
+  apiClient.getWithParams<ApiResponse<any[]>>('/marketplace/me/purchases', params as any);
+
+export const getMyLicenses = () =>
+  apiClient.get<ApiResponse<any[]>>('/marketplace/me/licenses');
+
+export const getCart = () =>
+  apiClient.get<ApiResponse<any>>('/marketplace/cart');
+
+export const addToCart = (data: { listingId: string; licenseType?: string }) =>
+  apiClient.post<ApiResponse<any>>('/marketplace/cart', data);
+
+export const removeFromCart = (itemId: string) =>
+  apiClient.delete<ApiResponse<{ success: boolean }>>(`/marketplace/cart/${itemId}`);
+
+export const clearCart = () =>
+  apiClient.post<ApiResponse<{ success: boolean }>>('/marketplace/cart/clear', {});
+
+export const getCartCount = () =>
+  apiClient.get<ApiResponse<{ count: number }>>('/marketplace/cart/count');
+
+export const checkoutCart = () =>
+  apiClient.post<ApiResponse<any>>('/marketplace/cart/checkout', {});
+
+export const validatePromo = (data: { code: string; listingId: string; amount: number }) =>
+  apiClient.post<ApiResponse<any>>('/marketplace/promo/validate', data);
+
+export const createReview = (listingId: string, data: { rating: number; text?: string }) =>
+  apiClient.post<ApiResponse<any>>(`/marketplace/${listingId}/review`, data);
+
+export const updateReview = (reviewId: string, data: { rating: number; text?: string }) =>
+  apiClient.patch<ApiResponse<any>>(`/marketplace/reviews/${reviewId}`, data);
+
+export const deleteReview = (reviewId: string) =>
+  apiClient.delete<ApiResponse<{ success: boolean }>>(`/marketplace/reviews/${reviewId}`);
+
+export const getMyBalance = () =>
+  apiClient.get<ApiResponse<any>>('/marketplace/me/balance');
+
+export const requestPayout = (data: { amount: number }) =>
+  apiClient.post<ApiResponse<any>>('/marketplace/me/payouts', data);
+
+export const getMyPayouts = (params?: { limit?: number; offset?: number }) =>
+  apiClient.getWithParams<ApiResponse<any[]>>('/marketplace/me/payouts', params as any);
+
+export const getMyEarningsHistory = (params?: { limit?: number; offset?: number }) =>
+  apiClient.getWithParams<ApiResponse<any[]>>('/marketplace/me/earnings-history', params as any);
+
+export const getMyAnalytics = (params?: { period?: string; limit?: number; offset?: number }) =>
+  apiClient.getWithParams<ApiResponse<any>>('/marketplace/me/analytics', params as any);
+
+export const getMyAnalyticsSummary = () =>
+  apiClient.get<ApiResponse<any>>('/marketplace/me/analytics/summary');

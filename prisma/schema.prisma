@@ -83,14 +83,24 @@ model User {
   // === RELATIONS ===
   comments               Comment[]
   games                  Game[]
-  licenses               License[]
   mediaUploads           Media[]                @relation("MediaUploader")
   reviewedApplications   OrganizerApplication[] @relation("ApplicationReviewer")
   organizerApplication   OrganizerApplication?
-  purchases              Purchase[]
   reviews                Review[]
   scenarios              Scenario[]
   createdVersions        ScenarioVersion[]
+
+  // === COMMERCE RELATIONS ===
+  marketplaceListings    MarketplaceListing[]
+  userLicenses           UserLicense[]
+  scenarioRuns           ScenarioRun[]
+  purchases              Purchase[]
+  favoriteListings       FavoriteListing[]
+  cart                   Cart?
+  authoredEarnings       AuthorEarning[]
+  payouts                Payout[]
+  marketplaceReviews     MarketplaceReview[]
+  promoCodesCreated      PromoCode[]
   captainTeams           Team[]                 @relation("TeamCaptain")
   teamMemberships        TeamMember[]
   auditLogs              AuditLog[]
@@ -516,31 +526,14 @@ model Scenario {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   deletedAt        DateTime?         @map("deleted_at")
   games            Game[]
-  licenses         License[]
-  purchases        Purchase[]
   author           User              @relation(fields: [authorId], references: [id])
+  listing          MarketplaceListing?
   versions         ScenarioVersion[]
 
   @@index([authorId])
   @@index([isPublished])
   @@index([price])
   @@index([validationStatus])
-}
-
-model ScenarioVersion {
-  id          String   @id @default(uuid()) @db.Uuid
-  scenarioId  String   @map("scenario_id") @db.Uuid
-  version     Int
-  nodes       Json     @default("[]")
-  edges       Json     @default("[]")
-  startNodeId String   @map("start_node_id") @db.VarChar(50)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdById String?  @map("created_by_id") @db.Uuid
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-
-  @@unique([scenarioId, version])
-  @@index([scenarioId])
 }
 
 // ============================================================
@@ -782,45 +775,473 @@ model Event {
 }
 
 // ============================================================
-// PURCHASE & LICENSE
+// COMMERCE MODULE — Marketplace, Licensing, Payments
 // ============================================================
 
-model Purchase {
-  id          String    @id @default(uuid()) @db.Uuid
-  scenarioId  String    @map("scenario_id") @db.Uuid
-  buyerId     String    @map("buyer_id") @db.Uuid
-  licenseType String    @map("license_type") @db.VarChar(50)
-  amount      Decimal   @db.Decimal(10, 2)
-  commission  Decimal   @db.Decimal(10, 2)
-  royalty     Decimal   @db.Decimal(10, 2)
-  status      String    @default("pending") @db.VarChar(50)
-  paymentId   String?   @map("payment_id") @db.VarChar(255)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  completedAt DateTime? @map("completed_at")
-  buyer       User      @relation(fields: [buyerId], references: [id])
-  scenario    Scenario  @relation(fields: [scenarioId], references: [id])
+// ============================================================
+// MarketplaceListing — витрина сценария
+// ============================================================
 
-  @@index([scenarioId])
-  @@index([buyerId])
-  @@index([status])
+enum ListingStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+  BLOCKED
+  ARCHIVED
 }
 
-model License {
+enum LicenseType {
+  SINGLE
+  MULTI_CITY
+  COMMERCIAL
+  WHITE_LABEL
+}
+
+enum UpdatePolicy {
+  ALL_UPDATES
+  MAJOR_ONLY
+  FIXES_ONLY
+  NO_UPDATES
+}
+
+model MarketplaceListing {
+  id          String        @id @default(uuid()) @db.Uuid
+  scenarioId  String        @unique @map("scenario_id") @db.Uuid
+  authorId    String        @map("author_id") @db.Uuid
+
+  // Основная информация
+  title       String        @db.VarChar(255)
+  description String?       @db.Text
+  shortDescription String?  @map("short_description") @db.VarChar(500)
+  category    String?       @db.VarChar(100)
+  tags        String[]      @default([])
+  coverUrl    String?       @map("cover_url") @db.VarChar(500)
+  bannerUrl   String?       @map("banner_url") @db.VarChar(500)
+
+  // Ценообразование
+  price       Decimal       @db.Decimal(10, 2)
+  licenseType LicenseType   @default(SINGLE) @map("license_type")
+  updatePolicy UpdatePolicy @default(ALL_UPDATES) @map("update_policy")
+
+  // Статус модерации
+  status            ListingStatus @default(DRAFT)
+  moderationComment String?       @map("moderation_comment")
+  moderatedBy       String?       @map("moderated_by") @db.Uuid
+  moderatedAt       DateTime?     @map("moderated_at")
+
+  // Версия сценария, которая опубликована в маркетплейсе
+  publishedVersionId String? @map("published_version_id") @db.Uuid
+
+  // Статистика (denormalized)
+  views       Int @default(0)
+  favorites   Int @default(0)
+  sales       Int @default(0)
+  avgRating   Float @default(0) @map("avg_rating")
+  reviewsCount Int @default(0) @map("reviews_count")
+
+  // Audit
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Relations
+  scenario    Scenario          @relation(fields: [scenarioId], references: [id])
+  author      User              @relation(fields: [authorId], references: [id])
+  licenses    UserLicense[]
+  purchases   Purchase[]
+  favoritedBy FavoriteListing[] @relation("ListingFavorites")
+  cartItems   CartItem[]
+  reviews     MarketplaceReview[]
+  analytics   MarketplaceAnalytics[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([category])
+  @@index([price])
+  @@index([avgRating])
+  @@index([sales])
+  @@index([createdAt])
+  @@map("marketplace_listings")
+}
+
+// ============================================================
+// ScenarioVersion — версии сценария
+// ============================================================
+
+enum VersionStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+  ARCHIVED
+}
+
+model ScenarioVersion {
+  id          String        @id @default(uuid()) @db.Uuid
+  scenarioId  String        @map("scenario_id") @db.Uuid
+  version     Int
+  versionLabel String?      @map("version_label") @db.VarChar(100)
+  nodes       Json          @default("[]")
+  edges       Json          @default("[]")
+  startNodeId String        @map("start_node_id") @db.VarChar(50)
+  status      VersionStatus @default(DRAFT)
+  changelog   String?       @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+  createdById String?       @map("created_by_id") @db.Uuid
+
+  createdBy   User?          @relation(fields: [createdById], references: [id])
+  scenario    Scenario       @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  licenses    UserLicense[]
+  purchases   Purchase[]
+
+  @@unique([scenarioId, version])
+  @@index([scenarioId])
+  @@index([status])
+  @@map("scenario_versions")
+}
+
+// ============================================================
+// UserLicense — активная лицензия пользователя
+// ============================================================
+
+enum LicenseStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+  SUSPENDED
+}
+
+enum RevocationReason {
+  CHARGEBACK
+  FRAUD
+  REFUND
+  VIOLATION
+  SUPPORT
+}
+
+model UserLicense {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  listingId       String          @map("listing_id") @db.Uuid
+  scenarioVersionId String        @map("scenario_version_id") @db.Uuid
+  licenseType     LicenseType     @default(SINGLE) @map("license_type")
+  status          LicenseStatus   @default(ACTIVE)
+  activationsUsed Int             @default(0) @map("activations_used")
+  activationsLimit Int            @default(0) @map("activations_limit") // 0 = ∞
+  expiresAt       DateTime?       @map("expires_at")
+  updatePolicy    UpdatePolicy    @default(ALL_UPDATES) @map("update_policy")
+  purchasedAt     DateTime        @default(now()) @map("purchased_at")
+  revokedAt       DateTime?       @map("revoked_at")
+  revokedReason   RevocationReason? @map("revoked_reason")
+  revokedBy       String?         @map("revoked_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  listing         MarketplaceListing @relation(fields: [listingId], references: [id])
+  scenarioVersion ScenarioVersion    @relation(fields: [scenarioVersionId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
+  runs            ScenarioRun[]
+
+  @@index([userId])
+  @@index([listingId])
+  @@index([status])
+  @@index([userId, listingId, status])
+  @@map("user_licenses")
+}
+
+// ============================================================
+// ScenarioRun — запуск сценария
+// ============================================================
+
+enum RunStatus {
+  RUNNING
+  COMPLETED
+  ABORTED
+}
+
+model ScenarioRun {
   id          String    @id @default(uuid()) @db.Uuid
   scenarioId  String    @map("scenario_id") @db.Uuid
-  buyerId     String    @map("buyer_id") @db.Uuid
-  licenseType String    @map("license_type") @db.VarChar(50)
-  city        String?   @db.VarChar(100)
-  price       Decimal   @db.Decimal(10, 2)
-  status      String    @default("active") @db.VarChar(50)
-  expiresAt   DateTime? @map("expires_at")
-  purchasedAt DateTime  @default(now()) @map("purchased_at")
-  buyer       User      @relation(fields: [buyerId], references: [id])
-  scenario    Scenario  @relation(fields: [scenarioId], references: [id])
+  organizerId String    @map("organizer_id") @db.Uuid
+  licenseId   String    @map("license_id") @db.Uuid
+  gameId      String?   @map("game_id") @db.Uuid
+  status      RunStatus @default(RUNNING)
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
+  license  UserLicense @relation(fields: [licenseId], references: [id])
+  organizer User       @relation(fields: [organizerId], references: [id])
+
+  @@index([organizerId])
+  @@index([licenseId])
   @@index([scenarioId])
+  @@index([gameId])
+  @@index([startedAt])
+  @@map("scenario_runs")
+}
+
+// ============================================================
+// Purchase — снапшот покупки
+// ============================================================
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+  CANCELLED
+}
+
+model Purchase {
+  id          String         @id @default(uuid()) @db.Uuid
+  listingId   String         @map("listing_id") @db.Uuid
+  scenarioVersionId String   @map("scenario_version_id") @db.Uuid
+  buyerId     String         @map("buyer_id") @db.Uuid
+
+  // Снапшот на момент покупки
+  listingSnapshotTitle   String   @map("listing_snapshot_title") @db.VarChar(255)
+  listingSnapshotVersion String   @map("listing_snapshot_version") @db.VarChar(50)
+  listingSnapshotPrice   Decimal  @map("listing_snapshot_price") @db.Decimal(10, 2)
+
+  licenseType LicenseType    @default(SINGLE) @map("license_type")
+  price       Decimal        @db.Decimal(10, 2)
+  commission  Decimal        @db.Decimal(10, 2)
+  royalty     Decimal        @db.Decimal(10, 2)
+  status      PurchaseStatus @default(PENDING)
+  paymentId   String?        @map("payment_id") @db.VarChar(255)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  completedAt DateTime?      @map("completed_at")
+
+  listing         MarketplaceListing @relation(fields: [listingId], references: [id])
+  scenarioVersion ScenarioVersion    @relation(fields: [scenarioVersionId], references: [id])
+  buyer           User               @relation(fields: [buyerId], references: [id])
+  earnings        AuthorEarning[]
+
+  @@index([listingId])
   @@index([buyerId])
   @@index([status])
+  @@index([createdAt])
+  @@map("purchases")
+}
+
+// ============================================================
+// FavoriteListing — избранное
+// ============================================================
+
+model FavoriteListing {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  listing MarketplaceListing @relation("ListingFavorites", fields: [listingId], references: [id], onDelete: Cascade)
+  user    User               @relation(fields: [userId], references: [id])
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+  @@map("favorite_listings")
+}
+
+// ============================================================
+// Cart / CartItem — корзина
+// ============================================================
+
+model Cart {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @unique @map("user_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id])
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @map("cart_id") @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  licenseType LicenseType @default(SINGLE) @map("license_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cart    Cart               @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing @relation(fields: [listingId], references: [id])
+
+  @@unique([cartId, listingId])
+  @@index([cartId])
+  @@index([listingId])
+  @@map("cart_items")
+}
+
+// ============================================================
+// PromoCode — промокоды
+// ============================================================
+
+enum PromoCodeType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PromoCodeStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+}
+
+model PromoCode {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique @db.VarChar(50)
+  type        PromoCodeType   @default(PERCENTAGE)
+  value       Decimal         @db.Decimal(10, 2) // процент или сумма
+  maxUses     Int             @default(0) // 0 = безлимит
+  usedCount   Int             @default(0) @map("used_count")
+  minAmount   Decimal?        @map("min_amount") @db.Decimal(10, 2)
+  maxAmount   Decimal?        @map("max_amount") @db.Decimal(10, 2)
+  listingId   String?         @map("listing_id") @db.Uuid // null = на всё
+  status      PromoCodeStatus @default(ACTIVE)
+  expiresAt   DateTime?       @map("expires_at")
+  createdById String          @map("created_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@index([code])
+  @@index([status])
+  @@index([listingId])
+  @@map("promo_codes")
+}
+
+// ============================================================
+// MarketplaceReview — отзывы на сценарии
+// ============================================================
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MarketplaceReview {
+  id          String       @id @default(uuid()) @db.Uuid
+  listingId   String       @map("listing_id") @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  rating      Int
+  text        String?      @db.Text
+  status      ReviewStatus @default(PENDING)
+  moderatedBy String?      @map("moderated_by") @db.Uuid
+  moderatedAt DateTime?    @map("moderated_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
+
+  @@unique([listingId, userId])
+  @@index([listingId])
+  @@index([userId])
+  @@index([status])
+  @@map("marketplace_reviews")
+}
+
+// ============================================================
+// AuthorEarning — доход автора
+// ============================================================
+
+enum EarningStatus {
+  PENDING
+  AVAILABLE
+  PAID_OUT
+  CANCELLED
+}
+
+model AuthorEarning {
+  id         String        @id @default(uuid()) @db.Uuid
+  authorId   String        @map("author_id") @db.Uuid
+  purchaseId String        @map("purchase_id") @db.Uuid
+  amount     Decimal       @db.Decimal(10, 2)
+  commission Decimal       @db.Decimal(10, 2)
+  royalty    Decimal       @db.Decimal(10, 2)
+  status     EarningStatus @default(PENDING)
+  payoutId   String?       @map("payout_id") @db.Uuid
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  author   User     @relation(fields: [authorId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  payout   Payout?  @relation(fields: [payoutId], references: [id])
+
+  @@index([authorId])
+  @@index([purchaseId])
+  @@index([status])
+  @@index([payoutId])
+  @@map("author_earnings")
+}
+
+// ============================================================
+// Payout — выплата автору
+// ============================================================
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+model Payout {
+  id           String       @id @default(uuid()) @db.Uuid
+  authorId     String       @map("author_id") @db.Uuid
+  amount       Decimal      @db.Decimal(10, 2)
+  status       PayoutStatus @default(PENDING)
+  paymentId    String?      @map("payment_id") @db.VarChar(255)
+  failedReason String?      @map("failed_reason")
+  processedAt  DateTime?    @map("processed_at")
+  processedBy  String?      @map("processed_by") @db.Uuid
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  author   User            @relation(fields: [authorId], references: [id])
+  earnings AuthorEarning[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payouts")
+}
+
+// ============================================================
+// MarketplaceAnalytics — аналитика
+// ============================================================
+
+enum AnalyticsPeriod {
+  DAY
+  WEEK
+  MONTH
+}
+
+model MarketplaceAnalytics {
+  id             String          @id @default(uuid()) @db.Uuid
+  listingId      String          @map("listing_id") @db.Uuid
+  views          Int             @default(0)
+  favorites      Int             @default(0)
+  sales          Int             @default(0)
+  conversionRate Float           @default(0) @map("conversion_rate")
+  avgRating      Float           @default(0) @map("avg_rating")
+  reviewsCount   Int             @default(0) @map("reviews_count")
+  period         AnalyticsPeriod @default(DAY)
+  date           DateTime        @map("date")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id])
+
+  @@unique([listingId, period, date])
+  @@index([listingId])
+  @@index([period, date])
+  @@map("marketplace_analytics")
 }
 
 // ============================================================
