@@ -15,6 +15,8 @@ interface AdminStats {
   totalScenarios: number;
   pendingGames: number;
   pendingApplications: number;
+  newSupportTickets: number;
+  inProgressSupportTickets: number;
 }
 
 export default function AdminDashboardPage() {
@@ -108,6 +110,12 @@ export default function AdminDashboardPage() {
           >
             📋 Заявки организаторов
           </Link>
+          <Link
+            href="/admin/support"
+            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
+          >
+            📬 Поддержка
+          </Link>
           {isAdmin && (
             <Link
               href="/admin/users"
@@ -172,10 +180,47 @@ export default function AdminDashboardPage() {
               </Link>
             )}
           </div>
+          {/* Support Tickets Widget */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-text-primary">📬 Обращения в поддержку</h3>
+              <Link href="/admin/support" className="text-xs text-primary hover:underline">
+                Все обращения →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`p-3 rounded-xl ${stats.newSupportTickets > 0 ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-surface-elevated'}`}>
+                <div className={`text-2xl font-bold mb-0.5 ${stats.newSupportTickets > 0 ? 'text-blue-500' : 'text-text-primary'}`}>
+                  {stats.newSupportTickets}
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {stats.newSupportTickets > 0 ? '🔵 Новых' : 'Новых'}
+                </div>
+              </div>
+              <div className={`p-3 rounded-xl ${stats.inProgressSupportTickets > 0 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-surface-elevated'}`}>
+                <div className={`text-2xl font-bold mb-0.5 ${stats.inProgressSupportTickets > 0 ? 'text-yellow-500' : 'text-text-primary'}`}>
+                  {stats.inProgressSupportTickets}
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {stats.inProgressSupportTickets > 0 ? '🟡 В работе' : 'В работе'}
+                </div>
+              </div>
+            </div>
+            {(stats.newSupportTickets > 0 || stats.inProgressSupportTickets > 0) && (
+              <Link
+                href="/admin/support"
+                className="mt-3 w-full px-3 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors inline-block text-center"
+              >
+                {stats.newSupportTickets > 0
+                  ? `Ответить на ${stats.newSupportTickets} нов${stats.newSupportTickets === 1 ? 'ое' : 'ых'} обращени${stats.newSupportTickets === 1 ? 'е' : 'я'}`
+                  : `${stats.inProgressSupportTickets} обращени${stats.inProgressSupportTickets === 1 ? 'е' : 'я'} в работе`}
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Link href="/admin/games/pending" className="card card-hover">
             <div className="text-3xl mb-3">🎮</div>
             <h3 className="font-semibold text-text-primary mb-1">Модерация игр</h3>
@@ -192,6 +237,15 @@ export default function AdminDashboardPage() {
               {stats.pendingApplications > 0
                 ? `${stats.pendingApplications} заяв${stats.pendingApplications === 1 ? 'ка' : 'ки'} ожидает рассмотрения`
                 : 'Нет заявок на рассмотрении'}
+            </p>
+          </Link>
+          <Link href="/admin/support" className="card card-hover">
+            <div className="text-3xl mb-3">📬</div>
+            <h3 className="font-semibold text-text-primary mb-1">Поддержка</h3>
+            <p className="text-sm text-text-secondary">
+              {stats.newSupportTickets > 0
+                ? `${stats.newSupportTickets} нов${stats.newSupportTickets === 1 ? 'ое' : 'ых'} обращени${stats.newSupportTickets === 1 ? 'е' : 'я'}`
+                : 'Обращений в поддержку'}
             </p>
           </Link>
           {isAdmin && (

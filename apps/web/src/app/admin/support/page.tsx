@@ -60,6 +60,7 @@ export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [responseText, setResponseText] = useState('');
+  const [responding, setResponding] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -91,13 +92,23 @@ export default function AdminSupportPage() {
     loadData();
   }, [router]);
 
+  const refreshData = async () => {
+    try {
+      const [ticketsRes, statsRes] = await Promise.all([
+        apiClient.getSupportTickets({ status: statusFilter || undefined, limit: 50 }),
+        apiClient.getSupportStats(),
+      ]);
+      setTickets(ticketsRes.data.items);
+      setStats(statsRes.data);
+    } catch (err) {
+      console.error('Ошибка обновления:', err);
+    }
+  };
+
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     try {
       await apiClient.updateSupportTicket(ticketId, { status: newStatus });
-      const ticketsRes = await apiClient.getSupportTickets({ status: statusFilter || undefined, limit: 50 });
-      setTickets(ticketsRes.data.items);
-      const statsRes = await apiClient.getSupportStats();
-      setStats(statsRes.data);
+      await refreshData();
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket(null);
       }
@@ -108,20 +119,30 @@ export default function AdminSupportPage() {
 
   const handleRespond = async (ticketId: string) => {
     if (!responseText.trim()) return;
+    setResponding(true);
     try {
       await apiClient.updateSupportTicket(ticketId, {
         status: 'CLOSED',
         response: responseText,
       });
       setResponseText('');
-      const ticketsRes = await apiClient.getSupportTickets({ status: statusFilter || undefined, limit: 50 });
-      setTickets(ticketsRes.data.items);
-      const statsRes = await apiClient.getSupportStats();
-      setStats(statsRes.data);
       setSelectedTicket(null);
+      await refreshData();
     } catch (err) {
       console.error('Ошибка ответа на тикет:', err);
+    } finally {
+      setResponding(false);
     }
+  };
+
+  const openTicket = (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    setResponseText('');
+  };
+
+  const closeModal = () => {
+    setSelectedTicket(null);
+    setResponseText('');
   };
 
   const filteredTickets = statusFilter
@@ -273,173 +294,196 @@ export default function AdminSupportPage() {
           </button>
         </div>
 
-        {/* Tickets List */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Tickets Table */}
-          <div className="lg:col-span-1 space-y-3">
-            {filteredTickets.length === 0 ? (
-              <div className="card text-center py-12">
-                <div className="text-4xl mb-3">📭</div>
-                <p className="text-text-secondary">Нет заявок</p>
-              </div>
-            ) : (
-              filteredTickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  onClick={() => {
-                    setSelectedTicket(ticket);
-                    setResponseText('');
-                  }}
-                  className={`w-full text-left card p-4 hover:shadow-md transition-all ${
-                    selectedTicket?.id === ticket.id ? 'ring-2 ring-primary' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
+        {/* Tickets List — full width */}
+        {filteredTickets.length === 0 ? (
+          <div className="card text-center py-12">
+            <div className="text-4xl mb-3">📭</div>
+            <p className="text-text-secondary">Нет заявок</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredTickets.map((ticket) => (
+              <button
+                key={ticket.id}
+                onClick={() => openTicket(ticket)}
+                className="w-full text-left card p-4 hover:shadow-md transition-all hover:ring-1 hover:ring-primary/30"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-text-primary text-sm truncate">
                       {ticket.name}
                     </span>
-                    <span
-                      className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        STATUS_COLORS[ticket.status]
-                      }`}
-                    >
-                      {STATUS_LABELS[ticket.status]}
+                    <span className="text-xs text-text-muted shrink-0">
+                      ({ticket.email})
                     </span>
                   </div>
-                  <p className="text-xs text-text-muted mb-1.5">
-                    {CATEGORY_LABELS[ticket.category] || ticket.category}
-                  </p>
-                  <p className="text-sm text-text-secondary line-clamp-2">
-                    {ticket.message}
-                  </p>
-                  <div className="flex items-center justify-between mt-2 text-xs text-text-muted">
-                    <span>{ticket.email}</span>
-                    <span>{new Date(ticket.createdAt).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-
-          {/* Ticket Detail */}
-          <div className="lg:col-span-1">
-            {selectedTicket ? (
-              <div className="card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-text-primary">
-                    Заявка #{selectedTicket.id.slice(0, 8)}
-                  </h3>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      STATUS_COLORS[selectedTicket.status]
+                    className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      STATUS_COLORS[ticket.status]
                     }`}
                   >
-                    {STATUS_LABELS[selectedTicket.status]}
+                    {STATUS_LABELS[ticket.status]}
                   </span>
                 </div>
-
-                <div className="space-y-3 mb-6 text-sm">
-                  <div>
-                    <span className="text-text-muted">От:</span>{' '}
-                    <span className="text-text-primary">{selectedTicket.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-text-muted">Email:</span>{' '}
-                    <span className="text-text-primary">{selectedTicket.email}</span>
-                  </div>
-                  <div>
-                    <span className="text-text-muted">Категория:</span>{' '}
-                    <span className="text-text-primary">
-                      {CATEGORY_LABELS[selectedTicket.category] || selectedTicket.category}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-text-muted">Создана:</span>{' '}
-                    <span className="text-text-primary">
-                      {new Date(selectedTicket.createdAt).toLocaleString('ru-RU')}
-                    </span>
-                  </div>
-                  {selectedTicket.assignee && (
-                    <div>
-                      <span className="text-text-muted">В работе у:</span>{' '}
-                      <span className="text-text-primary">{selectedTicket.assignee.name}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-text-primary mb-2">Сообщение:</h4>
-                  <div className="p-4 bg-surface-elevated rounded-xl text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
-                    {selectedTicket.message}
-                  </div>
-                </div>
-
-                {selectedTicket.response && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-text-primary mb-2">Ответ:</h4>
-                    <div className="p-4 bg-primary/5 rounded-xl text-sm text-text-secondary leading-relaxed whitespace-pre-wrap border border-primary/10">
-                      {selectedTicket.response}
-                    </div>
+                <p className="text-xs text-text-muted mb-1.5">
+                  {CATEGORY_LABELS[ticket.category] || ticket.category}
+                  {' · '}
+                  {new Date(ticket.createdAt).toLocaleDateString('ru-RU')}
+                </p>
+                <p className="text-sm text-text-secondary line-clamp-2">
+                  {ticket.message}
+                </p>
+                {ticket.response && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                    <span>✅</span>
+                    <span>Ответ дан</span>
                   </div>
                 )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-                {/* Actions */}
-                <div className="space-y-3">
-                  {selectedTicket.status === 'NEW' && (
-                    <button
-                      onClick={() => handleStatusChange(selectedTicket.id, 'IN_PROGRESS')}
-                      className="w-full px-4 py-2.5 bg-yellow-500 text-white rounded-xl font-medium hover:bg-yellow-600 transition-colors text-sm"
-                    >
-                      Взять в работу
-                    </button>
-                  )}
+      {/* Modal */}
+      {selectedTicket && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-background border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">
+                  Заявка #{selectedTicket.id.slice(0, 8)}
+                </h3>
+                <p className="text-sm text-text-muted mt-0.5">
+                  {CATEGORY_LABELS[selectedTicket.category] || selectedTicket.category}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    STATUS_COLORS[selectedTicket.status]
+                  }`}
+                >
+                  {STATUS_LABELS[selectedTicket.status]}
+                </span>
+                <button
+                  onClick={closeModal}
+                  className="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-                  {selectedTicket.status === 'IN_PROGRESS' && (
-                    <>
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Contact Info */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 bg-surface-elevated rounded-xl">
+                  <div className="text-text-muted text-xs mb-0.5">От</div>
+                  <div className="text-text-primary font-medium">{selectedTicket.name}</div>
+                </div>
+                <div className="p-3 bg-surface-elevated rounded-xl">
+                  <div className="text-text-muted text-xs mb-0.5">Email</div>
+                  <div className="text-text-primary font-medium break-all">{selectedTicket.email}</div>
+                </div>
+                <div className="p-3 bg-surface-elevated rounded-xl">
+                  <div className="text-text-muted text-xs mb-0.5">Создана</div>
+                  <div className="text-text-primary">
+                    {new Date(selectedTicket.createdAt).toLocaleString('ru-RU')}
+                  </div>
+                </div>
+                {selectedTicket.assignee && (
+                  <div className="p-3 bg-surface-elevated rounded-xl">
+                    <div className="text-text-muted text-xs mb-0.5">В работе у</div>
+                    <div className="text-text-primary font-medium">{selectedTicket.assignee.name}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Message */}
+              <div>
+                <h4 className="text-sm font-medium text-text-primary mb-2">Сообщение:</h4>
+                <div className="p-4 bg-surface-elevated rounded-xl text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+                  {selectedTicket.message}
+                </div>
+              </div>
+
+              {/* Previous Response */}
+              {selectedTicket.response && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-primary mb-2">Ответ:</h4>
+                  <div className="p-4 bg-primary/5 rounded-xl text-sm text-text-secondary leading-relaxed whitespace-pre-wrap border border-primary/10">
+                    {selectedTicket.response}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="space-y-3 pt-2 border-t border-border">
+                {selectedTicket.status === 'NEW' && (
+                  <button
+                    onClick={() => handleStatusChange(selectedTicket.id, 'IN_PROGRESS')}
+                    className="w-full px-4 py-2.5 bg-yellow-500 text-white rounded-xl font-medium hover:bg-yellow-600 transition-colors text-sm"
+                  >
+                    Взять в работу
+                  </button>
+                )}
+
+                {selectedTicket.status === 'IN_PROGRESS' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-1.5">
+                        Ответ пользователю
+                      </label>
                       <textarea
                         value={responseText}
                         onChange={(e) => setResponseText(e.target.value)}
-                        placeholder="Введите ответ пользователю..."
+                        placeholder="Введите ответ пользователю... (пока тестово, email-отправка не реализована)"
                         rows={4}
                         className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all text-sm resize-y"
                       />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleRespond(selectedTicket.id)}
-                          disabled={!responseText.trim()}
-                          className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Ответить и закрыть
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(selectedTicket.id, 'CLOSED')}
-                          className="px-4 py-2.5 bg-surface-elevated text-text-secondary rounded-xl font-medium hover:bg-border transition-colors text-sm"
-                        >
-                          Закрыть без ответа
-                        </button>
-                      </div>
-                    </>
-                  )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRespond(selectedTicket.id)}
+                        disabled={!responseText.trim() || responding}
+                        className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                      >
+                        {responding ? 'Отправка...' : 'Ответить и закрыть'}
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(selectedTicket.id, 'CLOSED')}
+                        className="px-4 py-2.5 bg-surface-elevated text-text-secondary rounded-xl font-medium hover:bg-border transition-colors text-sm"
+                      >
+                        Закрыть без ответа
+                      </button>
+                    </div>
+                  </>
+                )}
 
-                  {selectedTicket.status === 'CLOSED' && (
-                    <button
-                      onClick={() => handleStatusChange(selectedTicket.id, 'NEW')}
-                      className="w-full px-4 py-2.5 bg-surface-elevated text-text-secondary rounded-xl font-medium hover:bg-border transition-colors text-sm"
-                    >
-                      Открыть заново
-                    </button>
-                  )}
-                </div>
+                {selectedTicket.status === 'CLOSED' && (
+                  <button
+                    onClick={() => handleStatusChange(selectedTicket.id, 'NEW')}
+                    className="w-full px-4 py-2.5 bg-surface-elevated text-text-secondary rounded-xl font-medium hover:bg-border transition-colors text-sm"
+                  >
+                    Открыть заново
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className="card p-12 text-center">
-                <div className="text-5xl mb-4">📩</div>
-                <p className="text-text-secondary">Выберите заявку из списка</p>
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

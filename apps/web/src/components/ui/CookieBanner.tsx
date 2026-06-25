@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-type CookieCategory = 'necessary' | 'analytics' | 'marketing';
-
 interface CookieConsent {
   necessary: true;  // Всегда включено
   analytics: boolean;
@@ -29,6 +27,7 @@ export default function CookieBanner() {
       const timer = setTimeout(() => setShowBanner(true), 500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, []);
 
   const acceptAll = () => {

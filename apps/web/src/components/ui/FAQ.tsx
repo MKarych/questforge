@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useTheme } from '@/hooks/useTheme';
 
 interface FAQItem {
   question: string;
@@ -313,8 +312,6 @@ export default function FAQ() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
-  const theme = useTheme();
-
   useEffect(() => {
     setMounted(true);
   }, []);

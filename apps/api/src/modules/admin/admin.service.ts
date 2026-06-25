@@ -20,6 +20,8 @@ export class AdminService {
       totalScenarios,
       pendingGames,
       pendingApplications,
+      newSupportTickets,
+      inProgressSupportTickets,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null } }),
       this.prisma.user.count({
@@ -39,6 +41,12 @@ export class AdminService {
       this.prisma.organizerApplication.count({
         where: { status: 'PENDING' },
       }),
+      this.prisma.supportTicket.count({
+        where: { status: 'NEW' },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: 'IN_PROGRESS' },
+      }),
     ]);
 
     return {
@@ -49,6 +57,8 @@ export class AdminService {
       totalScenarios,
       pendingGames,
       pendingApplications,
+      newSupportTickets,
+      inProgressSupportTickets,
     };
   }
 

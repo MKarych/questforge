@@ -1017,6 +1017,8 @@ class ApiClient {
     totalScenarios: number;
     pendingGames: number;
     pendingApplications: number;
+    newSupportTickets: number;
+    inProgressSupportTickets: number;
   }>> {
     return this.request('/admin/stats');
   }

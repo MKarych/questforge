@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { logout, type User } from '@/lib/api/client';
 
 interface UserMenuProps {
@@ -11,7 +10,6 @@ interface UserMenuProps {
 }
 
 export default function UserMenu({ user, loading }: UserMenuProps) {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
