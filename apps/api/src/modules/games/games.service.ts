@@ -1525,13 +1525,14 @@ export class GamesService {
 
   /**
    * registerTeam: регистрация команды на игру.
-   * Проверки: статус REGISTRATION_OPEN, maxTeams, команда не зарегистрирована.
+   * Проверки: статус PUBLISHED или REGISTRATION_OPEN, maxTeams, команда не зарегистрирована.
+   * Согласно 56-gameplay-flow.md: в статусе PUBLISHED регистрация должна быть доступна.
    */
   async registerTeam(gameId: string, teamId: string, userId: string) {
     const game = await this.findGameOrThrow(gameId);
 
-    // Проверка: статус REGISTRATION_OPEN
-    if (game.status !== GAME_STATUS.REGISTRATION_OPEN) {
+    // Проверка: статус PUBLISHED или REGISTRATION_OPEN
+    if (game.status !== GAME_STATUS.REGISTRATION_OPEN && game.status !== GAME_STATUS.PUBLISHED) {
       throw new BadRequestException({
         code: 'REGISTRATION_CLOSED',
         message: 'Регистрация на эту игру закрыта',
@@ -1591,13 +1592,14 @@ export class GamesService {
 
   /**
    * registerTeamByName: регистрация команды по названию (создаёт новую команду).
-   * Проверки: статус REGISTRATION_OPEN, maxTeams, команда с таким названием не зарегистрирована.
+   * Проверки: статус PUBLISHED или REGISTRATION_OPEN, maxTeams, команда с таким названием не зарегистрирована.
+   * Согласно 56-gameplay-flow.md: в статусе PUBLISHED регистрация должна быть доступна.
    */
   async registerTeamByName(gameId: string, teamName: string, userId: string) {
     const game = await this.findGameOrThrow(gameId);
 
-    // Проверка: статус REGISTRATION_OPEN
-    if (game.status !== GAME_STATUS.REGISTRATION_OPEN) {
+    // Проверка: статус PUBLISHED или REGISTRATION_OPEN
+    if (game.status !== GAME_STATUS.REGISTRATION_OPEN && game.status !== GAME_STATUS.PUBLISHED) {
       throw new BadRequestException({
         code: 'REGISTRATION_CLOSED',
         message: 'Регистрация на эту игру закрыта',
