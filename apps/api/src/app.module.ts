@@ -22,6 +22,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { SupportModule } from './modules/support/support.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { SearchModule } from './modules/search/search.module';
+import { SocialModule } from './modules/social/social.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -61,6 +62,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     SupportModule,
     RealtimeModule,
     SearchModule,
+    SocialModule,
     EngineModule,
   ],
   controllers: [AppController],

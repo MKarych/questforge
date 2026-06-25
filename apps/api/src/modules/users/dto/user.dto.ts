@@ -18,6 +18,12 @@ export interface PublicUserDto {
   reviewsCount: number;
   lastSeenAt: Date | null;
   createdAt: Date;
+
+  // Social layer (public)
+  friendsCount: number;
+  isFriend: boolean;
+  hasPendingRequest: boolean;
+  isBlocked: boolean;
 }
 
 // ============================================================
@@ -43,6 +49,14 @@ export interface PrivateUserDto extends PublicUserDto {
   featureFlags: Record<string, boolean>;
   metadata: Record<string, unknown>;
   aiProfile: Record<string, unknown>;
+
+  // Social layer (private — полные данные)
+  social: {
+    friends: import('../../social/dto/social.dto').FriendDto[];
+    incomingRequests: import('../../social/dto/social.dto').FriendRequestDto[];
+    outgoingRequests: import('../../social/dto/social.dto').FriendRequestDto[];
+    blockedUsers: import('../../social/dto/social.dto').BlockedUserDto[];
+  };
 }
 
 // ============================================================

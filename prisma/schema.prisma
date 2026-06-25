@@ -113,12 +113,126 @@ model User {
   supportTickets         SupportTicket[]
   assignedSupportTickets SupportTicket[] @relation("SupportAssignee")
 
+  // === SOCIAL RELATIONS ===
+  friends                Friend[]               @relation("FriendTarget")
+  friendsOf              Friend[]               @relation("FriendSource")
+  sentFriendRequests     FriendRequest[]        @relation("FriendRequestSender")
+  receivedFriendRequests FriendRequest[]        @relation("FriendRequestReceiver")
+  blockedUsers           BlockedUser[]          @relation("BlockedUserTarget")
+  blockedBy              BlockedUser[]          @relation("BlockedUserSource")
+  chatsAsUser1           Chat[]                 @relation("ChatUser1")
+  chatsAsUser2           Chat[]                 @relation("ChatUser2")
+  chatMessages           ChatMessage[]
+
   @@index([email])
   @@index([username])
   @@index([slug])
   @@index([status])
   @@index([city])
   @@index([rating])
+}
+
+// ============================================================
+// SOCIAL — FRIENDS, FRIEND REQUESTS, BLOCKED USERS
+// ============================================================
+
+model Friend {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  friendId         String   @map("friend_id") @db.Uuid
+  addedAt          DateTime @default(now()) @map("added_at")
+  lastInteraction  DateTime @default(now()) @map("last_interaction")
+
+  user   User @relation("FriendSource", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendTarget", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+  @@map("friends")
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model FriendRequest {
+  id         String              @id @default(uuid()) @db.Uuid
+  fromUserId String              @map("from_user_id") @db.Uuid
+  toUserId   String              @map("to_user_id") @db.Uuid
+  status     FriendRequestStatus @default(PENDING)
+  message    String?             @db.Text
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  fromUser User @relation("FriendRequestSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("FriendRequestReceiver", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+  @@map("friend_requests")
+}
+
+model BlockedUser {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  blockedId   String   @map("blocked_id") @db.Uuid
+  reason      String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user   User @relation("BlockedUserSource", fields: [userId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedUserTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, blockedId])
+  @@index([userId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+// ============================================================
+// CHATS & MESSAGES
+// ============================================================
+
+model Chat {
+  id          String   @id @default(uuid()) @db.Uuid
+  user1Id     String   @map("user1_id") @db.Uuid
+  user2Id     String   @map("user2_id") @db.Uuid
+  lastMessage String?  @db.Text
+  lastMessageAt DateTime? @map("last_message_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user1    User          @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2    User          @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([lastMessageAt])
+  @@map("chats")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  chatId    String   @map("chat_id") @db.Uuid
+  senderId  String   @map("sender_id") @db.Uuid
+  text      String   @db.Text
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id])
+
+  @@index([chatId])
+  @@index([chatId, createdAt])
+  @@index([senderId])
+  @@map("chat_messages")
 }
 
 // ============================================================

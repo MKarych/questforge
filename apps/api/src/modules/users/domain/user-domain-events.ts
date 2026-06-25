@@ -22,6 +22,14 @@ export enum UserDomainEventType {
   SettingsUpdated = 'settings.updated',
   FavoritesUpdated = 'favorites.updated',
   UsernameChanged = 'username.changed',
+
+  // Social events
+  FriendRequestSent = 'friend.request.sent',
+  FriendRequestAccepted = 'friend.request.accepted',
+  FriendRequestRejected = 'friend.request.rejected',
+  FriendRemoved = 'friend.removed',
+  UserBlocked = 'user.blocked',
+  UserUnblocked = 'user.unblocked',
 }
 
 export interface UserDomainEvent {
