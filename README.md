@@ -141,7 +141,7 @@ npm run dev
 - API: http://localhost:3000
 - Frontend: http://localhost:3001
 
-📖 **Подробная инструкция:** [docs/SETUP.md](./docs/SETUP.md)
+📖 **Подробная инструкция:** [docs/SETUP.md](./docs/active/SETUP.md)
 
 ---
 
