@@ -775,32 +775,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // ==================== Clear All ====================
   clearAll: () => {
     get().pushHistory();
-    const startId = `scene-${Date.now()}-start`;
-    const finishId = `scene-${Date.now()}-finish`;
-    const startScene: Scene = {
-      id: startId,
-      type: 'location',
-      title: 'Старт',
-      description: 'Начало сценария',
-      missions: [],
-      metadata: {},
-      view: { type: 'list', config: {} },
-      position: { x: 100, y: 200 },
-      transitions: [],
-    };
-    const finishScene: Scene = {
-      id: finishId,
-      type: 'location',
-      title: 'Финиш',
-      description: 'Конец сценария',
-      missions: [],
-      metadata: {},
-      view: { type: 'list', config: {} },
-      position: { x: 500, y: 200 },
-      transitions: [],
-    };
     set({
-      scenes: [startScene, finishScene],
+      scenes: [],
       edges: [],
       selectedNodes: [],
       selectedEdges: [],

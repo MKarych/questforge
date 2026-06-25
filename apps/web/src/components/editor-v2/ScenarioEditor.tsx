@@ -501,9 +501,9 @@ function ScenarioEditorInner({
       onSave({
         name: store.name,
         description: store.description,
-        scenes: store.scenes,
+        nodes: store.scenes,
         edges: store.edges,
-        startSceneId: store.scenes.find((s) => s.title === 'Старт')?.id,
+        startNodeId: store.scenes.find((s) => s.title === 'Старт')?.id,
         settings: store.settings,
         variables: store.variables,
       });
