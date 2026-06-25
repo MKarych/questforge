@@ -34,6 +34,10 @@ const NOTIFICATION_ICONS: Record<string, string> = {
   scenario_approved: '✅',
   scenario_rejected: '❌',
   achievement: '🏆',
+  friend_request: '👥',
+  friend_request_accepted: '✅',
+  chat_message: '💬',
+  team_chat_message: '💬',
 };
 
 function getIcon(type: string): string {

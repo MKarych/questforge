@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -24,6 +24,7 @@ interface PublicProfile {
   reviewsCount: number;
   followersCount: number;
   followingCount: number;
+  friendsCount?: number;
   achievements: Achievement[];
   lastSeenAt: string | null;
   createdAt: string;
@@ -86,6 +87,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 export default function PublicProfilePage() {
   const params = useParams() as { id: string };
+  const router = useRouter();
   const { user } = useUser();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -95,6 +97,40 @@ export default function PublicProfilePage() {
   const [activeTab, setActiveTab] = useState<'activity' | 'reviews' | 'teams' | 'scenarios'>('activity');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Social state
+  const [isFriend, setIsFriend] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
+
+  const isOwnProfile = user?.uuid === params.id || user?.id === params.id;
+
+  const loadSocialStatus = useCallback(async () => {
+    if (!user || isOwnProfile) return;
+    try {
+      const [friendRes, pendingRes, blockedRes] = await Promise.allSettled([
+        apiClient.get<{ data: boolean }>(`/users/${params.id}/is-friend`),
+        apiClient.get<{ data: boolean }>(`/users/${params.id}/has-pending-request`),
+        apiClient.get<{ data: boolean }>(`/users/${params.id}/is-blocked`),
+      ]);
+      if (friendRes.status === 'fulfilled') setIsFriend(friendRes.value.data);
+      if (pendingRes.status === 'fulfilled') {
+        setHasPendingRequest(pendingRes.value.data);
+        if (pendingRes.value.data) {
+          // Get the pending request ID
+          const reqs = await apiClient.getFriendRequests();
+          const outgoing = reqs.data?.outgoing || [];
+          const found = outgoing.find(r => r.receiver.id === params.id);
+          if (found) setPendingRequestId(found.id);
+        }
+      }
+      if (blockedRes.status === 'fulfilled') setIsBlocked(blockedRes.value.data);
+    } catch {
+      // ignore social status errors
+    }
+  }, [user, params.id, isOwnProfile]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -142,7 +178,78 @@ export default function PublicProfilePage() {
     }
 
     loadProfile();
-  }, [params.id]);
+    loadSocialStatus();
+  }, [params.id, loadSocialStatus]);
+
+  const handleSendFriendRequest = async () => {
+    setSocialLoading(true);
+    try {
+      const res = await apiClient.sendFriendRequest(params.id);
+      setHasPendingRequest(true);
+      setPendingRequestId(res.data.id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка';
+      setError(msg);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleCancelFriendRequest = async () => {
+    if (!pendingRequestId) return;
+    setSocialLoading(true);
+    try {
+      await apiClient.cancelFriendRequest(pendingRequestId);
+      setHasPendingRequest(false);
+      setPendingRequestId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка';
+      setError(msg);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    setSocialLoading(true);
+    try {
+      await apiClient.removeFriend(params.id);
+      setIsFriend(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка';
+      setError(msg);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    setSocialLoading(true);
+    try {
+      await apiClient.socialBlockUser(params.id);
+      setIsBlocked(true);
+      setIsFriend(false);
+      setHasPendingRequest(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка';
+      setError(msg);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleUnblockUser = async () => {
+    setSocialLoading(true);
+    try {
+      await apiClient.socialUnblockUser(params.id);
+      setIsBlocked(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка';
+      setError(msg);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -173,8 +280,6 @@ export default function PublicProfilePage() {
       </div>
     );
   }
-
-  const isOwnProfile = user?.uuid === profile.uuid || user?.id === profile.uuid;
 
   return (
     <div className="min-h-screen">
@@ -235,11 +340,72 @@ export default function PublicProfilePage() {
                   <p className="text-text-secondary mb-4 max-w-xl">{profile.bio}</p>
                 )}
 
-                {/* Followers/Following */}
-                <div className="flex gap-4 text-sm text-text-secondary">
+                {/* Followers/Following/Friends */}
+                <div className="flex gap-4 text-sm text-text-secondary flex-wrap justify-center md:justify-start">
                   <span><strong className="text-text-primary">{profile.followersCount}</strong> подписчиков</span>
                   <span><strong className="text-text-primary">{profile.followingCount}</strong> подписок</span>
+                  {profile.friendsCount !== undefined && (
+                    <span><strong className="text-text-primary">{profile.friendsCount}</strong> друзей</span>
+                  )}
                 </div>
+
+                {/* Social Actions — только для чужих профилей */}
+                {!isOwnProfile && user && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {isBlocked ? (
+                      <button
+                        onClick={handleUnblockUser}
+                        disabled={socialLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-elevated/80 transition-colors disabled:opacity-50"
+                      >
+                        🔓 Разблокировать
+                      </button>
+                    ) : (
+                      <>
+                        {isFriend ? (
+                          <>
+                            <button
+                              onClick={() => router.push(`/profile/chats?userId=${params.id}`)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                            >
+                              💬 Написать
+                            </button>
+                            <button
+                              onClick={handleRemoveFriend}
+                              disabled={socialLoading}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50"
+                            >
+                              👥 Удалить из друзей
+                            </button>
+                          </>
+                        ) : hasPendingRequest ? (
+                          <button
+                            onClick={handleCancelFriendRequest}
+                            disabled={socialLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-warning/10 text-warning hover:bg-warning/20 transition-colors disabled:opacity-50"
+                          >
+                            ⏳ Отменить заявку
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleSendFriendRequest}
+                            disabled={socialLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                          >
+                            👥 Добавить в друзья
+                          </button>
+                        )}
+                        <button
+                          onClick={handleBlockUser}
+                          disabled={socialLoading}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-elevated/80 transition-colors disabled:opacity-50"
+                        >
+                          🚫 Заблокировать
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Rating & Trust Score */}

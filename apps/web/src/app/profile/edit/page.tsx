@@ -24,6 +24,12 @@ interface FormData {
     telegram: boolean;
     push: boolean;
   };
+  socialNotifications: {
+    friendRequest: boolean;
+    friendRequestAccepted: boolean;
+    chatMessage: boolean;
+    teamChatMessage: boolean;
+  };
   privacy: {
     showCity: 'everyone' | 'friends' | 'nobody';
     showContacts: 'everyone' | 'friends' | 'nobody';
@@ -66,6 +72,12 @@ export default function EditProfilePage() {
     language: 'ru',
     timezone: 'Europe/Moscow',
     notifications: { email: true, telegram: false, push: true },
+    socialNotifications: {
+      friendRequest: true,
+      friendRequestAccepted: true,
+      chatMessage: true,
+      teamChatMessage: true,
+    },
     privacy: {
       showCity: 'everyone',
       showContacts: 'friends',
@@ -82,6 +94,7 @@ export default function EditProfilePage() {
 
   useEffect(() => {
     if (user) {
+      const userSocialNotif = (user as any).socialNotificationSettings || {};
       setForm({
         username: user.username || '',
         city: user.city || '',
@@ -94,6 +107,12 @@ export default function EditProfilePage() {
         language: (user as any).language || 'ru',
         timezone: (user as any).timezone || 'Europe/Moscow',
         notifications: (user as any).notificationSettings || { email: true, telegram: false, push: true },
+        socialNotifications: {
+          friendRequest: userSocialNotif.friendRequest ?? true,
+          friendRequestAccepted: userSocialNotif.friendRequestAccepted ?? true,
+          chatMessage: userSocialNotif.chatMessage ?? true,
+          teamChatMessage: userSocialNotif.teamChatMessage ?? true,
+        },
         privacy: (user as any).privacySettings || {
           showCity: 'everyone', showContacts: 'friends',
           showStats: 'everyone', showAchievements: 'everyone',
@@ -175,6 +194,7 @@ export default function EditProfilePage() {
         language: form.language,
         timezone: form.timezone,
         notificationSettings: form.notifications,
+        socialNotificationSettings: form.socialNotifications,
         privacySettings: form.privacy,
       });
 
@@ -395,6 +415,36 @@ export default function EditProfilePage() {
                       name={`notif.${key}`}
                       checked={(form.notifications as any)[key]}
                       onChange={handleChange}
+                      className="w-5 h-5 rounded border-surface-elevated bg-surface text-primary focus:ring-primary"
+                    />
+                    <span className="text-text-primary">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* ===== УВЕДОМЛЕНИЯ СОЦИАЛЬНОГО СЛОЯ ===== */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-text-primary mb-4">👥 Социальные уведомления</h2>
+              <div className="space-y-3">
+                {[
+                  { key: 'friendRequest', label: 'Заявки в друзья' },
+                  { key: 'friendRequestAccepted', label: 'Заявка принята' },
+                  { key: 'chatMessage', label: 'Личные сообщения' },
+                  { key: 'teamChatMessage', label: 'Сообщения в команде' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name={`socialNotif.${key}`}
+                      checked={(form.socialNotifications as any)[key]}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setForm(prev => ({
+                          ...prev,
+                          socialNotifications: { ...prev.socialNotifications, [key]: checked },
+                        }));
+                      }}
                       className="w-5 h-5 rounded border-surface-elevated bg-surface text-primary focus:ring-primary"
                     />
                     <span className="text-text-primary">{label}</span>

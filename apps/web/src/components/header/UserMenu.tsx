@@ -103,6 +103,22 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
               Профиль
             </Link>
             <Link
+              href="/profile/friends"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>👥</span>
+              Мои друзья
+            </Link>
+            <Link
+              href="/profile/chats"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>💬</span>
+              Мои чаты
+            </Link>
+            <Link
               href="/teams?filter=my"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
               onClick={() => setIsOpen(false)}

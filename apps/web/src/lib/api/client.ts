@@ -93,6 +93,72 @@ export interface FeatureFlags {
   downloadApp: boolean;
 }
 
+// ==================== Social DTO ====================
+
+export interface FriendDto {
+  id: string;
+  username: string;
+  slug: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  city: string | null;
+  friendsSince: string;
+}
+
+export interface FriendRequestDto {
+  id: string;
+  sender: {
+    id: string;
+    username: string;
+    slug: string;
+    avatarUrl: string | null;
+  };
+  receiver: {
+    id: string;
+    username: string;
+    slug: string;
+    avatarUrl: string | null;
+  };
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  message: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlockedUserDto {
+  id: string;
+  username: string;
+  slug: string;
+  avatarUrl: string | null;
+  blockedAt: string;
+  reason: string | null;
+}
+
+export interface ChatPreviewDto {
+  id: string;
+  participant: {
+    id: string;
+    username: string;
+    slug: string;
+    avatarUrl: string | null;
+  };
+  lastMessage: {
+    text: string;
+    createdAt: string;
+    senderId: string;
+  } | null;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ChatMessageDto {
+  id: string;
+  text: string;
+  senderId: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 export interface SystemStatus {
   status: 'online' | 'maintenance' | 'beta' | 'error';
   message: string;
@@ -1269,6 +1335,60 @@ class ApiClient {
     params.append('limit', limit.toString());
     return this.request(`/search?${params.toString()}`);
   }
+
+  // ==================== Social ====================
+
+  async sendFriendRequest(userId: string): Promise<ApiResponse<FriendRequestDto>> {
+    return this.post<ApiResponse<FriendRequestDto>>(`/users/${userId}/friend-request`);
+  }
+
+  async respondToFriendRequest(requestId: string, action: 'accepted' | 'rejected'): Promise<ApiResponse<FriendRequestDto>> {
+    return this.patch<ApiResponse<FriendRequestDto>>(`/users/friend-requests/${requestId}`, { action });
+  }
+
+  async cancelFriendRequest(requestId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<ApiResponse<{ message: string }>>(`/users/friend-requests/${requestId}`);
+  }
+
+  async getFriendRequests(): Promise<ApiResponse<{ incoming: FriendRequestDto[]; outgoing: FriendRequestDto[] }>> {
+    return this.get<ApiResponse<{ incoming: FriendRequestDto[]; outgoing: FriendRequestDto[] }>>('/users/me/friend-requests');
+  }
+
+  async getMyFriends(): Promise<ApiResponse<FriendDto[]>> {
+    return this.get<ApiResponse<FriendDto[]>>('/users/me/friends');
+  }
+
+  async getUserFriends(userId: string): Promise<ApiResponse<FriendDto[]>> {
+    return this.get<ApiResponse<FriendDto[]>>(`/users/${userId}/friends`);
+  }
+
+  async removeFriend(friendId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<ApiResponse<{ message: string }>>(`/users/${friendId}/friend`);
+  }
+
+  async socialBlockUser(userId: string, reason?: string): Promise<ApiResponse<BlockedUserDto>> {
+    return this.post<ApiResponse<BlockedUserDto>>(`/users/${userId}/block`, reason ? { reason } : undefined);
+  }
+
+  async socialUnblockUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<ApiResponse<{ message: string }>>(`/users/${userId}/block`);
+  }
+
+  async getBlockedUsers(): Promise<ApiResponse<BlockedUserDto[]>> {
+    return this.get<ApiResponse<BlockedUserDto[]>>('/users/me/blocked');
+  }
+
+  async sendMessage(userId: string, text: string): Promise<ApiResponse<ChatMessageDto>> {
+    return this.post<ApiResponse<ChatMessageDto>>(`/users/${userId}/chat`, { text });
+  }
+
+  async getChats(): Promise<ApiResponse<ChatPreviewDto[]>> {
+    return this.get<ApiResponse<ChatPreviewDto[]>>('/users/me/chats');
+  }
+
+  async getChatHistory(userId: string): Promise<ApiResponse<ChatMessageDto[]>> {
+    return this.get<ApiResponse<ChatMessageDto[]>>(`/users/${userId}/chat`);
+  }
 }
 
 // ==================== Home Page ====================
@@ -1381,3 +1501,18 @@ export const getAdminTeams = (params?: { search?: string; status?: string; city?
 export const getAdminTeam = (id: string) => apiClient.getAdminTeam(id);
 export const updateAdminTeam = (id: string, data: any) => apiClient.updateAdminTeam(id, data);
 export const deleteAdminTeam = (id: string) => apiClient.deleteAdminTeam(id);
+
+// ==================== Social ====================
+export const sendFriendRequest = (userId: string) => apiClient.sendFriendRequest(userId);
+export const respondToFriendRequest = (requestId: string, action: 'accepted' | 'rejected') => apiClient.respondToFriendRequest(requestId, action);
+export const cancelFriendRequest = (requestId: string) => apiClient.cancelFriendRequest(requestId);
+export const getFriendRequests = () => apiClient.getFriendRequests();
+export const getMyFriends = () => apiClient.getMyFriends();
+export const getUserFriends = (userId: string) => apiClient.getUserFriends(userId);
+export const removeFriend = (friendId: string) => apiClient.removeFriend(friendId);
+export const socialBlockUser = (userId: string, reason?: string) => apiClient.socialBlockUser(userId, reason);
+export const socialUnblockUser = (userId: string) => apiClient.socialUnblockUser(userId);
+export const getBlockedUsers = () => apiClient.getBlockedUsers();
+export const sendMessage = (userId: string, text: string) => apiClient.sendMessage(userId, text);
+export const getChats = () => apiClient.getChats();
+export const getChatHistory = (userId: string) => apiClient.getChatHistory(userId);
