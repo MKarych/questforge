@@ -131,7 +131,7 @@ export class UsersService {
       followingCount: user._count.following,
       language: settings.language || 'ru',
       timezone: settings.timezone || 'Europe/Moscow',
-      theme: settings.theme || 'dark',
+      theme: settings.theme || 'light',
       notificationSettings: settings.notifications || {},
       privacySettings: settings.privacy || {},
       toolbarSettings: settings.toolbarSettings || { size: 'medium', display: 'icon_label' },
@@ -208,7 +208,7 @@ export class UsersService {
       followingCount: user._count.following,
       language: settings.language || 'ru',
       timezone: settings.timezone || 'Europe/Moscow',
-      theme: settings.theme || 'dark',
+      theme: settings.theme || 'light',
       notificationSettings: settings.notifications || {},
       privacySettings: settings.privacy || {},
       socialLinks: profile.socialLinks || {},
@@ -322,7 +322,7 @@ export class UsersService {
   // UPDATE AVATAR — POST /users/me/avatar
   // ============================================================
   async updateAvatar(userId: string, avatarUrl: string, ip?: string, userAgent?: string) {
-    if (!avatarUrl || !avatarUrl.startsWith('http')) {
+    if (!avatarUrl || (!avatarUrl.startsWith('http') && !avatarUrl.startsWith('/uploads/'))) {
       throw new BadRequestException('Некорректный URL аватара');
     }
 

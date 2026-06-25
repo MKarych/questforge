@@ -3,13 +3,18 @@
 import { useState, useEffect } from 'react';
 
 export default function ThemeSwitcher() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (saved) {
       setTheme(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
+      document.documentElement.setAttribute('data-theme', saved);
+    } else {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initial = systemPrefersDark ? 'dark' : 'light';
+      setTheme(initial);
+      document.documentElement.setAttribute('data-theme', initial);
     }
   }, []);
 
@@ -17,8 +22,7 @@ export default function ThemeSwitcher() {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
     localStorage.setItem('theme', next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-    // TODO: синхронизировать с settings.theme в профиле пользователя
+    document.documentElement.setAttribute('data-theme', next);
   };
 
   return (

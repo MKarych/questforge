@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useUser } from '@/hooks/useUser';
-import { apiClient, getMyTeams, type MyTeam } from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
 
 interface PublicProfile {
   uuid: string;
@@ -38,11 +38,61 @@ interface Achievement {
   unlockedAt: string;
 }
 
+interface ActivityItem {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface ReviewItem {
+  id: string;
+  rating: number;
+  text: string | null;
+  createdAt: string;
+  game: {
+    id: string;
+    title: string;
+    imageUrl: string | null;
+  };
+}
+
+interface TeamItem {
+  id: string;
+  name: string;
+  slug: string;
+  avatar: string | null;
+  captain: { id: string; username: string; avatarUrl: string | null };
+  _count: { members: number; games: number };
+}
+
+interface ScenarioItem {
+  id: string;
+  name: string;
+  version: number;
+  isPublished: boolean;
+  createdAt: string;
+  _count: { games: number; purchases: number };
+}
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  achievement: '🎯 Получено достижение',
+  game_played: '🎮 Прошёл игру',
+  game_created: '📅 Создал игру',
+  scenario_created: '📝 Создал сценарий',
+  review_left: '⭐ Оставил отзыв',
+  team_joined: '👥 Присоединился к команде',
+};
+
 export default function PublicProfilePage() {
   const params = useParams() as { id: string };
   const { user } = useUser();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [teams, setTeams] = useState<TeamItem[]>([]);
+  const [scenarios, setScenarios] = useState<ScenarioItem[]>([]);
+  const [activeTab, setActiveTab] = useState<'activity' | 'reviews' | 'teams' | 'scenarios'>('activity');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,14 +102,38 @@ export default function PublicProfilePage() {
         const response = await apiClient.get<any>(`/users/${params.id}`);
         setProfile(response.data);
 
-        try {
-          const teamsResponse = await getMyTeams();
-          if (teamsResponse.data && Array.isArray(teamsResponse.data)) {
-            setMyTeams(teamsResponse.data);
-          }
-        } catch {
-          // Игнорируем ошибки загрузки команд
-        }
+        // Загружаем дополнительные данные
+        const promises: Promise<void>[] = [];
+
+        // Activity Feed
+        promises.push(
+          apiClient.get<any>(`/users/${params.id}/activity?limit=10`).then(r => {
+            if (r.data?.items) setActivity(r.data.items);
+          }).catch(() => {})
+        );
+
+        // Reviews
+        promises.push(
+          apiClient.get<any>(`/users/${params.id}/reviews?limit=5`).then(r => {
+            if (r.data?.items) setReviews(r.data.items);
+          }).catch(() => {})
+        );
+
+        // Teams
+        promises.push(
+          apiClient.get<any>(`/users/${params.id}/teams`).then(r => {
+            if (Array.isArray(r.data)) setTeams(r.data);
+          }).catch(() => {})
+        );
+
+        // Scenarios
+        promises.push(
+          apiClient.get<any>(`/users/${params.id}/scenarios?limit=5`).then(r => {
+            if (r.data?.items) setScenarios(r.data.items);
+          }).catch(() => {})
+        );
+
+        await Promise.allSettled(promises);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки');
       } finally {
@@ -100,21 +174,30 @@ export default function PublicProfilePage() {
     );
   }
 
+  const isOwnProfile = user?.uuid === profile.uuid || user?.id === profile.uuid;
+
   return (
     <div className="min-h-screen">
       <Header />
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Header Card */}
+          {/* ===== HEADER CARD ===== */}
           <div className="card mb-6">
             <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-              <div className="w-32 h-32 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+              {/* Avatar */}
+              <div className="w-32 h-32 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
                 {profile.avatar ? (
                   <img
                     src={profile.avatar}
                     alt={profile.username}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Если аватар не загрузился — показываем заглушку
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).parentElement!.innerHTML =
+                        `<span class="text-5xl text-primary">${profile.username?.charAt(0)?.toUpperCase() || '?'}</span>`;
+                    }}
                   />
                 ) : (
                   <span className="text-5xl text-primary">
@@ -123,12 +206,13 @@ export default function PublicProfilePage() {
                 )}
               </div>
 
+              {/* Info */}
               <div className="flex-1 text-center md:text-left">
                 <div className="flex flex-col md:flex-row gap-3 items-center md:items-start mb-2">
                   <h1 className="text-3xl font-bold text-text-primary">
                     @{profile.username}
                   </h1>
-                  {user?.uuid === profile.uuid && (
+                  {isOwnProfile && (
                     <Link
                       href="/profile/edit"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
@@ -150,99 +234,55 @@ export default function PublicProfilePage() {
                 {profile.bio && (
                   <p className="text-text-secondary mb-4 max-w-xl">{profile.bio}</p>
                 )}
+
+                {/* Followers/Following */}
+                <div className="flex gap-4 text-sm text-text-secondary">
+                  <span><strong className="text-text-primary">{profile.followersCount}</strong> подписчиков</span>
+                  <span><strong className="text-text-primary">{profile.followingCount}</strong> подписок</span>
+                </div>
               </div>
 
+              {/* Rating & Trust Score */}
               <div className="text-center">
                 <div className="text-4xl font-bold text-primary mb-1">
                   {profile.rating?.toFixed(1) || '0.0'}
                 </div>
                 <div className="text-sm text-text-secondary">рейтинг</div>
-                <div className="text-lg font-semibold text-text-primary mt-2">
-                  🤝 {profile.trustScore || 0}%
+                <div className="mt-3 flex items-center gap-1 justify-center">
+                  <div className="w-16 h-2 bg-surface-elevated rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-yellow-400 to-green-500 rounded-full transition-all"
+                      style={{ width: `${profile.trustScore || 0}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-text-primary">{profile.trustScore || 0}%</span>
                 </div>
-                <div className="text-sm text-text-secondary">доверие</div>
+                <div className="text-xs text-text-secondary">доверие</div>
               </div>
             </div>
           </div>
 
-          {/* Stats Grid */}
+          {/* ===== STATS GRID ===== */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="card text-center p-4">
               <div className="text-3xl font-bold text-primary">{profile.gamesPlayed}</div>
-              <div className="text-sm text-text-secondary">Игр пройдено</div>
+              <div className="text-sm text-text-secondary">🎮 Игр пройдено</div>
             </div>
             <div className="card text-center p-4">
               <div className="text-3xl font-bold text-primary">{profile.gamesCreated}</div>
-              <div className="text-sm text-text-secondary">Игр создано</div>
+              <div className="text-sm text-text-secondary">📅 Игр создано</div>
             </div>
             <div className="card text-center p-4">
               <div className="text-3xl font-bold text-primary">{profile.gamesConducted}</div>
-              <div className="text-sm text-text-secondary">Игр проведено</div>
+              <div className="text-sm text-text-secondary">🎯 Игр проведено</div>
             </div>
             <div className="card text-center p-4">
               <div className="text-3xl font-bold text-primary">{profile.scenariosCreated}</div>
-              <div className="text-sm text-text-secondary">Сценариев</div>
+              <div className="text-sm text-text-secondary">📝 Сценариев</div>
             </div>
           </div>
 
-          {/* Followers info */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="card text-center p-4">
-              <div className="text-2xl font-bold text-primary">{profile.followersCount}</div>
-              <div className="text-sm text-text-secondary">Подписчиков</div>
-            </div>
-            <div className="card text-center p-4">
-              <div className="text-2xl font-bold text-primary">{profile.followingCount}</div>
-              <div className="text-sm text-text-secondary">Подписок</div>
-            </div>
-          </div>
-
-          {/* My Teams */}
-          {myTeams.length > 0 && (
-            <div className="card mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-text-primary">🏴 Мои команды</h2>
-                <Link href="/teams" className="text-primary hover:text-primary-hover text-sm font-medium">
-                  Все команды →
-                </Link>
-              </div>
-              <div className="space-y-3">
-                {myTeams.map((team) => (
-                  <Link
-                    key={team.id}
-                    href={`/teams/${team.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-primary font-semibold">
-                          {team.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-text-primary">{team.name}</div>
-                        <div className="text-xs text-text-secondary">
-                          {team.membersCount} участников
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        team.myRole === 'captain'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {team.myRole === 'captain' ? '👑 Капитан' : 'Участник'}
-                      </span>
-                      <span className="text-text-secondary">→</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Achievements */}
+          {/* ===== ACHIEVEMENTS ===== */}
           {profile.achievements && profile.achievements.length > 0 && (
             <div className="card mb-6">
               <h2 className="text-xl font-bold text-text-primary mb-4">🏆 Достижения</h2>
@@ -265,9 +305,151 @@ export default function PublicProfilePage() {
             </div>
           )}
 
-          {/* Activity Info */}
+          {/* ===== TABS: Activity / Reviews / Teams / Scenarios ===== */}
+          <div className="card mb-6">
+            <div className="flex border-b border-border mb-4 overflow-x-auto">
+              {([
+                { key: 'activity' as const, label: '📊 Активность' },
+                { key: 'reviews' as const, label: `⭐ Отзывы (${profile.reviewsCount})` },
+                { key: 'teams' as const, label: '👥 Команды' },
+                { key: 'scenarios' as const, label: '📝 Сценарии' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    activeTab === key
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Activity Tab */}
+            {activeTab === 'activity' && (
+              <div className="space-y-3">
+                {activity.length === 0 ? (
+                  <p className="text-text-secondary text-center py-6">Активность пока отсутствует</p>
+                ) : (
+                  activity.map((item) => (
+                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg bg-surface-elevated/50">
+                      <div className="text-lg">
+                        {ACTIVITY_LABELS[item.type]?.split(' ')[0] || '📌'}
+                      </div>
+                      <div>
+                        <p className="text-sm text-text-primary">
+                          {ACTIVITY_LABELS[item.type] || item.type}
+                          {item.payload?.name ? `: ${item.payload.name as string}` : ''}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {new Date(item.createdAt).toLocaleDateString('ru-RU', {
+                            day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Reviews Tab */}
+            {activeTab === 'reviews' && (
+              <div className="space-y-3">
+                {reviews.length === 0 ? (
+                  <p className="text-text-secondary text-center py-6">Отзывов пока нет</p>
+                ) : (
+                  reviews.map((review) => (
+                    <div key={review.id} className="p-3 rounded-lg bg-surface-elevated/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <Link href={`/games/${review.game.id}`} className="text-sm font-medium text-primary hover:text-primary-hover">
+                          {review.game.title}
+                        </Link>
+                        <div className="flex items-center gap-1">
+                          <span className="text-yellow-500">★</span>
+                          <span className="text-sm font-medium text-text-primary">{review.rating}</span>
+                        </div>
+                      </div>
+                      {review.text && (
+                        <p className="text-sm text-text-secondary">{review.text}</p>
+                      )}
+                      <p className="text-xs text-text-muted mt-1">
+                        {new Date(review.createdAt).toLocaleDateString('ru-RU', {
+                          day: 'numeric', month: 'long', year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Teams Tab */}
+            {activeTab === 'teams' && (
+              <div className="space-y-3">
+                {teams.length === 0 ? (
+                  <p className="text-text-secondary text-center py-6">Пользователь не состоит в командах</p>
+                ) : (
+                  teams.map((team) => (
+                    <Link
+                      key={team.id}
+                      href={`/teams/${team.id}`}
+                      className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-primary font-semibold">
+                            {team.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-text-primary">{team.name}</div>
+                          <div className="text-xs text-text-secondary">
+                            {team._count.members} участников · {team._count.games} игр
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-text-secondary">→</span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Scenarios Tab */}
+            {activeTab === 'scenarios' && (
+              <div className="space-y-3">
+                {scenarios.length === 0 ? (
+                  <p className="text-text-secondary text-center py-6">Сценариев пока нет</p>
+                ) : (
+                  scenarios.map((scenario) => (
+                    <div key={scenario.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated/50">
+                      <div>
+                        <div className="font-medium text-text-primary">{scenario.name}</div>
+                        <div className="text-xs text-text-secondary">
+                          v{scenario.version} · {scenario._count.games} игр · {scenario._count.purchases} покупок
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        scenario.isPublished
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {scenario.isPublished ? 'Опубликован' : 'Черновик'}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ===== ACTIVITY INFO ===== */}
           <div className="card">
-            <h2 className="text-xl font-bold text-text-primary mb-4">📊 Активность</h2>
+            <h2 className="text-xl font-bold text-text-primary mb-4">ℹ️ Информация</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm text-text-secondary">На платформе с</div>

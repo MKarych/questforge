@@ -19,7 +19,6 @@ interface FormData {
   github: string;
   language: 'ru' | 'en';
   timezone: string;
-  theme: 'dark' | 'light';
   notifications: {
     email: boolean;
     telegram: boolean;
@@ -66,7 +65,6 @@ export default function EditProfilePage() {
     github: '',
     language: 'ru',
     timezone: 'Europe/Moscow',
-    theme: 'dark',
     notifications: { email: true, telegram: false, push: true },
     privacy: {
       showCity: 'everyone',
@@ -95,7 +93,6 @@ export default function EditProfilePage() {
         github: user.socialLinks?.github || '',
         language: (user as any).language || 'ru',
         timezone: (user as any).timezone || 'Europe/Moscow',
-        theme: (user as any).theme || 'dark',
         notifications: (user as any).notificationSettings || { email: true, telegram: false, push: true },
         privacy: (user as any).privacySettings || {
           showCity: 'everyone', showContacts: 'friends',
@@ -177,7 +174,6 @@ export default function EditProfilePage() {
         },
         language: form.language,
         timezone: form.timezone,
-        theme: form.theme,
         notificationSettings: form.notifications,
         privacySettings: form.privacy,
       });
@@ -211,7 +207,42 @@ export default function EditProfilePage() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-text-primary mb-6">Настройки профиля</h1>
+          {/* ===== ШАПКА С КНОПКОЙ НАЗАД И СОХРАНИТЬ ===== */}
+          <div className="sticky top-16 z-40 -mx-4 px-4 py-3 bg-background/90 backdrop-blur-sm border-b border-border mb-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/profile/${user?.uuid || user?.id}`)}
+                className="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-surface-elevated"
+                aria-label="Назад"
+                title="Вернуться в профиль"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-bold text-text-primary">Настройки профиля</h1>
+            </div>
+
+            <button
+              type="submit"
+              form="profile-form"
+              disabled={submitting}
+              className="btn-primary text-sm px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Сохранение...
+                </span>
+              ) : (
+                'Сохранить'
+              )}
+            </button>
+          </div>
 
           {message && (
             <div className={`p-3 rounded-lg mb-4 ${
@@ -221,12 +252,12 @@ export default function EditProfilePage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form id="profile-form" onSubmit={handleSubmit} className="space-y-8">
             {/* ===== АВАТАР ===== */}
             <div className="card">
               <h2 className="text-lg font-semibold text-text-primary mb-4">Фото профиля</h2>
               <AvatarUpload
-                currentAvatar={user?.avatarUrl || user?.avatar || null}
+                currentAvatar={user?.avatar || user?.avatarUrl || null}
                 onUpload={handleAvatarUpload}
                 onDelete={handleAvatarDelete}
                 uploading={avatarUploading}
@@ -346,13 +377,6 @@ export default function EditProfilePage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="label">Тема</label>
-                  <select name="theme" value={form.theme} onChange={handleChange} className="input-field">
-                    <option value="dark">Тёмная</option>
-                    <option value="light">Светлая</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -415,30 +439,88 @@ export default function EditProfilePage() {
             {/* ===== СТАТИСТИКА ===== */}
             <div className="card">
               <h2 className="text-lg font-semibold text-text-primary mb-4">Статистика</h2>
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold text-primary">{user?.stats?.gamesPlayed || 0}</div>
-                  <div className="text-sm text-text-secondary">Игр пройдено</div>
+                  <div className="text-sm text-text-secondary">🎮 Игр пройдено</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-primary">{user?.gamesCreated || 0}</div>
-                  <div className="text-sm text-text-secondary">Игр создано</div>
+                  <div className="text-sm text-text-secondary">📅 Игр создано</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-primary">{user?.gamesConducted || 0}</div>
+                  <div className="text-sm text-text-secondary">🎯 Игр проведено</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-primary">{user?.scenariosCreated || 0}</div>
-                  <div className="text-sm text-text-secondary">Сценариев</div>
+                  <div className="text-sm text-text-secondary">📝 Сценариев</div>
+                </div>
+              </div>
+
+              {/* Trust Score */}
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-text-primary">🤝 Доверие (Trust Score)</span>
+                  <span className="text-sm font-bold text-primary">{user?.trustScore || 0}%</span>
+                </div>
+                <div className="w-full h-2 bg-surface-elevated rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-yellow-400 to-green-500 rounded-full transition-all"
+                    style={{ width: `${user?.trustScore || 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-text-primary">⭐ Рейтинг</span>
+                <span className="text-sm font-bold text-primary">{user?.rating?.toFixed(1) || '0.0'}</span>
+              </div>
+            </div>
+
+            {/* ===== AI ПРОФИЛЬ (структура) ===== */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-text-primary mb-4">🤖 AI-профиль</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                AI-профиль используется для персонализации рекомендаций. Данные обновляются автоматически.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Любимые жанры</label>
+                  <div className="text-sm text-text-primary">
+                    {(user as any)?.aiProfile?.preferences?.genres?.length
+                      ? (user as any).aiProfile.preferences.genres.join(', ')
+                      : 'Пока нет данных'}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Средний размер команды</label>
+                  <div className="text-sm text-text-primary">
+                    {(user as any)?.aiProfile?.preferences?.averageTeamSize || 'Пока нет данных'}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Средняя длительность игры</label>
+                  <div className="text-sm text-text-primary">
+                    {(user as any)?.aiProfile?.preferences?.averageGameDuration
+                      ? `${(user as any).aiProfile.preferences.averageGameDuration} мин.`
+                      : 'Пока нет данных'}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Любимая сложность</label>
+                  <div className="text-sm text-text-primary">
+                    {(user as any)?.aiProfile?.preferences?.favoriteDifficulty
+                      ? ['easy', 'medium', 'hard'].includes((user as any).aiProfile.preferences.favoriteDifficulty)
+                        ? { easy: 'Лёгкая', medium: 'Средняя', hard: 'Сложная' }[(user as any).aiProfile.preferences.favoriteDifficulty as 'easy' | 'medium' | 'hard']
+                        : (user as any).aiProfile.preferences.favoriteDifficulty
+                      : 'Пока нет данных'}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* ===== SUBMIT ===== */}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Сохранение...' : 'Сохранить изменения'}
-            </button>
           </form>
         </div>
       </div>
