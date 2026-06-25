@@ -122,18 +122,18 @@ npm run dev
 Вся документация в папке [`/docs`](./docs/).
 
 **Начните здесь:**
-- [📚 Навигатор по документации](./docs/DOCS-INDEX.md) — полный структурированный список всех документов
-- [⚙️ Установка и запуск](./docs/SETUP.md) — локальный запуск проекта
-- [🛡️ Правила разработки](./docs/10-development-rules.md) — для разработчиков и AI-агентов
+- [📚 Навигатор по документации](./docs/active/DOCS-INDEX.md) — полный структурированный список всех документов
+- [⚙️ Установка и запуск](./docs/active/SETUP.md) — локальный запуск проекта
+- [🛡️ Правила разработки](./docs/active/10-development-rules.md) — для разработчиков и AI-агентов
 
 **Ключевые документы:**
-- [🏗️ Архитектура](./docs/28-system-architecture.md)
-- [🗄️ Схема БД](./docs/32-database-schema.md)
-- [🔌 API спецификация](./docs/05-api-specification.md)
-- [🎮 Игровой движок](./docs/50-runtime-engine-spec.md)
-- [🧩 Конструктор сценариев](./docs/49-scenario-editor-ultimate-spec.md)
-- [👥 Основные модули](./docs/45-user-profile-spec.md), [Команды](./docs/46-team-module-spec.md), [Игры](./docs/47-game-module-spec.md)
-- [📱 Мобильный рантайм](./docs/52-mobile-runtime-spec.md)
+- [🏗️ Архитектура](./docs/active/28-system-architecture.md)
+- [🗄️ Схема БД](./docs/active/32-database-schema.md)
+- [🔌 API спецификация](./docs/active/05-api-specification.md)
+- [🎮 Игровой движок](./docs/active/50-runtime-engine-spec.md)
+- [🧩 Конструктор сценариев](./docs/active/49-scenario-editor-ultimate-spec.md)
+- [👥 Основные модули](./docs/active/45-user-profile-spec.md), [Команды](./docs/active/46-team-module-spec.md), [Игры](./docs/active/47-game-module-spec.md)
+- [📱 Мобильный рантайм](./docs/active/52-mobile-runtime-spec.md)
 
 ---
 
