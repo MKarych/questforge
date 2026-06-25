@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -244,9 +245,12 @@ export default function AdminGamesPage() {
                 <div className="flex flex-col lg:flex-row gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-text-primary truncate">
+                      <Link
+                        href={`/admin/games/${game.id}`}
+                        className="text-lg font-semibold text-text-primary hover:text-accent transition-colors truncate"
+                      >
                         {game.title}
-                      </h3>
+                      </Link>
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[game.status] || 'bg-gray-500/20 text-gray-400'}`}>
                         {STATUS_LABELS[game.status] || game.status}
                       </span>
