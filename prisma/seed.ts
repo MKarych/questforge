@@ -1,9 +1,9 @@
 // prisma/seed.ts
-import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus } from '@prisma/client';
+import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus, Tier } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
-const PASSWORD = '123123';
+const PASSWORD = '123456';
 const SALT_ROUNDS = 10;
 
 async function hashPassword(password: string): Promise<string> {
@@ -80,7 +80,7 @@ async function main() {
   const passwordHash = await hashPassword(PASSWORD);
 
   // ============================================================
-  // 2. ПОЛЬЗОВАТЕЛИ (11)
+  // 2. ПОЛЬЗОВАТЕЛИ (15)
   // ============================================================
   const users: Record<string, any> = {};
   const userData = [
@@ -110,12 +110,34 @@ async function main() {
         username: u.username,
         slug: u.slug,
         role: u.role as Role,
+        roles: [u.role as Role],
         status: UserStatus.ACTIVE,
         isEmailVerified: true,
         verificationToken: null,
+        verified: { email: true, phone: false, telegram: false },
         profile: {
           avatar: `https://placehold.co/128x128/EEE/999?text=${u.username.substring(0, 2)}`,
+          bio: '',
+          city: '',
+          socialLinks: { tg: '', vk: '', discord: '', youtube: '', github: '' },
+          favorites: { games: [], scenarios: [], authors: [] },
+          metadata: {},
         },
+        settings: {
+          language: 'ru',
+          timezone: 'Europe/Moscow',
+          theme: 'dark',
+          notifications: { email: true, telegram: false, push: true },
+          privacy: { showCity: true, showContacts: false, showStats: true, showAchievements: true },
+        },
+        security: {
+          lastLoginAt: null,
+          failedLoginAttempts: 0,
+          passwordChangedAt: new Date(),
+          trustedDevices: [],
+        },
+        capabilities: [],
+        featureFlags: {},
         aiProfile: {
           favoriteGenres: ['detective', 'horror'],
           averageTeamSize: 4,
@@ -155,10 +177,17 @@ async function main() {
       data: {
         name: t.name,
         slug,
+        description: `Команда "${t.name}" — тестовая команда`,
         captainId: captain.id,
         status: TeamStatus.ACTIVE,
         privacy: TeamVisibility.PUBLIC,
         joinPolicy: JoinPolicy.INVITE_ONLY,
+        tags: ['test', 'seed'],
+        maxMembers: 20,
+        maxInvitesPerDay: 10,
+        maxPendingRequests: 5,
+        maxChatMessagesPerMinute: 30,
+        socials: { discord: '', vk: '', telegram: '', youtube: '' },
         members: {
           create: t.members.map((email) => ({
             userId: users[email].id,
@@ -199,7 +228,17 @@ async function main() {
         authorId: author.id,
         isPublished: s.published,
         nodes: nodes,
+        edges: [],
         startNodeId: 'start',
+        metadata: {
+          type: s.type,
+          difficulty: 'medium',
+          estimatedDuration: 60,
+          tags: [],
+          coverImage: null,
+        },
+        validationStatus: s.published ? 'VALIDATED' : 'DRAFT',
+        publishedAt: s.published ? new Date() : null,
       },
     });
     scenarios[s.name] = scenario;
@@ -211,26 +250,28 @@ async function main() {
   // ============================================================
   const games: Record<string, any> = {};
   const gameData = [
-    { title: 'Тайны старого города', city: 'Москва', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Тайны старого города' },
-    { title: 'Ночной дозор', city: 'Минск', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Ночной дозор' },
-    { title: 'Фотоохота', city: 'Санкт-Петербург', status: 'REGISTRATION_OPEN', organizer: 'organizer2@test.com', scenario: 'Фотоохота' },
-    { title: 'GPS-квест', city: 'Рига', status: 'REGISTRATION_CLOSED', organizer: 'organizer2@test.com', scenario: 'GPS-квест' },
-    { title: 'Квиз-марафон', city: 'Казань', status: 'LOBBY', organizer: 'organizer1@test.com', scenario: 'Квиз-марафон' },
-    { title: 'QR-детектив', city: 'Москва', status: 'RUNNING', organizer: 'organizer1@test.com', scenario: 'QR-детектив' },
-    { title: 'Смешанный квест', city: 'Минск', status: 'FINISHED', organizer: 'organizer2@test.com', scenario: 'Смешанный квест' },
-    { title: 'Геокэшинг', city: 'Санкт-Петербург', status: 'CANCELLED', organizer: 'organizer2@test.com', scenario: 'Геокэшинг' },
-    { title: 'Детектив', city: 'Рига', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Детектив' },
-    { title: 'Ночной автоквест', city: 'Казань', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Ночной автоквест' },
+    { title: 'Тайны старого города', city: 'Москва', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Тайны старого города', tags: ['history', 'walking'] },
+    { title: 'Ночной дозор', city: 'Минск', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Ночной дозор', tags: ['night', 'adventure'] },
+    { title: 'Фотоохота', city: 'Санкт-Петербург', status: 'PUBLISHED', organizer: 'organizer2@test.com', scenario: 'Фотоохота', tags: ['photo', 'walking'] },
+    { title: 'GPS-квест', city: 'Рига', status: 'HIDDEN', organizer: 'organizer2@test.com', scenario: 'GPS-квест', tags: ['gps', 'exploration'] },
+    { title: 'Квиз-марафон', city: 'Казань', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Квиз-марафон', tags: ['quiz', 'intellectual'] },
+    { title: 'QR-детектив', city: 'Москва', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'QR-детектив', tags: ['qr', 'detective'] },
+    { title: 'Смешанный квест', city: 'Минск', status: 'DRAFT', organizer: 'organizer2@test.com', scenario: 'Смешанный квест', tags: ['mixed'] },
+    { title: 'Геокэшинг', city: 'Санкт-Петербург', status: 'DRAFT', organizer: 'organizer2@test.com', scenario: 'Геокэшинг', tags: ['geocaching'] },
+    { title: 'Детектив', city: 'Рига', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Детектив', tags: ['detective'] },
+    { title: 'Ночной автоквест', city: 'Казань', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Ночной автоквест', tags: ['night', 'auto'] },
   ];
 
   for (const g of gameData) {
     const organizer = users[g.organizer];
     const scenario = scenarios[g.scenario];
+    const isPublished = g.status === 'PUBLISHED';
     const game = await prisma.game.create({
       data: {
         title: g.title,
         description: `${g.title} — тестовая игра`,
         city: g.city,
+        address: null,
         date: new Date('2026-07-15'),
         time: '19:00',
         duration: 120,
@@ -242,6 +283,13 @@ async function main() {
         scenarioId: scenario.id,
         status: g.status as GameStatus,
         imageUrl: `https://placehold.co/800x600/1a1a2e/EEE?text=${encodeURIComponent(g.title.substring(0, 6))}`,
+        tags: g.tags,
+        autoStart: false,
+        autoStartDelay: 0,
+        allowEarlyStart: true,
+        startBuffer: 15,
+        allowLateRegistration: false,
+        publishedAt: isPublished ? new Date() : null,
       },
     });
     games[g.title] = game;
@@ -729,7 +777,10 @@ async function main() {
       authorId: users['organizer1@test.com'].id,
       isPublished: false,
       nodes: createScenarioNodes('text'),
+      edges: [],
       startNodeId: 'start',
+      metadata: { type: 'text', difficulty: 'medium', estimatedDuration: 60, tags: [], coverImage: null },
+      validationStatus: 'DRAFT',
       deletedAt: new Date(),
     },
   });
@@ -913,6 +964,12 @@ async function main() {
       scenarioId: scenarios['Тайны старого города'].id,
       status: GameStatus.DRAFT,
       imageUrl: null,
+      tags: [],
+      autoStart: false,
+      autoStartDelay: 0,
+      allowEarlyStart: true,
+      startBuffer: 15,
+      allowLateRegistration: false,
     },
   });
 
@@ -925,8 +982,26 @@ async function main() {
       username: 'noavatar',
       slug: 'noavatar',
       role: Role.PLAYER,
+      roles: [Role.PLAYER],
       status: UserStatus.ACTIVE,
+      isEmailVerified: false,
+      verified: { email: false, phone: false, telegram: false },
       profile: { avatar: null },
+      settings: {
+        language: 'ru',
+        timezone: 'Europe/Moscow',
+        theme: 'dark',
+        notifications: { email: true, telegram: false, push: true },
+        privacy: { showCity: true, showContacts: false, showStats: true, showAchievements: true },
+      },
+      security: {
+        lastLoginAt: null,
+        failedLoginAttempts: 0,
+        passwordChangedAt: new Date(),
+        trustedDevices: [],
+      },
+      capabilities: [],
+      featureFlags: {},
     },
   });
 
@@ -935,10 +1010,17 @@ async function main() {
     data: {
       name: 'Команда без участников',
       slug: 'team-without-members',
+      description: 'Тестовая команда без участников',
       captainId: users['player1@test.com'].id,
       status: TeamStatus.RECRUITING,
       privacy: TeamVisibility.PUBLIC,
       joinPolicy: JoinPolicy.OPEN,
+      tags: ['test'],
+      maxMembers: 20,
+      maxInvitesPerDay: 10,
+      maxPendingRequests: 5,
+      maxChatMessagesPerMinute: 30,
+      socials: { discord: '', vk: '', telegram: '', youtube: '' },
     },
   });
 
