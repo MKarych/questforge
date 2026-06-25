@@ -52,6 +52,17 @@ export class SupportController {
   }
 
   // ============================================================
+  // Admin/Moderator: Stats (должен быть ПЕРЕД :id, чтобы не перехватывался)
+  // ============================================================
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  async stats() {
+    return this.supportService.getStats();
+  }
+
+  // ============================================================
   // Admin/Moderator: Get single ticket
   // ============================================================
 
@@ -76,16 +87,5 @@ export class SupportController {
   ) {
     const moderatorId = req.user?.userId || req.user?.sub;
     return this.supportService.updateTicket(id, dto, moderatorId);
-  }
-
-  // ============================================================
-  // Admin/Moderator: Stats
-  // ============================================================
-
-  @Get('stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'MODERATOR')
-  async stats() {
-    return this.supportService.getStats();
   }
 }
