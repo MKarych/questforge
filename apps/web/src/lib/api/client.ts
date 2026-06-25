@@ -145,6 +145,7 @@ export interface Game {
   status: string;
   imageUrl: string | null;
   publishedAt: string | null;
+  scenarioId: string | null;
   organizer: {
     id: string;
     name: string;
@@ -1053,26 +1054,45 @@ class ApiClient {
     return this.request('/admin/stats');
   }
 
-  async getPendingGamesAdmin(params?: {
+  // ==================== Admin Games (пост-модерация) ====================
+
+  async getAdminGames(params?: {
+    status?: string;
+    city?: string;
+    search?: string;
     limit?: number;
     offset?: number;
-  }): Promise<ApiResponse<{ items: any[]; total: number }>> {
+  }): Promise<ApiResponse<{ data: any[]; meta: { total: number; limit: number; offset: number } }>> {
     const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.city) queryParams.append('city', params.city);
+    if (params?.search) queryParams.append('search', params.search);
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.offset) queryParams.append('offset', params.offset.toString());
     const query = queryParams.toString();
-    return this.request(`/admin/games/pending${query ? `?${query}` : ''}`);
+    return this.request(`/games/admin/all${query ? `?${query}` : ''}`);
   }
 
-  async approveGame(gameId: string): Promise<ApiResponse<any>> {
-    return this.request(`/admin/games/${gameId}/approve`, { method: 'POST' });
-  }
-
-  async rejectGame(gameId: string, reason: string): Promise<ApiResponse<any>> {
-    return this.request(`/admin/games/${gameId}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
+  async adminHideGame(gameId: string, comment?: string): Promise<ApiResponse<any>> {
+    return this.request(`/games/admin/${gameId}/hide`, {
+      method: 'PATCH',
+      body: JSON.stringify({ comment }),
     });
+  }
+
+  async adminUnhideGame(gameId: string): Promise<ApiResponse<any>> {
+    return this.request(`/games/admin/${gameId}/unhide`, { method: 'PATCH' });
+  }
+
+  async adminBlockGame(gameId: string, comment?: string): Promise<ApiResponse<any>> {
+    return this.request(`/games/admin/${gameId}/block`, {
+      method: 'PATCH',
+      body: JSON.stringify({ comment }),
+    });
+  }
+
+  async adminDeleteGame(gameId: string): Promise<ApiResponse<any>> {
+    return this.request(`/games/admin/${gameId}`, { method: 'DELETE' });
   }
 
   async getPendingApplications(): Promise<ApiResponse<any[]>> {

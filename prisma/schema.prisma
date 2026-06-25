@@ -273,7 +273,6 @@ model Game {
   bannerUrl         String?          @map("banner_url")
   tags              String[]         @default([]) @map("tags")
   status            GameStatus       @default(DRAFT)
-  moderationStatus  ModerationStatus @default(PENDING) @map("moderation_status")
   moderationComment String?          @map("moderation_comment")
   version           Int              @default(1) // Optimistic locking
 
@@ -288,8 +287,6 @@ model Game {
   scenarioId        String?          @map("scenario_id") @db.Uuid
 
   publishedAt       DateTime?        @map("published_at")
-  submittedAt       DateTime?        @map("submitted_at")
-  moderatedAt       DateTime?        @map("moderated_at")
   startedAt         DateTime?        @map("started_at")
   finishedAt        DateTime?        @map("finished_at")
   createdAt         DateTime         @default(now()) @map("created_at")
@@ -315,7 +312,6 @@ model Game {
   @@index([city])
   @@index([date])
   @@index([scenarioId])
-  @@index([moderationStatus])
   @@index([slug])
   @@index([deletedAt])
 }
@@ -943,8 +939,6 @@ enum OrganizerStatus {
 
 enum GameStatus {
   DRAFT
-  PENDING
-  APPROVED
   PUBLISHED
   REGISTRATION_OPEN
   REGISTRATION_CLOSED
@@ -954,12 +948,8 @@ enum GameStatus {
   ARCHIVED
   CANCELLED
   RESCHEDULED
-}
-
-enum ModerationStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  HIDDEN
+  BLOCKED
 }
 
 enum RegistrationStatus {

@@ -18,7 +18,6 @@ export class AdminService {
       totalGames,
       activeGames,
       totalScenarios,
-      pendingGames,
       pendingApplications,
       newSupportTickets,
       inProgressSupportTickets,
@@ -35,9 +34,6 @@ export class AdminService {
         },
       }),
       this.prisma.scenario.count(),
-      this.prisma.game.count({
-        where: { moderationStatus: 'PENDING', deletedAt: null },
-      }),
       this.prisma.organizerApplication.count({
         where: { status: 'PENDING' },
       }),
@@ -55,110 +51,11 @@ export class AdminService {
       totalGames,
       activeGames,
       totalScenarios,
-      pendingGames,
+      pendingGames: 0,
       pendingApplications,
       newSupportTickets,
       inProgressSupportTickets,
     };
-  }
-
-  // ============================================================
-  // Games Moderation
-  // ============================================================
-
-  async getPendingGames(params: { limit: number; offset: number }) {
-    const [items, total] = await Promise.all([
-      this.prisma.game.findMany({
-        where: { moderationStatus: 'PENDING', deletedAt: null },
-        include: {
-          organizer: {
-            select: { id: true, name: true, avatarUrl: true, email: true },
-          },
-          scenario: {
-            select: { id: true, name: true },
-          },
-          _count: {
-            select: { reviews: true, gameTeams: true },
-          },
-        },
-        orderBy: { submittedAt: 'desc' },
-        take: params.limit,
-        skip: params.offset,
-      }),
-      this.prisma.game.count({
-        where: { moderationStatus: 'PENDING', deletedAt: null },
-      }),
-    ]);
-
-    return { items, total };
-  }
-
-  async approveGame(gameId: string, moderatorId: string) {
-    const game = await this.prisma.game.findUnique({
-      where: { id: gameId },
-    });
-
-    if (!game) {
-      throw new NotFoundException('Игра не найдена');
-    }
-
-    if (game.moderationStatus !== 'PENDING') {
-      throw new ConflictException('Игра уже прошла модерацию');
-    }
-
-    const updated = await this.prisma.game.update({
-      where: { id: gameId },
-      data: {
-        moderationStatus: 'APPROVED',
-        status: 'PUBLISHED',
-        publishedAt: new Date(),
-        moderatedAt: new Date(),
-        moderationComment: null,
-      },
-      include: {
-        organizer: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    });
-
-    this.logger.log(`Game ${gameId} approved by moderator ${moderatorId}`);
-    return updated;
-  }
-
-  async rejectGame(gameId: string, reason: string, moderatorId: string) {
-    if (!reason || reason.trim().length === 0) {
-      throw new ForbiddenException('Причина отклонения обязательна');
-    }
-
-    const game = await this.prisma.game.findUnique({
-      where: { id: gameId },
-    });
-
-    if (!game) {
-      throw new NotFoundException('Игра не найдена');
-    }
-
-    if (game.moderationStatus !== 'PENDING') {
-      throw new ConflictException('Игра уже прошла модерацию');
-    }
-
-    const updated = await this.prisma.game.update({
-      where: { id: gameId },
-      data: {
-        moderationStatus: 'REJECTED',
-        moderatedAt: new Date(),
-        moderationComment: reason.trim(),
-      },
-      include: {
-        organizer: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    });
-
-    this.logger.log(`Game ${gameId} rejected by moderator ${moderatorId}. Reason: ${reason}`);
-    return updated;
   }
 
   // ============================================================

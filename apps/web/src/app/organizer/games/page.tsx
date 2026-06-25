@@ -124,6 +124,9 @@ export default function MyGamesPage() {
                         {new Date(game.date).toLocaleDateString('ru-RU')}
                       </span>
                     </div>
+                    <div className="mt-2 text-xs text-text-muted">
+                      {game.scenarioId ? '📜 Сценарий привязан' : '📜 Сценарий не привязан'}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Link
@@ -132,11 +135,6 @@ export default function MyGamesPage() {
                     >
                       Редактировать
                     </Link>
-                    {(game.status === 'DRAFT' || game.status === 'PENDING') && (
-                      <button className="btn-primary text-sm">
-                        Опубликовать
-                      </button>
-                    )}
                     <button className="text-error hover:text-error/80 text-sm font-medium">
                       Удалить
                     </button>

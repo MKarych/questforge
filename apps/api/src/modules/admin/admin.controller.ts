@@ -36,40 +36,6 @@ export class AdminController {
   }
 
   // ============================================================
-  // Games Moderation
-  // ============================================================
-
-  @Get('games/pending')
-  @Roles('ADMIN', 'MODERATOR')
-  async getPendingGames(
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-  ) {
-    return this.adminService.getPendingGames({
-      limit: Number(limit) || 20,
-      offset: Number(offset) || 0,
-    });
-  }
-
-  @Post('games/:id/approve')
-  @Roles('ADMIN', 'MODERATOR')
-  async approveGame(@Param('id') gameId: string, @Request() req: any) {
-    const moderatorId = req.user?.userId || req.user?.sub;
-    return this.adminService.approveGame(gameId, moderatorId);
-  }
-
-  @Post('games/:id/reject')
-  @Roles('ADMIN', 'MODERATOR')
-  async rejectGame(
-    @Param('id') gameId: string,
-    @Body('reason') reason: string,
-    @Request() req: any,
-  ) {
-    const moderatorId = req.user?.userId || req.user?.sub;
-    return this.adminService.rejectGame(gameId, reason, moderatorId);
-  }
-
-  // ============================================================
   // Organizer Applications
   // ============================================================
 

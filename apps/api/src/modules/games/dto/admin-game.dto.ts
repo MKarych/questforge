@@ -1,4 +1,4 @@
-import { GameStatus, ModerationStatus } from '@prisma/client';
+import { GameStatus } from '@prisma/client';
 import { PrivateGameDto } from './private-game.dto';
 
 /**

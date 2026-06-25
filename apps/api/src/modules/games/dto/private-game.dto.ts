@@ -1,11 +1,10 @@
-import { GameStatus, ModerationStatus } from '@prisma/client';
+import { GameStatus } from '@prisma/client';
 import { PublicGameDto } from './public-game.dto';
 
 /**
  * Приватное DTO для организатора (все данные игры + статусы команд).
  */
 export class PrivateGameDto extends PublicGameDto {
-  moderationStatus!: ModerationStatus;
   moderationComment!: string | null;
   version!: number;
   autoStart!: boolean;
@@ -15,8 +14,6 @@ export class PrivateGameDto extends PublicGameDto {
   allowLateRegistration!: boolean;
   organizerId!: string;
   publishedAt!: Date | null;
-  submittedAt!: Date | null;
-  moderatedAt!: Date | null;
   updatedAt!: Date;
   teams!: {
     teamId: string;

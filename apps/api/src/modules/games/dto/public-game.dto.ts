@@ -1,4 +1,4 @@
-import { GameStatus, ModerationStatus } from '@prisma/client';
+import { GameStatus } from '@prisma/client';
 
 /**
  * Публичное DTO для игроков (без чувствительных данных).

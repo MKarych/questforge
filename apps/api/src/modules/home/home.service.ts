@@ -75,9 +75,9 @@ export class HomeService {
   private async getFeaturedGames() {
     const games = await this.prisma.game.findMany({
       where: {
-        moderationStatus: 'APPROVED',
         deletedAt: null,
         publishedAt: { not: null },
+        status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
       },
       take: 4,
       orderBy: { publishedAt: 'desc' },
@@ -113,9 +113,9 @@ export class HomeService {
   private async getPopularGames() {
     const games = await this.prisma.game.findMany({
       where: {
-        moderationStatus: 'APPROVED',
         deletedAt: null,
         publishedAt: { not: null },
+        status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
       },
       take: 4,
       orderBy: { date: 'desc' },
@@ -151,9 +151,9 @@ export class HomeService {
   private async getRecentGames() {
     const games = await this.prisma.game.findMany({
       where: {
-        moderationStatus: 'APPROVED',
         deletedAt: null,
         publishedAt: { not: null },
+        status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
       },
       take: 4,
       orderBy: { createdAt: 'desc' },
@@ -189,9 +189,9 @@ export class HomeService {
   private async getTrendingGames() {
     const games = await this.prisma.game.findMany({
       where: {
-        moderationStatus: 'APPROVED',
         deletedAt: null,
         publishedAt: { not: null },
+        status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
       },
       take: 3,
       orderBy: { date: 'asc' },
@@ -329,7 +329,10 @@ export class HomeService {
     const [gamesCount, teamsCount, playersCount, citiesResult, organizersCount] =
       await Promise.all([
         this.prisma.game.count({
-          where: { moderationStatus: 'APPROVED', deletedAt: null },
+          where: {
+            deletedAt: null,
+            status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
+          },
         }),
         this.prisma.team.count({
           where: { status: 'ACTIVE', deletedAt: null },
@@ -338,7 +341,10 @@ export class HomeService {
           where: { deletedAt: null },
         }),
         this.prisma.game.findMany({
-          where: { moderationStatus: 'APPROVED', deletedAt: null },
+          where: {
+            deletedAt: null,
+            status: { notIn: ['DRAFT', 'CANCELLED', 'ARCHIVED', 'HIDDEN', 'BLOCKED'] },
+          },
           select: { city: true },
           distinct: ['city'],
         }),

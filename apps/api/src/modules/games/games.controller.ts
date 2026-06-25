@@ -325,71 +325,62 @@ export class GamesController {
     return this.gamesService.finishGame(gameId, req.user.userId);
   }
 
-  @Post(':id/submit')
-  @UseGuards(JwtAuthGuard)
-  async submitForModeration(@Request() req: any, @Param('id') gameId: string) {
-    return this.gamesService.submitForModeration(gameId, req.user.userId);
-  }
-
-  // @Post(':id/upload-cover')
-  // @UseGuards(JwtAuthGuard)
-  // @UseInterceptors(
-  //   FileInterceptor('file', {
-  //     storage: diskStorage({
-  //       destination: './public/uploads/covers',
-  //       filename: (_req: any, file: DiskStorageFile, callback: FileCallback) => {
-  //         const ext = extname(file.originalname);
-  //         const filename = `${uuidv4()}${ext}`;
-  //         callback(null, filename);
-  //       },
-  //     }),
-  //     fileFilter: (_req: any, file: DiskStorageFile, callback: (error: Error | null, acceptFile: boolean) => void) => {
-  //       const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  //       if (allowedMimeTypes.includes(file.mimetype)) {
-  //         callback(null, true);
-  //       } else {
-  //         callback(new ForbiddenException('Разрешены только изображения: jpg, png, webp'), false);
-  //       }
-  //     },
-  //     limits: {
-  //       fileSize: 5 * 1024 * 1024, // 5 MB
-  //     },
-  //   }),
-  // )
-  // async uploadCover(
-  //   @Request() req: any,
-  //   @Param('id') gameId: string,
-  //   @UploadedFile() file: Express.Multer.File,
-  // ) {
-  //   return this.gamesService.uploadCover(req.user.userId, gameId, file);
-  // }
-
   // ============================================================
   // 29.4. Админские эндпоинты (ADMIN/MODERATOR only)
   // ============================================================
 
-  @Get('admin/pending')
+  @Get('admin/all')
   @Roles('ADMIN', 'MODERATOR')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  async findPendingGames() {
-    return this.gamesService.findPendingGames();
+  async adminFindAll(
+    @Query('status') status?: string,
+    @Query('city') city?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.gamesService.adminFindAll({
+      status,
+      city,
+      search,
+      limit: Number(limit) || 50,
+      offset: Number(offset) || 0,
+    });
   }
 
-  @Post('admin/:id/approve')
+  @Patch('admin/:id/hide')
   @Roles('ADMIN', 'MODERATOR')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  async approveGame(@Param('id') gameId: string, @Request() req: any) {
-    return this.gamesService.approveGame(gameId, req.user.userId);
-  }
-
-  @Post('admin/:id/reject')
-  @Roles('ADMIN', 'MODERATOR')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async rejectGame(
+  async adminHideGame(
     @Param('id') gameId: string,
-    @Body() body: { reason: string },
+    @Body() body: { comment?: string },
     @Request() req: any,
   ) {
-    return this.gamesService.rejectGame(gameId, req.user.userId, body.reason);
+    return this.gamesService.adminHideGame(gameId, req.user.userId, body.comment);
+  }
+
+  @Patch('admin/:id/unhide')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async adminUnhideGame(@Param('id') gameId: string, @Request() req: any) {
+    return this.gamesService.adminUnhideGame(gameId, req.user.userId);
+  }
+
+  @Patch('admin/:id/block')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async adminBlockGame(
+    @Param('id') gameId: string,
+    @Body() body: { comment?: string },
+    @Request() req: any,
+  ) {
+    return this.gamesService.adminBlockGame(gameId, req.user.userId, body.comment);
+  }
+
+  @Delete('admin/:id')
+  @Roles('ADMIN', 'MODERATOR')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async adminDeleteGame(@Param('id') gameId: string, @Request() req: any) {
+    return this.gamesService.adminDeleteGame(gameId, req.user.userId);
   }
 }

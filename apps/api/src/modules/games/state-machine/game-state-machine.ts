@@ -4,13 +4,11 @@ import { $Enums } from '@prisma/client';
 type GameStatus = $Enums.GameStatus;
 
 // ============================================================
-// Карта разрешённых переходов (Раздел 7.1)
+// Карта разрешённых переходов
 // ============================================================
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ['PENDING'],
-  PENDING: ['APPROVED', 'DRAFT'],
-  APPROVED: ['PUBLISHED'],
-  PUBLISHED: ['REGISTRATION_OPEN', 'CANCELLED', 'RESCHEDULED'],
+  DRAFT: ['PUBLISHED'],
+  PUBLISHED: ['REGISTRATION_OPEN', 'CANCELLED', 'RESCHEDULED', 'DRAFT'],
   REGISTRATION_OPEN: ['REGISTRATION_CLOSED', 'CANCELLED', 'RESCHEDULED'],
   REGISTRATION_CLOSED: ['LOBBY', 'CANCELLED', 'RESCHEDULED'],
   LOBBY: ['RUNNING', 'CANCELLED', 'RESCHEDULED'],
@@ -19,10 +17,12 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: ['ARCHIVED'],
   RESCHEDULED: ['PUBLISHED'],
   ARCHIVED: [],
+  HIDDEN: ['PUBLISHED'],
+  BLOCKED: [],
 };
 
 // ============================================================
-// Запрещённые переходы (Раздел 7.2)
+// Запрещённые переходы
 // ============================================================
 const FORBIDDEN_TRANSITIONS: [string, string][] = [
   ['RUNNING', 'DRAFT'],

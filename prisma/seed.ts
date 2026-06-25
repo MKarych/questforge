@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, ModerationStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus } from '@prisma/client';
+import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -211,16 +211,16 @@ async function main() {
   // ============================================================
   const games: Record<string, any> = {};
   const gameData = [
-    { title: 'Тайны старого города', city: 'Москва', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Тайны старого города', moderationStatus: 'APPROVED' },
-    { title: 'Ночной дозор', city: 'Минск', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Ночной дозор', moderationStatus: 'APPROVED' },
-    { title: 'Фотоохота', city: 'Санкт-Петербург', status: 'REGISTRATION_OPEN', organizer: 'organizer2@test.com', scenario: 'Фотоохота', moderationStatus: 'APPROVED' },
-    { title: 'GPS-квест', city: 'Рига', status: 'REGISTRATION_CLOSED', organizer: 'organizer2@test.com', scenario: 'GPS-квест', moderationStatus: 'APPROVED' },
-    { title: 'Квиз-марафон', city: 'Казань', status: 'LOBBY', organizer: 'organizer1@test.com', scenario: 'Квиз-марафон', moderationStatus: 'APPROVED' },
-    { title: 'QR-детектив', city: 'Москва', status: 'RUNNING', organizer: 'organizer1@test.com', scenario: 'QR-детектив', moderationStatus: 'APPROVED' },
-    { title: 'Смешанный квест', city: 'Минск', status: 'FINISHED', organizer: 'organizer2@test.com', scenario: 'Смешанный квест', moderationStatus: 'APPROVED' },
-    { title: 'Геокэшинг', city: 'Санкт-Петербург', status: 'CANCELLED', organizer: 'organizer2@test.com', scenario: 'Геокэшинг', moderationStatus: 'APPROVED' },
-    { title: 'Детектив', city: 'Рига', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Детектив', moderationStatus: 'PENDING' },
-    { title: 'Ночной автоквест', city: 'Казань', status: 'PENDING', organizer: 'organizer1@test.com', scenario: 'Ночной автоквест', moderationStatus: 'REJECTED' },
+    { title: 'Тайны старого города', city: 'Москва', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Тайны старого города' },
+    { title: 'Ночной дозор', city: 'Минск', status: 'PUBLISHED', organizer: 'organizer1@test.com', scenario: 'Ночной дозор' },
+    { title: 'Фотоохота', city: 'Санкт-Петербург', status: 'REGISTRATION_OPEN', organizer: 'organizer2@test.com', scenario: 'Фотоохота' },
+    { title: 'GPS-квест', city: 'Рига', status: 'REGISTRATION_CLOSED', organizer: 'organizer2@test.com', scenario: 'GPS-квест' },
+    { title: 'Квиз-марафон', city: 'Казань', status: 'LOBBY', organizer: 'organizer1@test.com', scenario: 'Квиз-марафон' },
+    { title: 'QR-детектив', city: 'Москва', status: 'RUNNING', organizer: 'organizer1@test.com', scenario: 'QR-детектив' },
+    { title: 'Смешанный квест', city: 'Минск', status: 'FINISHED', organizer: 'organizer2@test.com', scenario: 'Смешанный квест' },
+    { title: 'Геокэшинг', city: 'Санкт-Петербург', status: 'CANCELLED', organizer: 'organizer2@test.com', scenario: 'Геокэшинг' },
+    { title: 'Детектив', city: 'Рига', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Детектив' },
+    { title: 'Ночной автоквест', city: 'Казань', status: 'DRAFT', organizer: 'organizer1@test.com', scenario: 'Ночной автоквест' },
   ];
 
   for (const g of gameData) {
@@ -241,7 +241,6 @@ async function main() {
         organizerId: organizer.id,
         scenarioId: scenario.id,
         status: g.status as GameStatus,
-        moderationStatus: g.moderationStatus as ModerationStatus,
         imageUrl: `https://placehold.co/800x600/1a1a2e/EEE?text=${encodeURIComponent(g.title.substring(0, 6))}`,
       },
     });
@@ -719,7 +718,6 @@ async function main() {
       organizerId: users['organizer1@test.com'].id,
       scenarioId: scenarios['Ночной автоквест'].id,
       status: GameStatus.CANCELLED,
-      moderationStatus: ModerationStatus.REJECTED,
       deletedAt: new Date(),
     },
   });
@@ -914,7 +912,6 @@ async function main() {
       organizerId: users['organizer1@test.com'].id,
       scenarioId: scenarios['Тайны старого города'].id,
       status: GameStatus.DRAFT,
-      moderationStatus: ModerationStatus.PENDING,
       imageUrl: null,
     },
   });
