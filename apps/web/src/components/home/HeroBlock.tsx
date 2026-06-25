@@ -27,18 +27,8 @@ function HeroContent({ hero }: { hero: HeroBlockProps['hero'] }) {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
 
       <div className="relative z-10 flex flex-col items-center text-center px-4 py-16 md:py-24">
-        <div className="flex items-center gap-3 mb-6">
-          <Image
-            src="/images/logo/logo-horizontal-full.png"
-            alt="Adventure Engine"
-            width={48}
-            height={48}
-            className="h-12 w-auto"
-            priority
-          />
-          <span className="text-3xl md:text-4xl font-bold text-text-primary">
-            {hero.title}
-          </span>
+        <div className="mb-6">
+          <HeroLogo />
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-text-primary max-w-3xl">
@@ -59,6 +49,30 @@ function HeroContent({ hero }: { hero: HeroBlockProps['hero'] }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Полный логотип в Hero-блоке — обе версии рендерятся сразу, переключение через CSS */
+function HeroLogo() {
+  return (
+    <div className="relative mx-auto" style={{ width: 360, height: 96 }}>
+      {/* Светлая версия — видна при data-theme="light" */}
+      <Image
+        src="/images/logo/logo-full-light.svg"
+        alt="Город Приключений"
+        fill
+        className="object-contain [html[data-theme='dark']_&]:hidden"
+        priority
+      />
+      {/* Тёмная версия — видна при data-theme="dark" */}
+      <Image
+        src="/images/logo/logo-full-dark.svg"
+        alt="Город Приключений"
+        fill
+        className="object-contain hidden [html[data-theme='dark']_&]:block"
+        priority
+      />
+    </div>
   );
 }
 

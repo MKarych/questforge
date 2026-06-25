@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
 import Header from '@/components/ui/Header';
+import { useTheme } from '@/hooks/useTheme';
 import { apiClient } from '@/lib/api/client';
 
 export default function ForgotPasswordPage() {
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -33,13 +35,12 @@ export default function ForgotPasswordPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Город Приключений</h1>
             <Image
-              src="/images/logo/logo-horizontal-full.png"
+              src={theme === 'dark' ? '/images/logo/logo-full-dark.svg' : '/images/logo/logo-full-light.svg'}
               alt="Adventure Engine"
               width={120}
               height={40}
-              className="h-10 w-auto mx-auto"
+              className="mx-auto"
             />
           </div>
           <div className="card">

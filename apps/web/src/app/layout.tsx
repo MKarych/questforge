@@ -30,8 +30,8 @@ export const metadata: Metadata = {
   creator: 'Город Приключений',
   publisher: 'Город Приключений',
   icons: {
-    icon: '/images/logo/logo-square-icon.png',
-    apple: '/images/logo/logo-square-icon.png',
+    icon: '/images/logo/logo-icon-light.svg',
+    apple: '/images/logo/logo-icon-light.svg',
   },
   openGraph: {
     type: 'website',
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     url: 'https://adventure-engine.com',
     images: [
       {
-        url: '/images/logo/logo-horizontal-full.png',
+        url: '/images/logo/logo-full-light.svg',
         width: 1200,
         height: 630,
         alt: 'Город Приключений',
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     title: 'Город Приключений',
     description:
       'Городские игры нового поколения. Создавай и проходи захватывающие квесты в своём городе.',
-    images: ['/images/logo/logo-horizontal-full.png'],
+    images: ['/images/logo/logo-full-light.svg'],
   },
   robots: {
     index: true,

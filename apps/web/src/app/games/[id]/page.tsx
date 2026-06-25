@@ -8,7 +8,7 @@ import { getPublicGame, getMyTeams, registerTeam, type GameDetails, type MyTeam 
 import Header from '@/components/ui/Header';
 import ImageModal from '@/components/ui/ImageModal';
 
-const DEFAULT_LOGO = '/images/logo/logo-horizontal-full.png';
+const DEFAULT_LOGO = '/images/logo/logo-full-light.svg';
 
 interface GamePageParams {
   [key: string]: string;

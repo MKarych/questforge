@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useTheme } from '@/hooks/useTheme';
 import type { FeatureFlags } from '@/lib/api/client';
 
 interface FooterProps {
@@ -17,6 +18,7 @@ interface FooterProps {
 }
 
 export default function Footer({ featureFlags, stats }: FooterProps) {
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -45,11 +47,10 @@ export default function Footer({ featureFlags, stats }: FooterProps) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Image
-                src="/images/logo/logo-horizontal-full.png"
+                src={theme === 'dark' ? '/images/logo/logo-icon-dark.svg' : '/images/logo/logo-icon-light.svg'}
                 alt="Город Приключений"
                 width={28}
                 height={28}
-                className="h-7 w-auto"
               />
               <span className="text-base font-bold text-text-primary">
                 Город Приключений

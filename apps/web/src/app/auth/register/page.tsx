@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { register } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
+import { useTheme } from '@/hooks/useTheme';
 
 function generateCaptcha(): { a: number; b: number } {
   return {
@@ -15,6 +16,7 @@ function generateCaptcha(): { a: number; b: number } {
 }
 
 export default function RegisterPage() {
+  const theme = useTheme();
   const router = useRouter();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -89,13 +91,12 @@ export default function RegisterPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Город Приключений</h1>
             <Image
-              src="/images/logo/logo-horizontal-full.png"
+              src={theme === 'dark' ? '/images/logo/logo-full-dark.svg' : '/images/logo/logo-full-light.svg'}
               alt="Adventure Engine"
               width={120}
               height={40}
-              className="h-10 w-auto mx-auto"
+              className="mx-auto"
             />
           </div>
           <div className="card">

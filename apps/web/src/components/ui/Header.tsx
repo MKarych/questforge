@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
+import { useTheme } from '@/hooks/useTheme';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getProfile, type User, type SystemStatus } from '@/lib/api/client';
@@ -140,6 +142,20 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
     </Link>
   );
 
+  /** Внутренний компонент для логотипа в шапке: иконка + текст с переключением темы */
+  function HeaderLogo() {
+    const theme = useTheme();
+    const iconSrc = theme === 'dark' ? '/images/logo/logo-icon-dark.svg' : '/images/logo/logo-icon-light.svg';
+    const textSrc = theme === 'dark' ? '/images/logo/logo-text-dark.svg' : '/images/logo/logo-text-light.svg';
+
+    return (
+      <div className="flex items-center gap-2">
+        <Image src={iconSrc} alt="Город Приключений" width={32} height={32} priority />
+        <Image src={textSrc} alt="Город Приключений" width={120} height={24} priority />
+      </div>
+    );
+  }
+
   return (
     <>
       <SystemStatusBar status={systemStatus} />
@@ -147,12 +163,10 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
       <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            {/* Left: Brand Name */}
+            {/* Left: Brand Name — иконка + текст */}
             <div className="flex items-center gap-4">
               <Link href="/" className="flex items-center gap-2 shrink-0 group">
-                <span className="text-xl font-bold text-primary hover:text-primary/80 transition-colors duration-200">
-                  Город Приключений
-                </span>
+                <HeaderLogo />
               </Link>
             </div>
 

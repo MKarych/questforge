@@ -6,7 +6,7 @@ import Image from 'next/image';
 import type { GameCard as GameCardType } from '@/lib/api/client';
 import ImageModal from './ImageModal';
 
-const DEFAULT_LOGO = '/images/logo/logo-horizontal-full.png';
+const DEFAULT_LOGO = '/images/logo/logo-full-light.svg';
 
 interface GameCardProps {
   game: GameCardType;
@@ -55,7 +55,7 @@ export default function GameCard({ game }: GameCardProps) {
               src={coverImage}
               alt={game.title}
               fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+              className={`${hasCustomImage ? 'object-cover group-hover:scale-105' : 'object-contain p-6'} transition-transform duration-300 pointer-events-none`}
               quality={hasCustomImage && !isPlaceholder ? 85 : 100}
               unoptimized={!hasCustomImage || isPlaceholder}
             />
