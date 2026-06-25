@@ -20,6 +20,7 @@ import { AchievementsModule } from './modules/achievements/achievements.module';
 import { ActivityFeedModule } from './modules/activity-feed/activity-feed.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { SupportModule } from './modules/support/support.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/configuration';
 
@@ -57,6 +58,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     ActivityFeedModule,
     BillingModule,
     SupportModule,
+    RealtimeModule,
     EngineModule,
   ],
   controllers: [AppController],

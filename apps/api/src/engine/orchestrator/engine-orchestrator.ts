@@ -10,6 +10,10 @@ import {
   ScenarioNode,
   NodeType,
   TransitionType,
+  AnswerCommand,
+  AnswerResult,
+  HintResponse,
+  RealtimeEvent,
 } from '../types/engine.types';
 import { EventStore } from '../event-store/event-store';
 import {
@@ -32,6 +36,7 @@ export interface ProcessAnswerResult {
   events: Event[];
   message: string;
   transitionType: TransitionType;
+  answerResult: AnswerResult;
 }
 
 export interface CurrentNodeInfo {
@@ -63,7 +68,8 @@ export class EngineOrchestrator {
   // ==========================================================================
 
   /**
-   * Process a player answer for a given node.
+   * Process a player answer for a given node with conflict resolution.
+   * Implements spec 59: stateVersion check, first-answer-is-canonical.
    */
   async processAnswer(
     sessionId: string,
@@ -71,6 +77,8 @@ export class EngineOrchestrator {
     gameId: string,
     answer: string,
     nodeId: string,
+    userId: string,
+    stateVersion?: number,
   ): Promise<ProcessAnswerResult> {
     // 1. Acquire distributed lock
     const acquired = await this.lockManager.acquire(sessionId);
@@ -88,26 +96,62 @@ export class EngineOrchestrator {
       // 3. Validate session is active
       this.validateSessionActive(state);
 
-      // 4. Load and validate node
+      // 4. Check stateVersion for optimistic locking (spec 59)
+      if (stateVersion !== undefined && stateVersion !== state.stateVersion) {
+        return {
+          success: false,
+          state,
+          nextNode: null,
+          events: [],
+          message: 'Ваш ответ относится к устаревшему состоянию. Обновите страницу.',
+          transitionType: 'fail',
+          answerResult: {
+            status: 'stale',
+            reason: 'STATE_VERSION_MISMATCH',
+            nodeId,
+            currentVersion: state.stateVersion,
+          },
+        };
+      }
+
+      // 5. Check if node is already resolved (first-answer-is-canonical)
+      const nodeAlreadyResolved = state.history.some((h) => h.nodeId === nodeId && h.result === 'success');
+      if (nodeAlreadyResolved) {
+        return {
+          success: false,
+          state,
+          nextNode: null,
+          events: [],
+          message: 'Это задание уже выполнено вашей командой.',
+          transitionType: 'fail',
+          answerResult: {
+            status: 'ignored',
+            reason: 'NODE_ALREADY_RESOLVED',
+            nodeId,
+          },
+        };
+      }
+
+      // 6. Load and validate node
       const node = await this.loadNode(gameId, nodeId);
       if (!node) {
         throw new NotFoundException(`Node ${nodeId} not found in game scenario`);
       }
 
-      // 5. Validate node belongs to current session
+      // 7. Validate node belongs to current session
       if (nodeId !== state.currentNodeId) {
         throw new BadRequestException(
           `Answer is for node ${nodeId}, but current node is ${state.currentNodeId}`,
         );
       }
 
-      // 6. Find plugin for node type
+      // 8. Find plugin for node type
       const plugin = this.pluginRegistry.get(node.type);
       if (!plugin) {
         throw new BadRequestException(`No plugin registered for node type: ${node.type}`);
       }
 
-      // 7. Evaluate answer through plugin (Rules Engine)
+      // 9. Evaluate answer through plugin (Rules Engine)
       const pluginConfig = this.buildPluginConfig(node);
       const context = new ExecutionContextImpl(this.toPlainRecord(state), answer);
 
@@ -117,10 +161,10 @@ export class EngineOrchestrator {
         context,
       );
 
-      // 8. Determine transition type
+      // 10. Determine transition type
       const transitionType: TransitionType = pluginResult.success ? 'success' : 'fail';
 
-      // 9. Generate events
+      // 11. Generate events with actorUserId
       const events = this.generateEvents(
         sessionId,
         teamId,
@@ -130,29 +174,31 @@ export class EngineOrchestrator {
         pluginResult,
         transitionType,
         state.history.length + 1,
+        userId,
       );
 
-      // 10. Resolve next node via transitions
+      // 12. Resolve next node via transitions
       const nextNode = this.resolveNextNode(node, transitionType);
 
-      // 11. Update state
+      // 13. Update state with incremented stateVersion
       const newState = this.applyTransition(
         state,
         nodeId,
         transitionType,
         pluginResult,
         nextNode,
+        userId,
       );
 
-      // 12. Transition state machine
+      // 14. Transition state machine
       this.transitionTeamState(newState, transitionType, nextNode);
 
-      // 13. Save events and state snapshot
+      // 15. Save events and state snapshot
       await this.eventStore.appendMany(events);
       await this.saveStateSnapshot(sessionId, newState);
 
       this.logger.log(
-        `Answer processed for session ${sessionId}: ${
+        `Answer processed for session ${sessionId} by user ${userId}: ${
           pluginResult.success ? 'accepted' : 'rejected'
         } — ${nodeId} -> ${nextNode?.id || 'FINISH'}`,
       );
@@ -163,13 +209,99 @@ export class EngineOrchestrator {
         nextNode,
         events,
         message: pluginResult.success
-          ? 'Answer accepted'
-          : pluginResult.reason || 'Answer rejected',
+          ? 'Ответ принят!'
+          : pluginResult.reason || 'Неправильный ответ. Попробуйте ещё раз.',
         transitionType,
+        answerResult: {
+          status: pluginResult.success ? 'accepted' : 'ignored',
+          nodeId,
+        },
       };
     } finally {
       await this.lockManager.release(sessionId);
     }
+  }
+
+  /**
+   * Request a hint for the current node.
+   * Hint is deducted once per team per node (spec 57, 59).
+   */
+  async requestHint(
+    sessionId: string,
+    teamId: string,
+    gameId: string,
+    userId: string,
+  ): Promise<HintResponse> {
+    const state = await this.loadSessionState(sessionId, teamId);
+    if (!state) {
+      throw new NotFoundException('Session not found');
+    }
+
+    const node = await this.loadNode(gameId, state.currentNodeId);
+    if (!node) {
+      throw new NotFoundException('Current node not found');
+    }
+
+    if (!node.hint) {
+      throw new BadRequestException('No hint available for this node');
+    }
+
+    // Check if hint was already revealed for this node
+    const hintAlreadyRevealed = state.history.some(
+      (h) => h.nodeId === state.currentNodeId && h.actorUserId === '__hint__',
+    );
+
+    if (hintAlreadyRevealed) {
+      return {
+        hint: node.hint,
+        penalty: 0,
+        alreadyRevealed: true,
+      };
+    }
+
+    // Apply penalty for hint (spec 60: hints cost points)
+    const hintPenalty = node.penalty || 5;
+
+    // Record hint in history
+    const hintEvent: Event = {
+      id: uuid(),
+      type: EventType.HINT_REVEALED,
+      gameId,
+      teamId,
+      nodeId: state.currentNodeId,
+      payload: { hint: node.hint, penalty: hintPenalty, userId },
+      timestamp: Date.now(),
+      sequence: state.history.length + 1,
+      version: 1,
+    };
+
+    const updatedState: SessionState = {
+      ...state,
+      penalties: state.penalties + hintPenalty,
+      score: Math.max(0, state.score - hintPenalty),
+      stateVersion: state.stateVersion + 1,
+      history: [
+        ...state.history,
+        {
+          nodeId: state.currentNodeId,
+          result: 'fail',
+          timestamp: Date.now(),
+          score: -hintPenalty,
+          actorUserId: '__hint__',
+        },
+      ],
+    };
+
+    await this.eventStore.append(hintEvent);
+    await this.saveStateSnapshot(sessionId, updatedState);
+
+    this.logger.log(`Hint revealed for team ${teamId} on node ${state.currentNodeId}, penalty: ${hintPenalty}`);
+
+    return {
+      hint: node.hint,
+      penalty: hintPenalty,
+      alreadyRevealed: false,
+    };
   }
 
   /**
@@ -203,7 +335,7 @@ export class EngineOrchestrator {
       );
     }
 
-    // Create initial state
+    // Create initial state with stateVersion = 1
     const state: SessionState = {
       sessionId: uuid(),
       teamId,
@@ -213,6 +345,7 @@ export class EngineOrchestrator {
       score: 0,
       penalties: 0,
       status: TeamStatus.WAITING_ANSWER,
+      stateVersion: 1,
       startedAt: Date.now(),
       history: [],
     };
@@ -492,6 +625,7 @@ export class EngineOrchestrator {
 
   /**
    * Apply state transition: update score, penalties, history, currentNodeId.
+   * Increments stateVersion for optimistic locking.
    */
   private applyTransition(
     state: SessionState,
@@ -499,6 +633,7 @@ export class EngineOrchestrator {
     transitionType: TransitionType,
     pluginResult: MissionResult,
     nextNode: ScenarioNode | null,
+    userId?: string,
   ): SessionState {
     const scoreDelta = pluginResult.success ? (pluginResult.score || 10) : 0;
     const penaltyDelta = pluginResult.success ? 0 : 1;
@@ -507,6 +642,7 @@ export class EngineOrchestrator {
       ...state,
       score: state.score + scoreDelta,
       penalties: state.penalties + penaltyDelta,
+      stateVersion: state.stateVersion + 1,
       history: [
         ...state.history,
         {
@@ -514,6 +650,7 @@ export class EngineOrchestrator {
           result: transitionType === 'success' ? 'success' : 'fail',
           timestamp: Date.now(),
           score: scoreDelta,
+          actorUserId: userId,
         },
       ],
       currentNodeId: nextNode?.id || state.currentNodeId,
@@ -566,18 +703,19 @@ export class EngineOrchestrator {
     pluginResult: MissionResult,
     transitionType: TransitionType,
     startSequence: number,
+    userId?: string,
   ): Event[] {
     const events: Event[] = [];
     let seq = startSequence;
 
-    // 1. Player answer submitted
+    // 1. Player answer submitted with actorUserId
     events.push({
       id: uuid(),
       type: EventType.PLAYER_ANSWER,
       gameId,
       teamId,
       nodeId,
-      payload: { answer },
+      payload: { answer, userId: userId || 'unknown' },
       timestamp: Date.now(),
       sequence: seq++,
       version: 1,
@@ -591,7 +729,7 @@ export class EngineOrchestrator {
         gameId,
         teamId,
         nodeId,
-        payload: { score: pluginResult.score || 10, answer },
+        payload: { score: pluginResult.score || 10, answer, userId: userId || 'unknown' },
         timestamp: Date.now(),
         sequence: seq++,
         version: 1,
@@ -628,7 +766,7 @@ export class EngineOrchestrator {
         gameId,
         teamId,
         nodeId,
-        payload: { reason: pluginResult.reason || 'incorrect', answer },
+        payload: { reason: pluginResult.reason || 'incorrect', answer, userId: userId || 'unknown' },
         timestamp: Date.now(),
         sequence: seq++,
         version: 1,

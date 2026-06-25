@@ -137,6 +137,7 @@ export interface SessionState {
   score: number;
   penalties: number;
   status: TeamStatus;
+  stateVersion: number; // optimistic locking — увеличивается при каждом изменении
   startedAt: number;
   finishedAt?: number;
   history: SessionHistoryEntry[];
@@ -147,4 +148,94 @@ export interface SessionHistoryEntry {
   result: 'success' | 'fail' | 'timeout';
   timestamp: number;
   score?: number;
+  actorUserId?: string; // кто именно сделал действие
+}
+
+/**
+ * Answer command with stateVersion for conflict resolution
+ */
+export interface AnswerCommand {
+  commandId: string;
+  teamId: string;
+  nodeId: string;
+  stateVersion: number; // ключевое поле для optimistic locking
+  answer: string;
+  userId: string;
+}
+
+/**
+ * Answer result with conflict resolution status
+ */
+export interface AnswerResult {
+  status: 'accepted' | 'ignored' | 'stale';
+  reason?: 'NODE_ALREADY_RESOLVED' | 'STATE_VERSION_MISMATCH';
+  nodeId: string;
+  currentVersion?: number;
+}
+
+/**
+ * Hint request
+ */
+export interface HintRequest {
+  nodeId: string;
+  teamId: string;
+  userId: string;
+}
+
+/**
+ * Hint response
+ */
+export interface HintResponse {
+  hint: string;
+  penalty: number;
+  alreadyRevealed: boolean;
+}
+
+/**
+ * Team presence
+ */
+export interface Presence {
+  userId: string;
+  teamId: string;
+  status: 'ONLINE' | 'OFFLINE' | 'IDLE';
+  lastSeenAt: number;
+  currentDevice: string;
+}
+
+/**
+ * Team event with actor tracking
+ */
+export interface TeamEvent {
+  id: string;
+  type: 'ANSWER_SUBMITTED' | 'ANSWER_ACCEPTED' | 'ANSWER_REJECTED' | 'HINT_REQUESTED' | 'HINT_REVEALED';
+  teamId: string;
+  actorUserId: string; // КТО ИМЕННО сделал действие
+  nodeId: string;
+  payload: Record<string, unknown>;
+  timestamp: number;
+}
+
+/**
+ * WebSocket realtime events
+ */
+export type RealtimeEventType =
+  | 'STATE_SYNC'
+  | 'NODE_ASSIGNED'
+  | 'NODE_COMPLETED'
+  | 'ANSWER_ACCEPTED'
+  | 'ANSWER_REJECTED'
+  | 'SCORE_UPDATED'
+  | 'INVENTORY_UPDATED'
+  | 'TEAM_FINISHED'
+  | 'MEMBER_JOINED'
+  | 'MEMBER_LEFT'
+  | 'PRESENCE_UPDATE'
+  | 'CHAT_MESSAGE'
+  | 'HINT_REVEALED';
+
+export interface RealtimeEvent {
+  type: RealtimeEventType;
+  teamId: string;
+  payload: Record<string, unknown>;
+  timestamp: number;
 }
