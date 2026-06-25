@@ -247,7 +247,15 @@ function ScenarioEditorInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-
+  // Синхронизация структуры узлов и рёбер из store в React Flow.
+  // Когда store обновляется (загрузка шаблона, undo/redo, clearAll),
+  // rfNodes/rfEdges пересчитываются через useMemo, но useNodesState
+  // не обновляет своё внутреннее состояние автоматически.
+  // Этот useEffect форсирует синхронизацию при изменении flowKey.
+  useEffect(() => {
+    setNodes(rfNodes);
+    setEdges(rfEdges);
+  }, [rfNodes, rfEdges, store.flowKey, setNodes, setEdges]);
 
   // AutoSave
   useEffect(() => {
@@ -326,7 +334,7 @@ function ScenarioEditorInner({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [store.selectedNodes, store.selectedEdges]);
+  }, [store, store.selectedNodes, store.selectedEdges]);
 
   // Drag & Drop
   const onDragStart = (event: React.DragEvent, block: BlockDefinition) => {

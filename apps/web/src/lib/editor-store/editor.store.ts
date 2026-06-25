@@ -411,6 +411,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       variables: previous.variables,
       history: { ...state.history, undoStack, redoStack },
       isDirty: true,
+      flowKey: state.flowKey + 1,
     });
   },
 
@@ -435,6 +436,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       variables: next.variables,
       history: { ...state.history, undoStack, redoStack },
       isDirty: true,
+      flowKey: state.flowKey + 1,
     });
   },
 
