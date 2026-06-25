@@ -40,7 +40,6 @@ const EditorNodeComponent = ({ id, data, selected }: NodeProps<Scene>) => {
     <div
       className={`
         px-4 py-3 rounded-lg shadow-md border-2 min-w-[200px] max-w-[300px]
-        transition-all
         ${selected
           ? 'border-primary ring-2 ring-primary/30'
           : hasErrors
@@ -49,7 +48,7 @@ const EditorNodeComponent = ({ id, data, selected }: NodeProps<Scene>) => {
               ? 'border-yellow-500 ring-2 ring-yellow-500/30'
               : 'border-border'
         }
-        bg-background hover:shadow-lg transition-shadow
+        bg-background hover:shadow-lg
       `}
     >
       {/* Header */}
@@ -102,23 +101,18 @@ const EditorNodeComponent = ({ id, data, selected }: NodeProps<Scene>) => {
         </div>
       )}
 
-      {/* Handle для соединений — isConnectable={false} чтобы не перехватывать drag узла */}
-      {/* Соединения создаются через onConnect (клик на source + клик на target) с connectOnClick={true} */}
-      {/* Handle для соединений — isConnectable={false} чтобы не перехватывать drag узла */}
-      {/* Соединения создаются через onConnect (клик на source + клик на target) с connectOnClick={true} */}
+      {/* Handle для соединений */}
       <Handle
         type="target"
         position={Position.Top}
         id={`${id}-target`}
         className="!bg-primary !w-2 !h-2 !border !border-white"
-        isConnectable={false}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id={`${id}-source`}
         className="!bg-primary !w-2 !h-2 !border !border-white"
-        isConnectable={false}
       />
     </div>
   );

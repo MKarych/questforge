@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { shallow } from 'zustand/shallow';
 import ReactFlow, {
   Background,
   Controls,
@@ -37,12 +38,14 @@ import ToolbarSettingsModal from './ToolbarSettingsModal';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
 // ==================== Node Types for React Flow ====================
+// Определяем на уровне модуля для стабильной ссылки (важно для React Flow)
 const nodeTypes = {
   location: EditorNodeComponent,
   quiz: EditorNodeComponent,
   dialogue: EditorNodeComponent,
   conference: EditorNodeComponent,
   rpg: EditorNodeComponent,
+  slide: EditorNodeComponent,
   custom: EditorNodeComponent,
 };
 
@@ -140,8 +143,10 @@ const CustomEdge = ({
   );
 };
 
+const CustomEdgeMemo = memo(CustomEdge);
+
 const edgeTypes = {
-  default: CustomEdge,
+  default: CustomEdgeMemo,
 };
 
 // ==================== Props ====================
@@ -168,6 +173,10 @@ function ScenarioEditorInner({
   onToggleHeader,
 }: ScenarioEditorV2Props) {
   const reactFlowInstance = useReactFlow();
+  // Используем селекторы для стабильных ссылок — это критически важно для useNodesState/useEdgesState,
+  // чтобы они не сбрасывали позиции узлов при ререндерах, вызванных изменением других полей стора
+  const storeScenes = useEditorStore((s) => s.scenes, shallow);
+  const storeEdges = useEditorStore((s) => s.edges, shallow);
   const store = useEditorStore();
   const initialized = useRef(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -207,21 +216,23 @@ function ScenarioEditorInner({
   }, []);
 
   // Convert Scene[] to React Flow Node[]
+  // Используем storeScenes (с shallow-сравнением) вместо store.scenes,
+  // чтобы useMemo возвращал стабильную ссылку и useNodesState не сбрасывал позиции узлов
   const rfNodes: Node[] = useMemo(
     () =>
-      store.scenes.map((s) => ({
+      storeScenes.map((s) => ({
         id: s.id,
         type: s.type,
         position: s.position,
         data: s,
       })),
-    [store.scenes]
+    [storeScenes]
   );
 
   // Convert Edge[] to React Flow Edge[]
   const rfEdges: Edge[] = useMemo(
     () =>
-      store.edges.map((e) => ({
+      storeEdges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -229,42 +240,14 @@ function ScenarioEditorInner({
         animated: e.animated,
         data: e.data,
       })),
-    [store.edges]
+    [storeEdges]
   );
 
-  // Используем useNodesState/useEdgesState для управления узлами в React Flow
-  // Инициализируем один раз — React Flow сам управляет состоянием узлов
+  // Управление узлами и рёбрами через useNodesState/useEdgesState
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-  // Синхронизация store -> React Flow ТОЛЬКО при загрузке нового сценария
-  // (когда flowKey меняется). При добавлении/удалении сцен через onDrop/onPaletteClick
-  // мы добавляем/удаляем узлы напрямую через setNodes.
-  // При drag позиция сохраняется в store через onNodeDragStop.
-  const scenesKey = useMemo(
-    () => store.scenes.map(s => `${s.id}:${s.type}`).join(','),
-    [store.scenes]
-  );
-  useEffect(() => {
-    console.log('[Sync] scenesKey changed:', scenesKey, 'nodes:', rfNodes.length);
-    setNodes(rfNodes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenesKey, setNodes]);
 
-  const edgesKey = useMemo(
-    () => store.edges.map(e => `${e.id}:${e.source}:${e.target}`).join(','),
-    [store.edges]
-  );
-  useEffect(() => {
-    console.log('[Sync] edgesKey changed:', edgesKey, 'edges:', rfEdges.length);
-    setEdges(rfEdges);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edgesKey, setEdges]);
-
-  // Auto-validate on scenes/edges change
-  useEffect(() => {
-    store.validate();
-  }, [store.scenes, store.edges]);
 
   // AutoSave
   useEffect(() => {
@@ -372,8 +355,9 @@ function ScenarioEditorInner({
 
       // Добавляем в store
       store.addScene(block.type, position, block.label);
-      // Добавляем в React Flow напрямую (useEffect сбросит позиции при drag)
-      const newScene = store.scenes[store.scenes.length - 1];
+      // Добавляем в React Flow напрямую
+      // Используем getState() для получения актуального состояния после addScene
+      const newScene = useEditorStore.getState().scenes.slice(-1)[0];
       if (newScene) {
         setNodes((nds) => [
           ...nds,
@@ -398,9 +382,13 @@ function ScenarioEditorInner({
         x: 200 + (existingCount % 3) * 320,
         y: 100 + Math.floor(existingCount / 3) * 200,
       };
+      // Создаём сцену в store
       store.addScene(block.type, position, block.label);
-      // Добавляем в React Flow напрямую
-      const newScene = store.scenes[store.scenes.length - 1];
+      // После addScene Zustand обновил внутреннее состояние, но store.scenes
+      // в этом замыкании всё ещё указывает на старый массив.
+      // Используем useEditorStore.getState() для получения актуального состояния.
+      const currentScenes = useEditorStore.getState().scenes;
+      const newScene = currentScenes[currentScenes.length - 1];
       if (newScene) {
         setNodes((nds) => [
           ...nds,
@@ -426,9 +414,25 @@ function ScenarioEditorInner({
     (params: Connection) => {
       if (params.source && params.target) {
         store.addEdge(params.source, params.target);
+        // Добавляем ребро в React Flow напрямую, аналогично onPaletteClick
+        const currentEdges = useEditorStore.getState().edges;
+        const newEdge = currentEdges[currentEdges.length - 1];
+        if (newEdge) {
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: newEdge.id,
+              source: newEdge.source,
+              target: newEdge.target,
+              type: 'default',
+              animated: newEdge.animated,
+              data: newEdge.data,
+            },
+          ]);
+        }
       }
     },
-    [store]
+    [store, setEdges]
   );
 
   // Selection + Live Preview
@@ -447,6 +451,13 @@ function ScenarioEditorInner({
   );
 
   // Сохраняем финальную позицию узла после завершения drag
+  const onNodeDragStart = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      // Drag начался — React Flow сам обновляет позицию узла в useNodesState
+    },
+    []
+  );
+
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       store.moveScene(node.id, node.position);
@@ -828,31 +839,19 @@ function ScenarioEditorInner({
           )}
 
           <ReactFlow
-            key={store.flowKey}
             nodes={nodes}
             edges={edges}
             nodesDraggable={true}
             elementsSelectable={true}
             nodeDragThreshold={1}
-            connectOnClick={true}
+            connectOnClick={false}
             connectionMode={ConnectionMode.Strict}
-            // Handle имеет isConnectable={false} — соединения только через onConnect
-            onNodesChange={(changes) => {
-              onNodesChange(changes);
-              // НЕ синхронизируем позицию здесь — финальная позиция в onNodeDragStop
-            }}
-            onEdgesChange={(changes) => {
-              onEdgesChange(changes);
-              // Sync edge deletions
-              for (const change of changes) {
-                if (change.type === 'remove' && change.id) {
-                  store.removeEdge(change.id);
-                }
-              }
-            }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
+            onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
             onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
@@ -864,6 +863,9 @@ function ScenarioEditorInner({
             className="bg-background"
             deleteKeyCode={null}
             selectionMode={SelectionMode.Partial}
+            panOnDrag={[1, 2]}
+            panOnScroll={false}
+            zoomOnScroll={true}
           >
             <Background color="#888" gap={20} />
             <Controls />

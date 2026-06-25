@@ -16,6 +16,7 @@ export default function GameCard({ game }: GameCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
+  const isPlaceholder = hasCustomImage && game.imageUrl?.includes('placehold.co');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -55,8 +56,8 @@ export default function GameCard({ game }: GameCardProps) {
               alt={game.title}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
-              quality={hasCustomImage ? 85 : 100}
-              unoptimized={!hasCustomImage}
+              quality={hasCustomImage && !isPlaceholder ? 85 : 100}
+              unoptimized={!hasCustomImage || isPlaceholder}
             />
             {!hasCustomImage && (
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
