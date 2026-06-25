@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../common/prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 import { MarketplaceController } from './marketplace.controller';
 import { MarketplaceService } from './marketplace/marketplace.service';
 import { PurchaseService } from './purchase/purchase.service';
@@ -11,7 +12,7 @@ import { PayoutService } from './payout/payout.service';
 import { AnalyticsService } from './analytics/analytics.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [MarketplaceController],
   providers: [
     MarketplaceService,
