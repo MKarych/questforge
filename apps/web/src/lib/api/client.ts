@@ -607,6 +607,10 @@ class ApiClient {
         const data = await response.json();
 
         if (!response.ok) {
+          // Если 401 — токен невалидный, очищаем его
+          if (response.status === 401) {
+            this.removeToken();
+          }
           const error: ApiError = data;
           throw new Error(error.error?.message || 'Request failed');
         }
@@ -667,7 +671,8 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    this.saveToken(response.data.token);
+    // Бэкенд возвращает accessToken, а интерфейс ожидает token
+    this.saveToken((response.data as any).accessToken || response.data.token);
     return response;
   }
 
@@ -676,7 +681,8 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-    this.saveToken(response.data.token);
+    // Бэкенд возвращает accessToken, а интерфейс ожидает token
+    this.saveToken((response.data as any).accessToken || response.data.token);
     return response;
   }
 

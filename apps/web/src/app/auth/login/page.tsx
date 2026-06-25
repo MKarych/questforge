@@ -13,14 +13,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setWarning(null);
 
     try {
-      await login({ login: loginField, password });
+      const response = await login({ login: loginField, password });
+      // Если есть предупреждение (например, неподтверждённый email) — показываем
+      if ((response.data as any).warning) {
+        setWarning((response.data as any).warning);
+      }
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка входа');
@@ -76,6 +82,12 @@ export default function LoginPage() {
                   required
                 />
               </div>
+
+              {warning && (
+                <div className="p-3 rounded-lg bg-warning/10 text-warning text-sm">
+                  {warning}
+                </div>
+              )}
 
               {error && (
                 <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
