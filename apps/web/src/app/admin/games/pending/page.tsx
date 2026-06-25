@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import AdminNav from '@/components/admin/AdminNav';
 
 interface PendingGame {
   id: string;
@@ -43,6 +43,7 @@ export default function AdminGamesPendingPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Reject modal
   const [rejectModal, setRejectModal] = useState<{ gameId: string; gameTitle: string } | null>(null);
@@ -53,6 +54,7 @@ export default function AdminGamesPendingPage() {
       try {
         const profileResponse = await getProfile();
         const role = profileResponse.data.role;
+        setUserRole(role);
         if (role !== 'ADMIN' && role !== 'MODERATOR') {
           router.push('/');
           return;
@@ -132,6 +134,8 @@ export default function AdminGamesPendingPage() {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
+        <AdminNav userRole={userRole} />
+        
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">🎮 Модерация игр</h1>
@@ -139,9 +143,6 @@ export default function AdminGamesPendingPage() {
               {total > 0 ? `${total} игр${total === 1 ? 'а' : 'ы'} ожидает проверки` : 'Нет игр на проверке'}
             </p>
           </div>
-          <Link href="/admin/dashboard" className="text-text-secondary hover:text-text-primary text-sm">
-            ← Назад к дашборду
-          </Link>
         </div>
 
         {error && (

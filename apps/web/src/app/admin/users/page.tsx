@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import AdminNav from '@/components/admin/AdminNav';
 
 interface AdminUser {
   id: string;
@@ -33,6 +33,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Role change modal
   const [roleModal, setRoleModal] = useState<{ userId: string; userName: string; currentRole: string } | null>(null);
@@ -43,6 +44,7 @@ export default function AdminUsersPage() {
       try {
         const profileResponse = await getProfile();
         const role = profileResponse.data.role;
+        setUserRole(role);
         if (role !== 'ADMIN') {
           router.push('/');
           return;
@@ -167,14 +169,13 @@ export default function AdminUsersPage() {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
+        <AdminNav userRole={userRole} />
+        
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">👥 Пользователи</h1>
             <p className="text-text-secondary mt-1">Всего: {total}</p>
           </div>
-          <Link href="/admin/dashboard" className="text-text-secondary hover:text-text-primary text-sm">
-            ← Назад к дашборду
-          </Link>
         </div>
 
         {error && (

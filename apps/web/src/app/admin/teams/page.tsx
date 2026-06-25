@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import AdminNav from '@/components/admin/AdminNav';
 
 interface AdminTeam {
   id: string;
@@ -125,47 +126,13 @@ export default function AdminTeamsPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
+        <AdminNav userRole={userRole} />
+
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-text-primary">👥 Управление командами</h1>
           <span className="text-sm text-text-secondary">
             {isAdmin ? 'Администратор' : 'Модератор'}
           </span>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          <Link
-            href="/admin/dashboard"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📊 Дашборд
-          </Link>
-          <Link
-            href="/admin/games/pending"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            🎮 Модерация игр
-          </Link>
-          <Link
-            href="/admin/organizers/applications"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📋 Заявки организаторов
-          </Link>
-          {isAdmin && (
-            <Link
-              href="/admin/users"
-              className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-            >
-              👥 Пользователи
-            </Link>
-          )}
-          <Link
-            href="/admin/teams"
-            className="px-4 py-2 rounded-lg bg-primary text-white font-medium"
-          >
-            👥 Команды
-          </Link>
         </div>
 
         {/* Success/Error Messages */}

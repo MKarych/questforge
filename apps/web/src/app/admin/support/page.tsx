@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { apiClient, getProfile } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import AdminNav from '@/components/admin/AdminNav';
 
 interface SupportTicket {
   id: string;
@@ -179,53 +180,13 @@ export default function AdminSupportPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
+        <AdminNav userRole={userRole} />
+
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-text-primary">📬 Заявки в поддержку</h1>
           <span className="text-sm text-text-secondary">
             {userRole === 'ADMIN' ? 'Администратор' : 'Модератор'}
           </span>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          <Link
-            href="/admin/dashboard"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📊 Дашборд
-          </Link>
-          <Link
-            href="/admin/games/pending"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            🎮 Модерация игр
-          </Link>
-          <Link
-            href="/admin/organizers/applications"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            📋 Заявки организаторов
-          </Link>
-          <Link
-            href="/admin/support"
-            className="px-4 py-2 rounded-lg bg-primary text-white font-medium"
-          >
-            📬 Поддержка
-          </Link>
-          {userRole === 'ADMIN' && (
-            <Link
-              href="/admin/users"
-              className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-            >
-              👥 Пользователи
-            </Link>
-          )}
-          <Link
-            href="/admin/teams"
-            className="px-4 py-2 rounded-lg bg-surface-elevated text-text-secondary hover:bg-surface-hover font-medium"
-          >
-            👥 Команды
-          </Link>
         </div>
 
         {/* Stats */}
