@@ -892,6 +892,588 @@ POST /games/:id/finish
 
 ---
 
+### 5.10. Отменить игру
+
+```
+POST /games/:id/cancel
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "CANCELLED",
+    "cancelledAt": "2025-01-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 5.11. Перенести игру
+
+```
+POST /games/:id/reschedule
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Body:**
+```json
+{
+  "newDate": "2025-02-01T14:00:00Z",
+  "reason": "Плохая погода"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "RESCHEDULED",
+    "newDate": "2025-02-01T14:00:00Z"
+  }
+}
+```
+
+---
+
+### 5.12. Переместить в лобби
+
+```
+POST /games/:id/move-to-lobby
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "LOBBY"
+  }
+}
+```
+
+---
+
+### 5.13. Загрузить обложку
+
+```
+POST /games/:id/upload-cover
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Body:** multipart/form-data (file)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "coverUrl": "https://cdn.questforge.ru/games/abc/cover.jpg"
+  }
+}
+```
+
+---
+
+### 5.14. Отправить на модерацию
+
+```
+POST /games/:id/submit-for-review
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "moderationStatus": "PENDING"
+  }
+}
+```
+
+---
+
+### 5.15. Опубликовать игру
+
+```
+POST /games/:id/publish
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "PUBLISHED"
+  }
+}
+```
+
+---
+
+### 5.16. Регистрация команды на игру
+
+```
+POST /games/:id/register
+```
+
+**Authorization:** Bearer <token> (капитан команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "teamId": "team-123",
+    "status": "REGISTERED"
+  }
+}
+```
+
+---
+
+### 5.17. Отмена регистрации команды
+
+```
+POST /games/:id/unregister
+```
+
+**Authorization:** Bearer <token> (капитан команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### 5.18. Команда готова
+
+```
+POST /games/:id/ready
+```
+
+**Authorization:** Bearer <token> (капитан команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "teamId": "team-123",
+    "status": "READY"
+  }
+}
+```
+
+---
+
+### 5.19. Задать вопрос по игре
+
+```
+POST /games/:id/questions
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123",
+  "question": "Где найти ключ?"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "q-789",
+    "answer": "Посмотрите под скамейкой"
+  }
+}
+```
+
+---
+
+### 5.20. Отправить сообщение в чат игры
+
+```
+POST /games/:id/chat
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123",
+  "message": "Мы нашли подсказку!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "msg-456",
+    "createdAt": "2025-01-01T14:30:00Z"
+  }
+}
+```
+
+---
+
+### 5.21. Отправить сообщение организатору
+
+```
+POST /games/:id/organizer-message
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Body:**
+```json
+{
+  "teamId": "team-123",
+  "message": "Нужна помощь!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "msg-789",
+    "createdAt": "2025-01-01T14:35:00Z"
+  }
+}
+```
+
+---
+
+### 5.22. Регистрация по названию команды (для организатора)
+
+```
+POST /games/:id/register-by-name
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Body:**
+```json
+{
+  "teamName": "Ночные волки",
+  "captainName": "Иван Иванов",
+  "captainPhone": "+7-900-123-45-67"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "teamId": "team-456",
+    "status": "REGISTERED"
+  }
+}
+```
+
+---
+
+### 5.23. Админские эндпоинты для игр
+
+#### Получить все игры (админ/модератор)
+
+```
+GET /games/admin
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Query Parameters:**
+- `status` — фильтр по статусу
+- `search` — поиск по названию
+- `limit` — количество (по умолчанию 20)
+- `offset` — смещение
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [...],
+    "total": 50
+  }
+}
+```
+
+#### Скрыть игру
+
+```
+POST /games/:id/admin/hide
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "HIDDEN"
+  }
+}
+```
+
+#### Показать игру (снять скрытие)
+
+```
+POST /games/:id/admin/unhide
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "PUBLISHED"
+  }
+}
+```
+
+#### Заблокировать игру
+
+```
+POST /games/:id/admin/block
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Body:**
+```json
+{
+  "reason": "Нарушение правил платформы"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "BLOCKED"
+  }
+}
+```
+
+#### Разблокировать игру
+
+```
+POST /games/:id/admin/unblock
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "DRAFT"
+  }
+}
+```
+
+---
+
+### 5.24. Отзывы на игру
+
+#### Оставить отзыв
+
+```
+POST /games/:id/reviews
+```
+
+**Authorization:** Bearer <token>
+
+**Body:**
+```json
+{
+  "rating": 5,
+  "text": "Отличная игра!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "review-123",
+    "rating": 5
+  }
+}
+```
+
+#### Получить отзывы
+
+```
+GET /games/:id/reviews
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [...],
+    "total": 10
+  }
+}
+```
+
+---
+
+### 5.25. Комментарии к игре
+
+#### Получить комментарии
+
+```
+GET /games/:id/comments
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [...],
+    "total": 5
+  }
+}
+```
+
+#### Добавить комментарий
+
+```
+POST /games/:id/comments
+```
+
+**Authorization:** Bearer <token>
+
+**Body:**
+```json
+{
+  "text": "Когда будет следующая игра?"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "comment-456",
+    "text": "Когда будет следующая игра?"
+  }
+}
+```
+
+#### Обновить комментарий
+
+```
+PATCH /games/:id/comments/:commentId
+```
+
+**Authorization:** Bearer <token> (только автор комментария)
+
+**Body:**
+```json
+{
+  "text": "Обновлённый текст"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "comment-456",
+    "text": "Обновлённый текст"
+  }
+}
+```
+
+#### Удалить комментарий
+
+```
+DELETE /games/:id/comments/:commentId
+```
+
+**Authorization:** Bearer <token> (только автор комментария или ADMIN)
+
+**Response (200):**
+```json
+{
+  "success": true
+}
+```
+
+---
+
 ## 7. Sessions (Игровые сессии)
 
 ### 7.1. Создать сессию (начать игру)

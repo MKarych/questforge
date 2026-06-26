@@ -127,6 +127,17 @@ text
 DRAFT → CANCELLED (отмена)
 PUBLISHED → CANCELLED (отмена)
 PUBLISHED → RESCHEDULED (перенос)
+
+Административные статусы (устанавливаются только администратором/модератором):
+
+text
+HIDDEN (скрыта) — не видна в каталоге, но не заблокирована
+  ↑↓ adminHide() / adminUnhide()
+  Может быть установлен из: PUBLISHED, REGISTRATION_OPEN, REGISTRATION_CLOSED
+
+BLOCKED (заблокирована) — полностью заблокирована за нарушение правил
+  ↑↓ adminBlock() / adminUnblock()
+  Может быть установлен из любого статуса
 7.1. Разрешенные переходы
 text
 DRAFT -> PUBLISHED
@@ -155,6 +166,17 @@ FINISHED -> ARCHIVED
 
 CANCELLED -> ARCHIVED
 RESCHEDULED -> PUBLISHED (после переноса)
+
+# Административные переходы
+PUBLISHED -> HIDDEN (скрыть от каталога)
+REGISTRATION_OPEN -> HIDDEN (скрыть от каталога)
+REGISTRATION_CLOSED -> HIDDEN (скрыть от каталога)
+HIDDEN -> PUBLISHED (вернуть в каталог)
+HIDDEN -> REGISTRATION_OPEN (вернуть с регистрацией)
+HIDDEN -> REGISTRATION_CLOSED (вернуть с закрытой регистрацией)
+* -> BLOCKED (заблокировать из любого статуса)
+BLOCKED -> DRAFT (разблокировать в черновик)
+BLOCKED -> ARCHIVED (заблокировать и отправить в архив)
 7.2. Запрещенные переходы
 text
 RUNNING -> DRAFT ❌
@@ -179,6 +201,8 @@ FINISHED	Результаты, статистика	Результаты, чат
 ARCHIVED	Только просмотр	Только просмотр
 CANCELLED	Отмена, уведомления	Уведомление об отмене
 RESCHEDULED	Новая дата/время	Уведомление о переносе
+HIDDEN	Видна, но скрыта из каталога	Не видна в каталоге
+BLOCKED	Заблокирована, только просмотр	Не видна, уведомление о блокировке
 9. Team Ready Status
 typescript
 interface TeamRegistration {

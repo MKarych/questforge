@@ -21,52 +21,70 @@
 ### 2.1. GameStatus
 
 ```
-CREATED
-   │
-   ▼
+DRAFT
+  │
+  ▼
 PUBLISHED
-   │
-   ▼
-WAITING_FOR_PLAYERS
-   │
-   ▼
-STARTED
-   │
-   ▼
-IN_PROGRESS
-   │
-   ├── PAUSED
-   │      │
-   │      ▼
-   │   IN_PROGRESS
-   │
-   ▼
-FINISHED
-   │
-   ▼
-ARCHIVED
+  │
+  ▼
+REGISTRATION_OPEN
+  │
+  ├── REGISTRATION_CLOSED
+  │      │
+  │      ▼
+  │   LOBBY
+  │      │
+  │      ▼
+  │   RUNNING
+  │      │
+  │      ▼
+  │   FINISHED
+  │      │
+  │      ▼
+  │   ARCHIVED
+  │
+  ├── CANCELLED
+  │
+  └── RESCHEDULED
+        │
+        ▼
+     PUBLISHED
+
+HIDDEN (может быть установлен из PUBLISHED, REGISTRATION_OPEN, REGISTRATION_CLOSED администратором)
+BLOCKED (может быть установлен из любого статуса администратором)
 ```
 
 ### 2.2. Переходы игры
 
 | From | To | Триггер | Кто | Событие |
 | :--- | :--- | :--- | :--- | :--- |
-| CREATED | PUBLISHED | publish() | Organizer | GAME_PUBLISHED |
-| PUBLISHED | WAITING_FOR_PLAYERS | openRegistration() | Organizer | REGISTRATION_OPENED |
-| WAITING_FOR_PLAYERS | STARTED | start() | Organizer | GAME_STARTED |
-| STARTED | IN_PROGRESS | assignFirstNode() | Engine | NODE_ASSIGNED |
-| IN_PROGRESS | PAUSED | pause() | Organizer | GAME_PAUSED |
-| PAUSED | IN_PROGRESS | resume() | Organizer | GAME_RESUMED |
-| IN_PROGRESS | FINISHED | finish() | Engine | GAME_FINISHED |
+| DRAFT | PUBLISHED | publish() | Organizer | GAME_PUBLISHED |
+| PUBLISHED | REGISTRATION_OPEN | openRegistration() | Organizer | REGISTRATION_OPENED |
+| REGISTRATION_OPEN | REGISTRATION_CLOSED | closeRegistration() | Organizer | REGISTRATION_CLOSED |
+| REGISTRATION_CLOSED | LOBBY | moveToLobby() | Organizer | GAME_MOVED_TO_LOBBY |
+| LOBBY | RUNNING | start() | Organizer | GAME_STARTED |
+| RUNNING | FINISHED | finish() | Engine | GAME_FINISHED |
 | FINISHED | ARCHIVED | archive() | Admin | GAME_ARCHIVED |
+| PUBLISHED | CANCELLED | cancel() | Organizer | GAME_CANCELLED |
+| REGISTRATION_OPEN | CANCELLED | cancel() | Organizer | GAME_CANCELLED |
+| REGISTRATION_CLOSED | CANCELLED | cancel() | Organizer | GAME_CANCELLED |
+| LOBBY | CANCELLED | cancel() | Organizer | GAME_CANCELLED |
+| PUBLISHED | RESCHEDULED | reschedule() | Organizer | GAME_RESCHEDULED |
+| RESCHEDULED | PUBLISHED | publish() | Organizer | GAME_PUBLISHED |
+| * | HIDDEN | adminHide() | Admin | GAME_HIDDEN |
+| HIDDEN | * | adminUnhide() | Admin | GAME_UNHIDDEN |
+| * | BLOCKED | adminBlock() | Admin | GAME_BLOCKED |
+| BLOCKED | * | adminUnblock() | Admin | GAME_UNBLOCKED |
 
 ### 2.3. Запрещенные переходы
 
 | From | To | Почему запрещено |
 | :--- | :--- | :--- |
-| CREATED | STARTED | Игра должна быть опубликована |
-| PUBLISHED | PAUSED | Нельзя поставить на паузу неактивную игру |
-| FINISHED | IN_PROGRESS | Нельзя возобновить завершенную игру |
+| DRAFT | REGISTRATION_OPEN | Игра должна быть опубликована |
+| DRAFT | LOBBY | Игра должна пройти регистрацию |
+| PUBLISHED | RUNNING | Игра должна пройти регистрацию и лобби |
+| FINISHED | RUNNING | Нельзя возобновить завершенную игру |
+| ARCHIVED | * | Архивная игра не может быть изменена |
 
 ---
 
@@ -75,43 +93,35 @@ ARCHIVED
 ### 3.1. TeamStatus
 
 ```
-REGISTERED
-   │
-   ▼
 ACTIVE
-   │
-   ▼
-WAITING_ANSWER
-   │
-   ├── NODE_COMPLETED
-   │      │
-   │      ▼
-   │   NEXT_NODE
-   │      │
-   │      ▼
-   │   WAITING_ANSWER
-   │
-   ├── NODE_FAILED
-   │      │
-   │      ▼
-   │   WAITING_ANSWER
-   │
-   ▼
-FINISHED
+  │
+  ├── RECRUITING
+  │      │
+  │      ▼
+  │   ACTIVE
+  │
+  ├── INACTIVE
+  │      │
+  │      ▼
+  │   ACTIVE
+  │
+  ├── ARCHIVED
+  │
+  └── DELETED
 ```
 
 ### 3.2. Переходы команды
 
 | From | To | Триггер | Кто | Событие |
 | :--- | :--- | :--- | :--- | :--- |
-| REGISTERED | ACTIVE | gameStart() | Engine | TEAM_ACTIVATED |
-| ACTIVE | WAITING_ANSWER | assignNode() | Engine | NODE_ASSIGNED |
-| WAITING_ANSWER | NODE_COMPLETED | answerAccepted() | Engine | ANSWER_ACCEPTED |
-| NODE_COMPLETED | NEXT_NODE | transition() | Engine | NODE_COMPLETED |
-| NEXT_NODE | WAITING_ANSWER | assignNode() | Engine | NODE_ASSIGNED |
-| WAITING_ANSWER | NODE_FAILED | answerRejected() | Engine | ANSWER_REJECTED |
-| NODE_FAILED | WAITING_ANSWER | retry() | Engine | NODE_RETRY |
-| WAITING_ANSWER | FINISHED | gameFinish() | Engine | TEAM_FINISHED |
+| ACTIVE | RECRUITING | setRecruiting() | Captain | TEAM_RECRUITING |
+| RECRUITING | ACTIVE | closeRecruiting() | Captain | TEAM_CLOSED |
+| ACTIVE | INACTIVE | setInactive() | Captain | TEAM_INACTIVE |
+| INACTIVE | ACTIVE | setActive() | Captain | TEAM_ACTIVE |
+| ACTIVE | ARCHIVED | archive() | Captain/Admin | TEAM_ARCHIVED |
+| ACTIVE | DELETED | delete() | Captain/Admin | TEAM_DELETED |
+| RECRUITING | DELETED | delete() | Captain/Admin | TEAM_DELETED |
+| INACTIVE | DELETED | delete() | Captain/Admin | TEAM_DELETED |
 
 ---
 

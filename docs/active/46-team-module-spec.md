@@ -78,6 +78,19 @@ interface TeamSettings {
   limits: TeamLimits;
 }
 
+enum TeamVisibility {
+  PUBLIC = 'PUBLIC',
+  UNLISTED = 'UNLISTED',
+  PRIVATE = 'PRIVATE',
+  ARCHIVED = 'ARCHIVED'
+}
+
+enum JoinPolicy {
+  OPEN = 'OPEN',
+  APPROVAL = 'APPROVAL',
+  INVITE_ONLY = 'INVITE_ONLY'
+}
+
 interface TeamLimits {
   maxMembers: number;              // По умолчанию 20
   maxInvitesPerDay: number;        // 10
@@ -110,6 +123,13 @@ interface TeamAIProfile {
 Автоматически вычисляемые возможности команды (не путать с правами).
 
 typescript
+enum TeamRole {
+  CAPTAIN = 'CAPTAIN',
+  VICE_CAPTAIN = 'VICE_CAPTAIN',
+  MEMBER = 'MEMBER',
+  RECRUIT = 'RECRUIT'
+}
+
 enum TeamCapability {
   PARTICIPATE_GAMES = 'PARTICIPATE_GAMES',
   HOST_GAMES = 'HOST_GAMES',
