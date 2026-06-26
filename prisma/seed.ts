@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus, Tier } from '@prisma/client';
+import { PrismaClient, Role, UserStatus, TeamStatus, GameStatus, RegistrationStatus, TeamVisibility, JoinPolicy, TeamRole, MemberStatus, InviteStatus, JoinRequestStatus, TransferStatus, Tier, ListingStatus, LicenseType, UpdatePolicy, PurchaseStatus, LicenseStatus, ReviewStatus, PromoCodeType, PromoCodeStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -48,6 +48,21 @@ async function main() {
   // ============================================================
   // 1. ПОЛНАЯ ОЧИСТКА ТАБЛИЦ (DELETE FROM для надёжности)
   // ============================================================
+  // Marketplace (snake_case из-за @@map в схеме)
+  await prisma.$executeRaw`DELETE FROM "marketplace_analytics";`;
+  await prisma.$executeRaw`DELETE FROM "author_earnings";`;
+  await prisma.$executeRaw`DELETE FROM "payouts";`;
+  await prisma.$executeRaw`DELETE FROM "marketplace_reviews";`;
+  await prisma.$executeRaw`DELETE FROM "cart_items";`;
+  await prisma.$executeRaw`DELETE FROM "carts";`;
+  await prisma.$executeRaw`DELETE FROM "favorite_listings";`;
+  await prisma.$executeRaw`DELETE FROM "scenario_runs";`;
+  await prisma.$executeRaw`DELETE FROM "user_licenses";`;
+  await prisma.$executeRaw`DELETE FROM "purchases";`;
+  await prisma.$executeRaw`DELETE FROM "promo_codes";`;
+  await prisma.$executeRaw`DELETE FROM "marketplace_listings";`;
+  await prisma.$executeRaw`DELETE FROM "scenario_versions";`;
+  // Остальные таблицы (PascalCase — стандартное именование Prisma)
   await prisma.$executeRaw`DELETE FROM "ActivityLog";`;
   await prisma.$executeRaw`DELETE FROM "Notification";`;
   await prisma.$executeRaw`DELETE FROM "UserAchievement";`;
@@ -73,8 +88,6 @@ async function main() {
   await prisma.$executeRaw`DELETE FROM "Resource";`;
   await prisma.$executeRaw`DELETE FROM "AuditLog";`;
   await prisma.$executeRaw`DELETE FROM "Follow";`;
-  await prisma.$executeRaw`DELETE FROM "Purchase";`;
-  await prisma.$executeRaw`DELETE FROM "License";`;
   await prisma.$executeRaw`DELETE FROM "User";`;
 
   const passwordHash = await hashPassword(PASSWORD);
@@ -1025,6 +1038,354 @@ async function main() {
   });
 
   console.log(`✅ Negative Data created`);
+
+  // ============================================================
+  // 26. MARKETPLACE — СЦЕНАРИИ ДЛЯ МАРКЕТПЛЕЙСА (10)
+  // ============================================================
+  // Создаём ScenarioVersion для каждого сценария, который будет опубликован
+  const scenarioVersions: Record<string, any> = {};
+
+  for (const [name, scenario] of Object.entries(scenarios)) {
+    const version = await prisma.scenarioVersion.create({
+      data: {
+        scenarioId: scenario.id,
+        version: 1,
+        versionLabel: '1.0.0',
+        nodes: scenario.nodes,
+        edges: scenario.edges,
+        startNodeId: scenario.startNodeId,
+        status: 'PUBLISHED' as any,
+        changelog: 'Первый релиз',
+        createdById: scenario.authorId,
+      },
+    });
+    scenarioVersions[name] = version;
+  }
+  console.log(`✅ ${Object.keys(scenarioVersions).length} scenario versions created`);
+
+  // ============================================================
+  // 27. MARKETPLACE — ЛИСТИНГИ (10)
+  // ============================================================
+  const listings: Record<string, any> = {};
+  const listingData = [
+    {
+      scenario: 'Тайны старого города', author: 'organizer1@test.com',
+      title: 'Тайны старого города — пешеходный квест',
+      description: 'Погрузитесь в историю старого города! Вас ждут загадки, архитектурные памятники и увлекательные факты. Идеально для прогулки с друзьями или семьёй.',
+      shortDescription: 'Исторический пешеходный квест по центру города',
+      category: 'QUEST', price: 9.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['history', 'walking', 'family'], views: 245, favorites: 18, sales: 12, avgRating: 4.5, reviewsCount: 4,
+    },
+    {
+      scenario: 'Ночной дозор', author: 'organizer1@test.com',
+      title: 'Ночной дозор — авто-приключение',
+      description: 'Ночной автоквест по самым загадочным местам города. Проверьте свою смелость и знание городских легенд!',
+      shortDescription: 'Автоквест по ночному городу с загадками',
+      category: 'AUTO_QUEST', price: 19.99, licenseType: 'MULTI_CITY' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['night', 'auto', 'adventure'], views: 189, favorites: 15, sales: 8, avgRating: 4.3, reviewsCount: 3,
+    },
+    {
+      scenario: 'Фотоохота', author: 'organizer2@test.com',
+      title: 'Фотоохота — городской фотоквест',
+      description: 'Квест для любителей фотографии. Ищите интересные ракурсы, выполняйте креативные задания и делитесь результатами!',
+      shortDescription: 'Фотоквест с креативными заданиями',
+      category: 'QUEST', price: 5.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['photo', 'creative', 'walking'], views: 312, favorites: 25, sales: 20, avgRating: 4.7, reviewsCount: 5,
+    },
+    {
+      scenario: 'GPS-квест', author: 'organizer2@test.com',
+      title: 'GPS-квест: сокровища города',
+      description: 'Настоящий геокэшинг-квест! Используйте GPS-навигацию, чтобы найти скрытые сокровища и узнать тайны города.',
+      shortDescription: 'GPS-квест по достопримечательностям',
+      category: 'ESCAPE', price: 14.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'MAJOR_ONLY' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['gps', 'exploration', 'outdoor'], views: 156, favorites: 12, sales: 6, avgRating: 4.0, reviewsCount: 2,
+    },
+    {
+      scenario: 'Квиз-марафон', author: 'organizer1@test.com',
+      title: 'Квиз-марафон: битва умов',
+      description: 'Интеллектуальный квиз для эрудитов. Вопросы из разных областей знаний: история, наука, искусство, поп-культура.',
+      shortDescription: 'Интеллектуальный квиз для эрудитов',
+      category: 'QUIZ', price: 7.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['quiz', 'intellectual', 'team'], views: 420, favorites: 35, sales: 28, avgRating: 4.8, reviewsCount: 6,
+    },
+    {
+      scenario: 'QR-детектив', author: 'organizer1@test.com',
+      title: 'QR-детектив: расследование',
+      description: 'Детективный квест с QR-кодами. Собирайте улики, допрашивайте свидетелей и раскройте преступление!',
+      shortDescription: 'Детективный квест с QR-кодами',
+      category: 'RPG', price: 12.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['qr', 'detective', 'mystery'], views: 278, favorites: 22, sales: 15, avgRating: 4.6, reviewsCount: 4,
+    },
+    {
+      scenario: 'Смешанный квест', author: 'organizer2@test.com',
+      title: 'Смешанный квест: всё включено',
+      description: 'Самый разнообразный квест! Текстовые задания, фото, GPS, QR-коды — попробуйте всё в одном приключении.',
+      shortDescription: 'Квест с разными типами заданий',
+      category: 'QUEST', price: 16.99, licenseType: 'COMMERCIAL' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['mixed', 'variety', 'adventure'], views: 198, favorites: 16, sales: 10, avgRating: 4.4, reviewsCount: 3,
+    },
+    {
+      scenario: 'Геокэшинг', author: 'organizer2@test.com',
+      title: 'Геокэшинг: охота за тайниками',
+      description: 'Классический геокэшинг-квест. Ищите тайники, обменивайтесь трофеями и открывайте новые места.',
+      shortDescription: 'Поиск тайников в городских локациях',
+      category: 'FAMILY', price: 8.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'FIXES_ONLY' as UpdatePolicy,
+      status: 'DRAFT' as ListingStatus, tags: ['geocaching', 'family', 'outdoor'], views: 45, favorites: 3, sales: 0, avgRating: 0, reviewsCount: 0,
+    },
+    {
+      scenario: 'Детектив', author: 'organizer1@test.com',
+      title: 'Детектив: запутанное дело',
+      description: 'Станьте детективом и раскройте запутанное преступление. Собирайте улики, анализируйте факты и найдите убийцу!',
+      shortDescription: 'Детективный квест с запутанным сюжетом',
+      category: 'RPG', price: 11.99, licenseType: 'SINGLE' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'PUBLISHED' as ListingStatus, tags: ['detective', 'mystery', 'story'], views: 534, favorites: 42, sales: 35, avgRating: 4.9, reviewsCount: 7,
+    },
+    {
+      scenario: 'Ночной автоквест', author: 'organizer1@test.com',
+      title: 'Ночной автоквест: экстрим',
+      description: 'Экстремальный автоквест для опытных водителей. Ночные гонки с загадками и испытаниями.',
+      shortDescription: 'Экстремальный ночной автоквест',
+      category: 'AUTO_QUEST', price: 29.99, licenseType: 'COMMERCIAL' as LicenseType, updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+      status: 'ARCHIVED' as ListingStatus, tags: ['night', 'auto', 'extreme'], views: 67, favorites: 5, sales: 2, avgRating: 3.5, reviewsCount: 1,
+    },
+  ];
+
+  for (const ld of listingData) {
+    const author = users[ld.author];
+    const scenario = scenarios[ld.scenario];
+    const listing = await prisma.marketplaceListing.create({
+      data: {
+        scenarioId: scenario.id,
+        authorId: author.id,
+        title: ld.title,
+        description: ld.description,
+        shortDescription: ld.shortDescription,
+        category: ld.category,
+        tags: ld.tags,
+        coverUrl: `https://placehold.co/800x450/1a1a2e/EEE?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
+        bannerUrl: `https://placehold.co/1200x400/16213e/EEE?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
+        price: ld.price,
+        licenseType: ld.licenseType,
+        updatePolicy: ld.updatePolicy,
+        status: ld.status,
+        publishedVersionId: scenarioVersions[ld.scenario].id,
+        views: ld.views,
+        favorites: ld.favorites,
+        sales: ld.sales,
+        avgRating: ld.avgRating,
+        reviewsCount: ld.reviewsCount,
+        publishedAt: ld.status === 'PUBLISHED' ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000) : null,
+      },
+    });
+    listings[ld.scenario] = listing;
+  }
+  console.log(`✅ ${Object.keys(listings).length} marketplace listings created`);
+
+  // ============================================================
+  // 28. MARKETPLACE — ПОКУПКИ И ЛИЦЕНЗИИ (8)
+  // ============================================================
+  const purchaseData = [
+    { listing: 'Тайны старого города', buyer: 'player1@test.com', licenseType: 'SINGLE' as LicenseType, price: 9.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Фотоохота', buyer: 'player2@test.com', licenseType: 'SINGLE' as LicenseType, price: 5.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Квиз-марафон', buyer: 'player3@test.com', licenseType: 'SINGLE' as LicenseType, price: 7.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'QR-детектив', buyer: 'player4@test.com', licenseType: 'SINGLE' as LicenseType, price: 12.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Детектив', buyer: 'player5@test.com', licenseType: 'SINGLE' as LicenseType, price: 11.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Ночной дозор', buyer: 'player6@test.com', licenseType: 'MULTI_CITY' as LicenseType, price: 19.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Смешанный квест', buyer: 'player7@test.com', licenseType: 'SINGLE' as LicenseType, price: 16.99, status: 'COMPLETED' as PurchaseStatus },
+    { listing: 'Детектив', buyer: 'player1@test.com', licenseType: 'SINGLE' as LicenseType, price: 11.99, status: 'COMPLETED' as PurchaseStatus },
+  ];
+
+  for (const pd of purchaseData) {
+    const listing = listings[pd.listing];
+    const buyer = users[pd.buyer];
+    const scenarioVersion = scenarioVersions[Object.keys(scenarios).find(k => scenarios[k].id === listing.scenarioId)!];
+
+    const purchase = await prisma.purchase.create({
+      data: {
+        listingId: listing.id,
+        scenarioVersionId: scenarioVersion.id,
+        buyerId: buyer.id,
+        listingSnapshotTitle: listing.title,
+        listingSnapshotVersion: '1.0.0',
+        listingSnapshotPrice: pd.price,
+        licenseType: pd.licenseType,
+        price: pd.price,
+        commission: pd.price * 0.15,
+        royalty: pd.price * 0.85,
+        status: pd.status,
+        completedAt: pd.status === 'COMPLETED' ? new Date() : null,
+      },
+    });
+
+    // Создаём лицензию для каждой завершённой покупки
+    await prisma.userLicense.create({
+      data: {
+        userId: buyer.id,
+        listingId: listing.id,
+        scenarioVersionId: scenarioVersion.id,
+        licenseType: pd.licenseType,
+        status: 'ACTIVE' as LicenseStatus,
+        activationsUsed: 0,
+        activationsLimit: pd.licenseType === 'SINGLE' ? 1 : 10,
+        updatePolicy: 'ALL_UPDATES' as UpdatePolicy,
+        expiresAt: pd.licenseType === 'MULTI_CITY' ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : null,
+        purchasedAt: new Date(),
+      },
+    });
+
+    // Создаём запись о доходе автора
+    const listingRecord = await prisma.marketplaceListing.findUnique({ where: { id: listing.id } });
+    if (listingRecord) {
+      await prisma.authorEarning.create({
+        data: {
+          authorId: listingRecord.authorId,
+          purchaseId: purchase.id,
+          amount: pd.price * 0.85,
+          commission: pd.price * 0.15,
+          royalty: pd.price * 0.85,
+          status: 'AVAILABLE' as any,
+        },
+      });
+    }
+  }
+  console.log(`✅ ${purchaseData.length} purchases + licenses + earnings created`);
+
+  // ============================================================
+  // 29. MARKETPLACE — КОРЗИНЫ (2-3 пользователя)
+  // ============================================================
+  const cartData = [
+    { user: 'player1@test.com', items: [{ listing: 'Ночной дозор', licenseType: 'MULTI_CITY' as LicenseType }, { listing: 'GPS-квест', licenseType: 'SINGLE' as LicenseType }] },
+    { user: 'player3@test.com', items: [{ listing: 'Детектив', licenseType: 'SINGLE' as LicenseType }] },
+    { user: 'player5@test.com', items: [{ listing: 'Фотоохота', licenseType: 'SINGLE' as LicenseType }, { listing: 'Смешанный квест', licenseType: 'COMMERCIAL' as LicenseType }] },
+  ];
+
+  for (const cd of cartData) {
+    const user = users[cd.user];
+    const cart = await prisma.cart.create({
+      data: {
+        userId: user.id,
+        items: {
+          create: cd.items.map(item => ({
+            listingId: listings[item.listing].id,
+            licenseType: item.licenseType,
+          })),
+        },
+      },
+    });
+  }
+  console.log(`✅ ${cartData.length} carts created`);
+
+  // ============================================================
+  // 30. MARKETPLACE — ИЗБРАННОЕ (у каждого пользователя по 2-3)
+  // ============================================================
+  const favoriteData = [
+    { user: 'player1@test.com', listings: ['Тайны старого города', 'Квиз-марафон', 'Детектив'] },
+    { user: 'player2@test.com', listings: ['Фотоохота', 'QR-детектив'] },
+    { user: 'player3@test.com', listings: ['Квиз-марафон', 'Детектив', 'Ночной дозор'] },
+    { user: 'player4@test.com', listings: ['QR-детектив', 'Смешанный квест'] },
+    { user: 'player5@test.com', listings: ['Детектив', 'Тайны старого города', 'Фотоохота'] },
+    { user: 'player6@test.com', listings: ['Ночной дозор', 'GPS-квест'] },
+    { user: 'player7@test.com', listings: ['Смешанный квест', 'Квиз-марафон'] },
+    { user: 'organizer1@test.com', listings: ['Фотоохота', 'GPS-квест'] },
+    { user: 'organizer2@test.com', listings: ['Тайны старого города', 'Детектив'] },
+    { user: 'moderator@test.com', listings: ['Квиз-марафон', 'QR-детектив'] },
+    { user: 'admin@test.com', listings: ['Детектив', 'Смешанный квест'] },
+  ];
+
+  for (const fd of favoriteData) {
+    const user = users[fd.user];
+    for (const listingName of fd.listings) {
+      await prisma.favoriteListing.create({
+        data: {
+          userId: user.id,
+          listingId: listings[listingName].id,
+        },
+      });
+    }
+  }
+  console.log(`✅ Favorites created for ${favoriteData.length} users`);
+
+  // ============================================================
+  // 31. MARKETPLACE — ОТЗЫВЫ (10)
+  // ============================================================
+  const marketplaceReviews = [
+    { listing: 'Тайны старого города', user: 'player1@test.com', rating: 5, text: 'Отличный квест! Очень познавательно и интересно. Прошли всей семьёй.' },
+    { listing: 'Тайны старого города', user: 'player2@test.com', rating: 4, text: 'Хороший квест, но некоторые вопросы были сложноваты для детей.' },
+    { listing: 'Фотоохота', user: 'player3@test.com', rating: 5, text: 'Обожаю фотоквесты! Этот один из лучших.' },
+    { listing: 'Квиз-марафон', user: 'player4@test.com', rating: 5, text: 'Лучший квиз на платформе! Вопросы очень интересные.' },
+    { listing: 'QR-детектив', user: 'player5@test.com', rating: 4, text: 'Интересный сюжет, но QR-коды могли быть покрупнее.' },
+    { listing: 'Детектив', user: 'player6@test.com', rating: 5, text: 'Шедевр! Сюжет держит в напряжении до самого конца.' },
+    { listing: 'Ночной дозор', user: 'player7@test.com', rating: 4, text: 'Атмосферный квест, особенно ночью. Рекомендую!' },
+    { listing: 'Смешанный квест', user: 'player1@test.com', rating: 5, text: 'Разнообразие заданий — это супер! Не даёт заскучать.' },
+    { listing: 'Детектив', user: 'player2@test.com', rating: 5, text: 'Прошёл два раза, чтобы увидеть все концовки.' },
+    { listing: 'Квиз-марафон', user: 'player3@test.com', rating: 4, text: 'Отличный квиз, но хотелось бы больше вопросов про науку.' },
+  ];
+
+  for (const r of marketplaceReviews) {
+    await prisma.marketplaceReview.create({
+      data: {
+        listingId: listings[r.listing].id,
+        userId: users[r.user].id,
+        rating: r.rating,
+        text: r.text,
+        status: 'APPROVED' as ReviewStatus,
+      },
+    });
+  }
+  console.log(`✅ ${marketplaceReviews.length} marketplace reviews created`);
+
+  // ============================================================
+  // 32. MARKETPLACE — ПРОМОКОДЫ (2)
+  // ============================================================
+  await prisma.promoCode.create({
+    data: {
+      code: 'WELCOME10',
+      type: 'PERCENTAGE' as PromoCodeType,
+      value: 10,
+      maxUses: 100,
+      usedCount: 5,
+      minAmount: 5,
+      maxAmount: 50,
+      status: 'ACTIVE' as PromoCodeStatus,
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      createdById: users['admin@test.com'].id,
+    },
+  });
+
+  await prisma.promoCode.create({
+    data: {
+      code: 'QUEST25',
+      type: 'FIXED' as PromoCodeType,
+      value: 25,
+      maxUses: 50,
+      usedCount: 12,
+      minAmount: 10,
+      status: 'ACTIVE' as PromoCodeStatus,
+      expiresAt: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+      createdById: users['admin@test.com'].id,
+    },
+  });
+  console.log(`✅ 2 promo codes created`);
+
+  // ============================================================
+  // 33. MARKETPLACE — АНАЛИТИКА (10 записей)
+  // ============================================================
+  for (const [name, listing] of Object.entries(listings)) {
+    await prisma.marketplaceAnalytics.create({
+      data: {
+        listingId: listing.id,
+        views: Math.floor(Math.random() * 100),
+        favorites: Math.floor(Math.random() * 10),
+        sales: Math.floor(Math.random() * 5),
+        conversionRate: Math.random() * 0.15,
+        avgRating: Math.random() * 2 + 3,
+        reviewsCount: Math.floor(Math.random() * 3),
+        period: 'DAY' as any,
+        date: new Date(),
+      },
+    });
+  }
+  console.log(`✅ ${Object.keys(listings).length} analytics records created`);
 
   console.log('🎉 Seeding complete!');
 }
