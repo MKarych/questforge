@@ -180,6 +180,8 @@ GET	/admin/teams/:id	Детали команды	ADMIN, MODERATOR
 PATCH	/admin/teams/:id	Обновить команду	ADMIN, MODERATOR
 DELETE	/admin/teams/:id	Удалить команду	ТОЛЬКО ADMIN
 POST	/admin/teams/:id/restore	Восстановить команду	ТОЛЬКО ADMIN
+GET	/admin/support/tickets	Тикеты поддержки	ADMIN, MODERATOR
+PATCH	/admin/support/tickets/:id	Обновить тикет	ADMIN, MODERATOR
 5. Проверка (Как протестировать)
 Создать админа:
 

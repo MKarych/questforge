@@ -668,7 +668,7 @@ POST /games
 ### 5.2. Получить список своих игр
 
 ```
-GET /games
+GET /games/me
 ```
 
 **Authorization:** Bearer <token>
@@ -677,7 +677,7 @@ GET /games
 
 | Параметр | Тип | Описание |
 | :--- | :--- | :--- |
-| `status` | string | `draft`, `pending`, `approved`, `rejected`, `active`, `finished` |
+| `status` | string | `draft`, `published`, `running`, `finished`, `cancelled` |
 | `limit` | number | 1-100, по умолчанию 20 |
 | `offset` | number | Смещение для пагинации |
 
@@ -690,7 +690,7 @@ GET /games
     {
       "id": "game-456",
       "title": "Тайны старого города",
-      "status": "approved",
+      "status": "published",
       "shareLink": "/play/abc123xyz",
       "playersCount": 45,
       "createdAt": "2025-01-01T12:00:00Z"
@@ -701,6 +701,250 @@ GET /games
     "limit": 20,
     "offset": 0
   }
+}
+```
+
+---
+
+### 5.2a. Открыть регистрацию на игру
+
+```
+POST /games/:id/open-registration
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "REGISTRATION_OPEN"
+  }
+}
+```
+
+---
+
+### 5.2b. Закрыть регистрацию на игру
+
+```
+POST /games/:id/close-registration
+```
+
+**Authorization:** Bearer <token> (только организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "game-456",
+    "status": "REGISTRATION_CLOSED"
+  }
+}
+```
+
+---
+
+### 5.2c. Получить список команд игры
+
+```
+GET /games/:id/teams
+```
+
+**Authorization:** Bearer <token> (организатор или участник)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "team-123",
+        "name": "Ночные волки",
+        "score": 150,
+        "status": "registered"
+      }
+    ],
+    "total": 8
+  }
+}
+```
+
+---
+
+### 5.2d. Получить статусы всех команд
+
+```
+GET /games/:id/teams-status
+```
+
+**Authorization:** Bearer <token> (организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "teams": [
+      {
+        "teamId": "team-123",
+        "teamName": "Ночные волки",
+        "status": "READY",
+        "readyAt": "2025-01-15T18:45:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 5.2e. Получить вопросы по игре
+
+```
+GET /games/:id/questions
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "q-789",
+        "question": "Где найти ключ?",
+        "answer": "Посмотрите под скамейкой",
+        "answeredAt": "2025-01-15T14:00:00Z"
+      }
+    ],
+    "total": 5
+  }
+}
+```
+
+---
+
+### 5.2f. Получить сообщения чата игры
+
+```
+GET /games/:id/chat
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Query Parameters:**
+| Параметр | Тип | Описание |
+| :--- | :--- | :--- |
+| `limit` | number | Количество сообщений (по умолчанию 50) |
+| `offset` | number | Смещение |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "msg-456",
+        "text": "Мы нашли подсказку!",
+        "senderId": "user-123",
+        "createdAt": "2025-01-15T14:30:00Z"
+      }
+    ],
+    "total": 25
+  }
+}
+```
+
+---
+
+### 5.2g. Получить сообщения организатора
+
+```
+GET /games/:id/chat/organizer
+```
+
+**Authorization:** Bearer <token> (участник команды)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [],
+    "total": 0
+  }
+}
+```
+
+---
+
+### 5.2h. Проверить, можно ли запустить игру
+
+```
+GET /games/:id/can-start
+```
+
+**Authorization:** Bearer <token> (организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "canStart": true,
+    "reason": null,
+    "registeredTeams": 3,
+    "readyTeams": 2
+  }
+}
+```
+
+---
+
+### 5.2i. Получить таймер до старта
+
+```
+GET /games/:id/timer
+```
+
+**Authorization:** Bearer <token> (организатор игры)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "date": "2025-01-15T19:00:00Z",
+    "time": "19:00",
+    "timeUntilStart": 3600,
+    "isStarted": false
+  }
+}
+```
+
+---
+
+### 5.2j. Удалить игру (админ)
+
+```
+DELETE /admin/games/:id
+```
+
+**Authorization:** Bearer <token> (ADMIN или MODERATOR)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Игра удалена"
 }
 ```
 
