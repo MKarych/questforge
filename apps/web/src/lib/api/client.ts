@@ -1155,6 +1155,202 @@ class ApiClient {
     return this.request(`/games/${gameId}/teams-status`);
   }
 
+  // ==================== Gameplay (Организатор) ====================
+
+  async cancelGame(gameId: string): Promise<ApiResponse<{ id: string; status: string; message: string }>> {
+    return this.request(`/games/${gameId}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  async rescheduleGame(gameId: string, date: string, time: string): Promise<ApiResponse<{ id: string; status: string; scheduledAt: string; message: string }>> {
+    return this.request(`/games/${gameId}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify({ date, time }),
+    });
+  }
+
+  async moveToLobby(gameId: string): Promise<ApiResponse<{ id: string; status: string; message: string }>> {
+    return this.request(`/games/${gameId}/move-to-lobby`, {
+      method: 'POST',
+    });
+  }
+
+  async setTeamReady(gameId: string, teamId: string): Promise<ApiResponse<{ status: string; message: string }>> {
+    return this.request(`/games/${gameId}/ready`, {
+      method: 'POST',
+      body: JSON.stringify({ teamId }),
+    });
+  }
+
+  async askQuestion(gameId: string, text: string): Promise<ApiResponse<{ id: string; text: string; createdAt: string }>> {
+    return this.request(`/games/${gameId}/questions`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  async getQuestions(gameId: string): Promise<ApiResponse<Array<{ id: string; text: string; answer: string | null; createdAt: string; user: { id: string; name: string } }>>> {
+    return this.request(`/games/${gameId}/questions`);
+  }
+
+  async sendChatMessage(gameId: string, text: string): Promise<ApiResponse<{ id: string; text: string; createdAt: string; user: { id: string; name: string } }>> {
+    return this.request(`/games/${gameId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  async getChatMessages(gameId: string): Promise<ApiResponse<Array<{ id: string; text: string; createdAt: string; user: { id: string; name: string; avatarUrl: string | null } }>>> {
+    return this.request(`/games/${gameId}/chat`);
+  }
+
+  async sendOrganizerMessage(gameId: string, text: string): Promise<ApiResponse<{ id: string; text: string; createdAt: string }>> {
+    return this.request(`/games/${gameId}/chat/organizer`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  async getOrganizerMessages(gameId: string): Promise<ApiResponse<Array<{ id: string; text: string; createdAt: string; user: { id: string; name: string } }>>> {
+    return this.request(`/games/${gameId}/chat/organizer`);
+  }
+
+  async uploadCover(gameId: string, formData: FormData): Promise<ApiResponse<{ coverUrl: string }>> {
+    return this.request(`/games/${gameId}/upload-cover`, {
+      method: 'POST',
+      body: formData,
+      headers: {},
+    });
+  }
+
+  // ==================== Sessions (Игрок) ====================
+
+  async requestHint(teamId: string): Promise<ApiResponse<{ hint: string; penalty: number }>> {
+    return this.request(`/sessions/${teamId}/hint`, {
+      method: 'POST',
+    });
+  }
+
+  async getCurrentNode(teamId: string): Promise<ApiResponse<{ id: string; title: string; description: string; type: string; hint: string | null; mediaUrl: string | null; startedAt: string }>> {
+    return this.request(`/sessions/${teamId}/current-node`);
+  }
+
+  async getInventory(teamId: string): Promise<ApiResponse<Array<{ id: string; itemId: string; name: string; description: string; icon: string | null; quantity: number; acquiredAt: string }>>> {
+    return this.request(`/sessions/${teamId}/inventory`);
+  }
+
+  async addInventoryItem(teamId: string, itemId: string, quantity?: number): Promise<ApiResponse<{ id: string; itemId: string; quantity: number; message: string }>> {
+    return this.request(`/sessions/${teamId}/inventory`, {
+      method: 'POST',
+      body: JSON.stringify({ itemId, quantity: quantity || 1 }),
+    });
+  }
+
+  async removeInventoryItem(teamId: string, itemId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/sessions/${teamId}/inventory/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getResources(teamId: string): Promise<ApiResponse<{ hp: number; maxHp: number; energy: number; maxEnergy: number; score: number; bonuses: Array<{ id: string; name: string; value: number; expiresAt: string | null }> }>> {
+    return this.request(`/sessions/${teamId}/resources`);
+  }
+
+  // ==================== Users (Социальное) ====================
+
+  async getFollowers(userId: string, limit = 20, offset = 0): Promise<ApiResponse<{ data: Array<{ id: string; name: string; avatarUrl: string | null; followedAt: string }>; meta: { total: number; limit: number; offset: number } }>> {
+    return this.request(`/users/${userId}/followers?limit=${limit}&offset=${offset}`);
+  }
+
+  async getFollowing(userId: string, limit = 20, offset = 0): Promise<ApiResponse<{ data: Array<{ id: string; name: string; avatarUrl: string | null; followedAt: string }>; meta: { total: number; limit: number; offset: number } }>> {
+    return this.request(`/users/${userId}/following?limit=${limit}&offset=${offset}`);
+  }
+
+  async followUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'POST',
+    });
+  }
+
+  async unfollowUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getFavorites(userId: string): Promise<ApiResponse<Array<{ id: string; category: string; itemId: string; createdAt: string; item?: any }>>> {
+    return this.request(`/users/${userId}/favorites`);
+  }
+
+  async addFavorite(category: string, itemId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/me/favorites/${category}/${itemId}`, {
+      method: 'POST',
+    });
+  }
+
+  async removeFavorite(category: string, itemId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/me/favorites/${category}/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActivityFeed(userId: string, limit = 20, offset = 0): Promise<ApiResponse<{ data: Array<{ id: string; type: string; description: string; createdAt: string; metadata?: any }>; meta: { total: number; limit: number; offset: number } }>> {
+    return this.request(`/users/${userId}/activity?limit=${limit}&offset=${offset}`);
+  }
+
+  async getUserTeams(userId: string): Promise<ApiResponse<Array<{ id: string; name: string; slug: string; avatar: string | null; memberCount: number; role: string }>>> {
+    return this.request(`/users/${userId}/teams`);
+  }
+
+  async getUserScenarios(userId: string, limit = 20, offset = 0): Promise<ApiResponse<{ data: Array<{ id: string; title: string; description: string; status: string; createdAt: string; updatedAt: string }>; meta: { total: number; limit: number; offset: number } }>> {
+    return this.request(`/users/${userId}/scenarios?limit=${limit}&offset=${offset}`);
+  }
+
+  async getUserAchievements(userId: string): Promise<ApiResponse<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>> {
+    return this.request(`/users/${userId}/achievements`);
+  }
+
+  async checkAchievements(): Promise<ApiResponse<Array<{ id: string; name: string; unlocked: boolean }>>> {
+    return this.request(`/users/me/check-achievements`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteAvatar(): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/me/avatar`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteUser(): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/users/me`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ==================== Notifications ====================
+
+  async getNotifications(limit = 20, offset = 0): Promise<ApiResponse<{ data: Array<{ id: string; type: string; title: string; message: string; read: boolean; link: string | null; createdAt: string }>; meta: { total: number; limit: number; offset: number } }>> {
+    return this.request(`/notifications?limit=${limit}&offset=${offset}`);
+  }
+
+  async markNotificationRead(id: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(`/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  async markAllNotificationsRead(): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return this.request(`/notifications/read-all`, {
+      method: 'PATCH',
+    });
+  }
+
+  async getUnreadNotificationCount(): Promise<ApiResponse<{ count: number }>> {
+    return this.request(`/notifications/unread-count`);
+  }
+
   // ==================== Admin ====================
 
   async getAdminStats(): Promise<ApiResponse<{
@@ -1494,6 +1690,41 @@ export const registerTeamByName = (gameId: string, teamName: string) => apiClien
 export const addReview = (gameId: string, rating: number, text?: string) => apiClient.addReview(gameId, rating, text);
 export const startGame = (gameId: string) => apiClient.startGame(gameId);
 export const getGameRegistrations = (gameId: string) => apiClient.getGameRegistrations(gameId);
+export const cancelGame = (gameId: string) => apiClient.cancelGame(gameId);
+export const rescheduleGame = (gameId: string, date: string, time: string) => apiClient.rescheduleGame(gameId, date, time);
+export const moveToLobby = (gameId: string) => apiClient.moveToLobby(gameId);
+export const setTeamReady = (gameId: string, teamId: string) => apiClient.setTeamReady(gameId, teamId);
+export const askQuestion = (gameId: string, text: string) => apiClient.askQuestion(gameId, text);
+export const getQuestions = (gameId: string) => apiClient.getQuestions(gameId);
+export const sendChatMessage = (gameId: string, text: string) => apiClient.sendChatMessage(gameId, text);
+export const getChatMessages = (gameId: string) => apiClient.getChatMessages(gameId);
+export const sendOrganizerMessage = (gameId: string, text: string) => apiClient.sendOrganizerMessage(gameId, text);
+export const getOrganizerMessages = (gameId: string) => apiClient.getOrganizerMessages(gameId);
+export const uploadCover = (gameId: string, formData: FormData) => apiClient.uploadCover(gameId, formData);
+export const requestHint = (teamId: string) => apiClient.requestHint(teamId);
+export const getCurrentNode = (teamId: string) => apiClient.getCurrentNode(teamId);
+export const getInventory = (teamId: string) => apiClient.getInventory(teamId);
+export const addInventoryItem = (teamId: string, itemId: string, quantity?: number) => apiClient.addInventoryItem(teamId, itemId, quantity);
+export const removeInventoryItem = (teamId: string, itemId: string) => apiClient.removeInventoryItem(teamId, itemId);
+export const getResources = (teamId: string) => apiClient.getResources(teamId);
+export const getFollowers = (userId: string, limit?: number, offset?: number) => apiClient.getFollowers(userId, limit, offset);
+export const getFollowing = (userId: string, limit?: number, offset?: number) => apiClient.getFollowing(userId, limit, offset);
+export const followUser = (userId: string) => apiClient.followUser(userId);
+export const unfollowUser = (userId: string) => apiClient.unfollowUser(userId);
+export const getFavorites = (userId: string) => apiClient.getFavorites(userId);
+export const addFavorite = (category: string, itemId: string) => apiClient.addFavorite(category, itemId);
+export const removeFavorite = (category: string, itemId: string) => apiClient.removeFavorite(category, itemId);
+export const getActivityFeed = (userId: string, limit?: number, offset?: number) => apiClient.getActivityFeed(userId, limit, offset);
+export const getUserTeams = (userId: string) => apiClient.getUserTeams(userId);
+export const getUserScenarios = (userId: string, limit?: number, offset?: number) => apiClient.getUserScenarios(userId, limit, offset);
+export const getUserAchievements = (userId: string) => apiClient.getUserAchievements(userId);
+export const checkAchievements = () => apiClient.checkAchievements();
+export const deleteAvatar = () => apiClient.deleteAvatar();
+export const deleteUser = () => apiClient.deleteUser();
+export const getNotifications = (limit?: number, offset?: number) => apiClient.getNotifications(limit, offset);
+export const markNotificationRead = (id: string) => apiClient.markNotificationRead(id);
+export const markAllNotificationsRead = () => apiClient.markAllNotificationsRead();
+export const getUnreadNotificationCount = () => apiClient.getUnreadNotificationCount();
 export const getPublicComments = (gameId: string, limit?: number, offset?: number) => apiClient.getPublicComments(gameId, limit, offset);
 export const addPublicComment = (gameId: string, text: string) => apiClient.addPublicComment(gameId, text);
 export const deletePublicComment = (gameId: string, commentId: string) => apiClient.deletePublicComment(gameId, commentId);

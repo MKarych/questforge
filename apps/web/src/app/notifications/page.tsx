@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/api/client';
 
 interface NotificationItem {
   id: string;
@@ -53,7 +53,6 @@ function formatDate(dateStr: string): string {
 }
 
 export default function NotificationsPage() {
-  const router = useRouter();
   const [data, setData] = useState<NotificationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -61,24 +60,14 @@ export default function NotificationsPage() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        router.push('/auth/login');
-        return;
-      }
-      const res = await fetch(`/api/notifications?limit=${limit}&offset=${page * limit}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-      }
+      const res = await getNotifications(limit, page * limit);
+      setData(res.data as any);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [page, router]);
+  }, [page]);
 
   useEffect(() => {
     fetchNotifications();
@@ -86,12 +75,7 @@ export default function NotificationsPage() {
 
   const handleMarkAllRead = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return;
-      await fetch('/api/notifications/read-all', {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await markAllNotificationsRead();
       fetchNotifications();
     } catch {
       // ignore
@@ -100,12 +84,7 @@ export default function NotificationsPage() {
 
   const handleMarkRead = async (id: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return;
-      await fetch(`/api/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await markNotificationRead(id);
       fetchNotifications();
     } catch {
       // ignore

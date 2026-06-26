@@ -111,6 +111,38 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
               Мои друзья
             </Link>
             <Link
+              href="/profile/following"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>👥</span>
+              Подписки
+            </Link>
+            <Link
+              href="/profile/favorites"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>❤️</span>
+              Избранное
+            </Link>
+            <Link
+              href="/profile/achievements"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>🏆</span>
+              Достижения
+            </Link>
+            <Link
+              href="/profile/activity"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>📋</span>
+              Активность
+            </Link>
+            <Link
               href="/profile/chats"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
               onClick={() => setIsOpen(false)}
@@ -119,7 +151,7 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
               Мои чаты
             </Link>
             <Link
-              href="/teams?filter=my"
+              href="/profile/teams"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
               onClick={() => setIsOpen(false)}
             >
@@ -127,12 +159,28 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
               Мои команды
             </Link>
             <Link
-              href="/games?filter=my"
+              href="/profile/scenarios"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
               onClick={() => setIsOpen(false)}
             >
-              <span>🎮</span>
-              Мои игры
+              <span>📝</span>
+              Мои сценарии
+            </Link>
+            <Link
+              href="/profile/payouts"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>💰</span>
+              Выплаты
+            </Link>
+            <Link
+              href="/profile/analytics"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>📊</span>
+              Аналитика
             </Link>
             <Link
               href="/profile/edit"
