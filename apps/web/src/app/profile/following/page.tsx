@@ -37,10 +37,16 @@ export default function FollowingPage() {
         getFollowers(id),
         getFollowing(id),
       ]);
-      setFollowers(followersRes.data?.data || followersRes.data || []);
-      setTotalFollowers(followersRes.data?.meta?.total || 0);
-      setFollowing(followingRes.data?.data || followingRes.data || []);
-      setTotalFollowing(followingRes.data?.meta?.total || 0);
+      const mapItem = (item: any): UserItem => ({
+        id: item.userId || item.id,
+        name: item.username || item.name,
+        avatarUrl: item.avatar || item.avatarUrl || null,
+        followedAt: item.followedAt,
+      });
+      setFollowers((followersRes.data?.items || []).map(mapItem));
+      setTotalFollowers(followersRes.data?.total || 0);
+      setFollowing((followingRes.data?.items || []).map(mapItem));
+      setTotalFollowing(followingRes.data?.total || 0);
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки');
     } finally {

@@ -27,7 +27,13 @@ export default function FavoritesPage() {
     setError(null);
     try {
       const res = await getFavorites('me');
-      setFavorites(res.data || []);
+      const data = res.data || {};
+      const items: FavoriteItem[] = [
+        ...(data.games || []).map((id: string) => ({ id, category: 'games', itemId: id, createdAt: '' })),
+        ...(data.scenarios || []).map((id: string) => ({ id, category: 'scenarios', itemId: id, createdAt: '' })),
+        ...(data.authors || []).map((id: string) => ({ id, category: 'authors', itemId: id, createdAt: '' })),
+      ];
+      setFavorites(items);
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки избранного');
     } finally {

@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalAuthGuard } from '../auth/guards/optional-auth.guard';
 import { UserRequest } from '../../common/types/user-request.type';
 
 @Controller('users')
@@ -15,8 +16,10 @@ export class UsersController {
   // ============================================================
 
   @Get(':id')
-  async getPublicProfile(@Param('id') userId: string) {
-    return this.usersService.getPublicProfile(userId);
+  @UseGuards(OptionalAuthGuard)
+  async getPublicProfile(@Param('id') userId: string, @Request() req: UserRequest) {
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getPublicProfile(id);
   }
 
   // ============================================================
@@ -86,21 +89,27 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/followers')
+  @UseGuards(OptionalAuthGuard)
   async getFollowers(
     @Param('id') userId: string,
+    @Request() req: UserRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.usersService.getFollowers(userId, Number(limit) || 20, Number(offset) || 0);
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getFollowers(id, Number(limit) || 20, Number(offset) || 0);
   }
 
   @Get(':id/following')
+  @UseGuards(OptionalAuthGuard)
   async getFollowing(
     @Param('id') userId: string,
+    @Request() req: UserRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.usersService.getFollowing(userId, Number(limit) || 20, Number(offset) || 0);
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getFollowing(id, Number(limit) || 20, Number(offset) || 0);
   }
 
   @Post(':id/follow')
@@ -121,8 +130,10 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/favorites')
-  async getFavorites(@Param('id') userId: string) {
-    return this.usersService.getFavorites(userId);
+  @UseGuards(OptionalAuthGuard)
+  async getFavorites(@Param('id') userId: string, @Request() req: UserRequest) {
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getFavorites(id);
   }
 
   @Post('me/favorites/:category/:itemId')
@@ -159,12 +170,15 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/activity')
+  @UseGuards(OptionalAuthGuard)
   async getActivityFeed(
     @Param('id') userId: string,
+    @Request() req: UserRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.usersService.getActivityFeed(userId, Number(limit) || 20, Number(offset) || 0);
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getActivityFeed(id, Number(limit) || 20, Number(offset) || 0);
   }
 
   // ============================================================
@@ -172,8 +186,10 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/teams')
-  async getUserTeams(@Param('id') userId: string) {
-    return this.usersService.getUserTeams(userId);
+  @UseGuards(OptionalAuthGuard)
+  async getUserTeams(@Param('id') userId: string, @Request() req: UserRequest) {
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getUserTeams(id);
   }
 
   // ============================================================
@@ -181,12 +197,15 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/scenarios')
+  @UseGuards(OptionalAuthGuard)
   async getUserScenarios(
     @Param('id') userId: string,
+    @Request() req: UserRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.usersService.getUserScenarios(userId, Number(limit) || 20, Number(offset) || 0);
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getUserScenarios(id, Number(limit) || 20, Number(offset) || 0);
   }
 
   // ============================================================
@@ -194,8 +213,10 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/achievements')
-  async getUserAchievements(@Param('id') userId: string) {
-    return this.usersService.getUserAchievements(userId);
+  @UseGuards(OptionalAuthGuard)
+  async getUserAchievements(@Param('id') userId: string, @Request() req: UserRequest) {
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getUserAchievements(id);
   }
 
   @Post('me/check-achievements')
@@ -209,12 +230,15 @@ export class UsersController {
   // ============================================================
 
   @Get(':id/reviews')
+  @UseGuards(OptionalAuthGuard)
   async getUserReviews(
     @Param('id') userId: string,
+    @Request() req: UserRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.usersService.getUserReviews(userId, Number(limit) || 20, Number(offset) || 0);
+    const id = userId === 'me' ? req.user?.userId : userId;
+    return this.usersService.getUserReviews(id, Number(limit) || 20, Number(offset) || 0);
   }
 
   // ============================================================
@@ -223,8 +247,9 @@ export class UsersController {
 
   @Get(':id/admin')
   @UseGuards(JwtAuthGuard)
-  async getAdminProfile(@Param('id') userId: string) {
-    return this.usersService.getAdminProfile(userId);
+  async getAdminProfile(@Param('id') userId: string, @Request() req: UserRequest) {
+    const id = userId === 'me' ? req.user.userId : userId;
+    return this.usersService.getAdminProfile(id);
   }
 
   // ============================================================

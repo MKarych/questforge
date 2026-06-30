@@ -42,13 +42,13 @@ export default function ScenariosPage() {
     setError(null);
     try {
       const res = await getUserScenarios('me', limit, pageNum * limit);
-      const data = res.data?.data || res.data || [];
+      const data = res.data?.items || [];
       if (pageNum === 0) {
         setScenarios(data);
       } else {
         setScenarios((prev) => [...prev, ...data]);
       }
-      setTotal(res.data?.meta?.total || data.length);
+      setTotal(res.data?.total || data.length);
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки сценариев');
     } finally {
