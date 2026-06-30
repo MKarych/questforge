@@ -94,6 +94,7 @@ export default function EditGamePage() {
       await updateGame(gameId, {
         ...formData,
         date: isoDate,
+        scenarioId: formData.scenarioId || null,
       });
       
       setGame(prev => prev ? { ...prev, ...formData, date: isoDate } : null);

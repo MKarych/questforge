@@ -8,6 +8,7 @@ import {
   MaxLength,
   IsArray,
   ArrayMaxSize,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateGameDto {
@@ -54,9 +55,10 @@ export class UpdateGameDto {
   @IsOptional()
   maxTeams?: number;
 
+  @ValidateIf((o) => o.scenarioId !== null && o.scenarioId !== undefined)
   @IsString()
   @IsOptional()
-  scenarioId?: string;
+  scenarioId?: string | null;
 
   @IsString()
   @IsOptional()

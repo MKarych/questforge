@@ -411,7 +411,7 @@ export interface CreateGameRequest {
   duration: number;
   price: number;
   maxTeams: number;
-  scenarioId?: string;
+  scenarioId?: string | null;
   status?: string;
 }
 
@@ -884,7 +884,7 @@ class ApiClient {
 
   async updateGame(id: string, data: Partial<CreateGameRequest>): Promise<ApiResponse<GameDetails>> {
     return this.request(`/games/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
