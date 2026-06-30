@@ -460,8 +460,7 @@ export interface EditorState {
 
   // UX features
   showTemplates: boolean;
-  showAIAssistant: boolean;
-  showAiEnhance: boolean;
+  showAiChat: boolean;
   showToolbarSettings: boolean;
   livePreviewSceneId: string | null;
   authorAchievements: AuthorAchievementData[];

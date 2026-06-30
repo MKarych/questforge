@@ -118,8 +118,7 @@ export interface EditorActions {
 
   // UX features
   setShowTemplates: (show: boolean) => void;
-  setShowAIAssistant: (show: boolean) => void;
-  setShowAiEnhance: (show: boolean) => void;
+  setShowAiChat: (show: boolean) => void;
   setShowToolbarSettings: (show: boolean) => void;
   setLivePreviewScene: (sceneId: string | null) => void;
   setToolbarSettings: (settings: ToolbarSettings) => void;
@@ -180,8 +179,7 @@ const createInitialState = (): EditorState => ({
 
   // UX features
   showTemplates: false,
-  showAIAssistant: false,
-  showAiEnhance: false,
+  showAiChat: false,
   showToolbarSettings: false,
   livePreviewSceneId: null,
   authorAchievements: [],
@@ -745,8 +743,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   // ==================== UX Features ====================
   setShowTemplates: (show) => set({ showTemplates: show }),
-  setShowAIAssistant: (show) => set({ showAIAssistant: show }),
-  setShowAiEnhance: (show) => set({ showAiEnhance: show }),
+  setShowAiChat: (show) => set({ showAiChat: show }),
   setShowToolbarSettings: (show) => set({ showToolbarSettings: show }),
   setLivePreviewScene: (sceneId) => set({ livePreviewSceneId: sceneId }),
   setToolbarSettings: (settings) => set({ toolbarSettings: settings }),

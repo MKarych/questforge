@@ -31,9 +31,8 @@ import EditorNodeComponent from './EditorNode';
 import AssetPanel from './AssetPanel';
 import LivePreview from './LivePreview';
 import ScenarioTemplatesModal from './ScenarioTemplatesModal';
-import AIAssistant from './AIAssistant';
+import AiChat from './AiChat';
 import AuthorAchievements from './AuthorAchievements';
-import AiEnhanceModal from './AiEnhanceModal';
 import ToolbarSettingsModal from './ToolbarSettingsModal';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
@@ -630,18 +629,10 @@ function ScenarioEditorInner({
             {tbContent('🎮', 'Тест')}
           </button>
 
-          {/* ✨ AI Доработка */}
-          <button onClick={() => store.setShowAiEnhance(true)}
-            className={tbBtn('bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-500/20')}
-            title="Доработать сценарий с AI"
-          >
-            {tbContent('✨', 'AI Дор')}
-          </button>
-
-          {/* ✨ AI Assistant (генерация) */}
-          <button onClick={() => store.setShowAIAssistant(true)}
+          {/* 🤖 AI-ассистент (чат) */}
+          <button onClick={() => store.setShowAiChat(true)}
             className={tbBtn('bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/20')}
-            title="AI-помощник"
+            title="AI-ассистент — создание и доработка сценариев"
           >
             {tbContent('🤖', 'AI')}
           </button>
@@ -995,61 +986,31 @@ function ScenarioEditorInner({
         />
       )}
 
-      {/* AI Assistant Modal */}
-      {store.showAIAssistant && (
-        <AIAssistant
-          onGenerate={(prompt) => {
-            // Создаём простую структуру на основе промпта
-            const startScene: Scene = {
-              id: 'ai-start',
-              type: 'location',
-              title: 'Старт',
-              description: prompt,
-              missions: [{
-                id: 'ai-mission-1',
-                type: 'text',
-                title: 'Начало',
-                description: 'Напишите "готов" чтобы начать',
-                config: { correctAnswer: 'готов', matchMode: 'case_insensitive', maxAttempts: 99 },
-                rewards: [],
-                conditions: [],
-                hints: [],
-              }],
-              metadata: {},
-              view: { type: 'list', config: {} },
-              position: { x: 100, y: 100 },
-              transitions: [],
-            };
-            const finishScene: Scene = {
-              id: 'ai-finish',
-              type: 'location',
-              title: 'Финиш',
-              description: 'Сценарий завершён!',
-              missions: [],
-              metadata: {},
-              view: { type: 'list', config: {} },
-              position: { x: 400, y: 100 },
-              transitions: [],
-            };
+      {/* AI Chat Modal — единый AI-ассистент */}
+      {store.showAiChat && (
+        <AiChat
+          scenarioJson={store.scenes.length > 0 ? JSON.stringify({
+            id: store.scenarioId || '',
+            name: store.name,
+            description: store.description,
+            scenes: store.scenes,
+            edges: store.edges,
+            variables: store.variables,
+            settings: store.settings,
+            version: store.version,
+          }) : null}
+          onApply={(data) => {
             store.loadScenario({
-              name: `AI: ${prompt.slice(0, 40)}...`,
-              description: prompt,
-              scenes: [startScene, finishScene],
-              edges: [{ id: 'ai-edge-1', source: startScene.id, target: finishScene.id, type: 'auto' }],
-              variables: [],
-              settings: {
-                totalTime: 0,
-                defaultPoints: 10,
-                defaultPenalty: 0,
-                hintLimit: 3,
-                maxAttempts: 3,
-                variables: [],
-              },
+              name: data.name || store.name,
+              description: data.description || store.description,
+              scenes: data.scenes || store.scenes,
+              edges: data.edges || store.edges,
+              variables: data.variables || store.variables,
+              settings: data.settings || store.settings,
             });
-            store.setShowAIAssistant(false);
             store.addAuthorAchievement('first_scenario');
           }}
-          onClose={() => store.setShowAIAssistant(false)}
+          onClose={() => store.setShowAiChat(false)}
         />
       )}
 
@@ -1060,33 +1021,6 @@ function ScenarioEditorInner({
           allScenes={store.scenes}
           onClose={() => store.setLivePreviewScene(null)}
           onNavigate={(sceneId) => store.setLivePreviewScene(sceneId)}
-        />
-      )}
-
-      {/* AI Enhance Modal */}
-      {store.showAiEnhance && (
-        <AiEnhanceModal
-          scenarioJson={JSON.stringify({
-            id: store.scenarioId || '',
-            name: store.name,
-            description: store.description,
-            scenes: store.scenes,
-            edges: store.edges,
-            variables: store.variables,
-            settings: store.settings,
-            version: store.version,
-          })}
-          onApply={(data) => {
-            store.loadScenario({
-              name: data.name || store.name,
-              description: data.description || store.description,
-              scenes: data.scenes || store.scenes,
-              edges: data.edges || store.edges,
-              variables: data.variables || store.variables,
-              settings: data.settings || store.settings,
-            });
-          }}
-          onClose={() => store.setShowAiEnhance(false)}
         />
       )}
 
