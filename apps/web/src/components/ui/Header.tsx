@@ -106,7 +106,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
   // Организаторская навигация — только ORGANIZER / ADMIN
   const organizerNavItems = [
-    { label: 'Мои игры', href: '/organizer/games', roles: ['ORGANIZER', 'ADMIN'] },
+    { label: 'Мои игры', href: '/organizer/dashboard', roles: ['ORGANIZER', 'ADMIN'] },
     { label: 'Мои сценарии', href: '/organizer/scenarios', roles: ['ORGANIZER', 'ADMIN'] },
     { label: 'Создать игру', href: '/organizer/games/create', roles: ['ORGANIZER', 'ADMIN'] },
     { label: 'Создать сценарий', href: '/organizer/scenarios/create', roles: ['ORGANIZER', 'ADMIN'] },
