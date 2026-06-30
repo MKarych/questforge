@@ -247,6 +247,11 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
             {/* Mobile/Tablet: гамбургер (на < lg) — показываем на телефонах и планшетах */}
             <div className="flex lg:hidden items-center gap-1">
+              {/* User Menu на мобилке — аватарка с выпадающим меню */}
+              {!isAuthPage && (
+                <UserMenu user={user} loading={loading} />
+              )}
+
               {/* Кнопка PRO на мобилке — только иконка */}
               {user && (
                 <Link
