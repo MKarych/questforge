@@ -1902,3 +1902,66 @@ export const getMyAnalytics = (params?: { period?: string; limit?: number; offse
 
 export const getMyAnalyticsSummary = () =>
   apiClient.get<ApiResponse<any>>('/marketplace/me/analytics/summary');
+
+// ============================================================
+// COMPLAINT / REPORT SYSTEM
+// ============================================================
+
+export type ComplaintTargetType = 'GAME' | 'SCENARIO' | 'COMMENT' | 'REVIEW' | 'MARKETPLACE_REVIEW' | 'USER' | 'TEAM' | 'CHAT_MESSAGE';
+export type ComplaintReason = 'SPAM' | 'ABUSE' | 'NSFW' | 'COPYRIGHT' | 'FRAUD' | 'HARASSMENT' | 'IMPERSONATION' | 'FALSE_INFO' | 'OTHER';
+export type ComplaintStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CreateComplaintData {
+  targetType: ComplaintTargetType;
+  targetId: string;
+  reason: ComplaintReason;
+  description?: string;
+}
+
+export interface ModerateComplaintData {
+  action: 'soft' | 'hard';
+  moderationNote?: string;
+}
+
+export interface ComplaintDto {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  reporterAvatar: string | null;
+  targetType: ComplaintTargetType;
+  targetId: string;
+  reason: ComplaintReason;
+  description: string | null;
+  status: ComplaintStatus;
+  moderatedBy: string | null;
+  moderatedByName: string | null;
+  moderatedAt: string | null;
+  moderationNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  targetInfo?: Record<string, unknown>;
+}
+
+export interface ComplaintListResponse {
+  items: ComplaintDto[];
+  total: number;
+}
+
+export const createComplaint = (data: CreateComplaintData) =>
+  apiClient.post<ApiResponse<ComplaintDto>>('/complaints', data);
+
+export const getAdminComplaints = (params?: {
+  status?: string;
+  targetType?: string;
+  limit?: number;
+  offset?: number;
+}) => apiClient.getWithParams<ApiResponse<ComplaintListResponse>>('/admin/complaints', params as any);
+
+export const getAdminComplaintDetail = (id: string) =>
+  apiClient.get<ApiResponse<ComplaintDto>>(`/admin/complaints/${id}`);
+
+export const approveComplaint = (id: string, data: ModerateComplaintData) =>
+  apiClient.post<ApiResponse<ComplaintDto>>(`/admin/complaints/${id}/approve`, data);
+
+export const rejectComplaint = (id: string, moderationNote?: string) =>
+  apiClient.post<ApiResponse<ComplaintDto>>(`/admin/complaints/${id}/reject`, { moderationNote });

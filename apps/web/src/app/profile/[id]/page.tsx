@@ -7,6 +7,7 @@ import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useUser } from '@/hooks/useUser';
 import { apiClient } from '@/lib/api/client';
+import ReportButton from '@/components/complaints/ReportButton';
 
 interface PublicProfile {
   uuid: string;
@@ -402,6 +403,12 @@ export default function PublicProfilePage() {
                         >
                           🚫 Заблокировать
                         </button>
+                        <ReportButton
+                          targetType="USER"
+                          targetId={profile.uuid}
+                          targetLabel={`@${profile.username}`}
+                          variant="text"
+                        />
                       </>
                     )}
                   </div>

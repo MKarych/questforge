@@ -496,3 +496,42 @@ export enum ErrorCode {
   RATE_LIMIT = 'RATE_LIMIT',
   INTERNAL_ERROR = 'INTERNAL_ERROR',
 }
+
+// ============================================================
+// COMPLAINT / REPORT SYSTEM
+// ============================================================
+
+export type ComplaintTargetType = 'GAME' | 'SCENARIO' | 'COMMENT' | 'REVIEW' | 'MARKETPLACE_REVIEW' | 'USER' | 'TEAM' | 'CHAT_MESSAGE';
+
+export type ComplaintReason = 'SPAM' | 'ABUSE' | 'NSFW' | 'COPYRIGHT' | 'FRAUD' | 'HARASSMENT' | 'IMPERSONATION' | 'FALSE_INFO' | 'OTHER';
+
+export type ComplaintStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CreateComplaintDto {
+  targetType: ComplaintTargetType;
+  targetId: string;
+  reason: ComplaintReason;
+  description?: string;
+}
+
+export interface ModerateComplaintDto {
+  action: 'soft' | 'hard';
+  moderationNote?: string;
+}
+
+export interface ComplaintDto {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  reporterAvatar: string | null;
+  targetType: ComplaintTargetType;
+  targetId: string;
+  reason: ComplaintReason;
+  description: string | null;
+  status: ComplaintStatus;
+  moderatedBy: string | null;
+  moderatedAt: string | null;
+  moderationNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -130,6 +130,8 @@ model User {
   receivedFriendRequests FriendRequest[]        @relation("FriendRequestReceiver")
   blockedUsers           BlockedUser[]          @relation("BlockedUserTarget")
   blockedBy              BlockedUser[]          @relation("BlockedUserSource")
+  complaintsFiled        Complaint[]            @relation("ComplaintReporter")
+  complaintsModerated    Complaint[]            @relation("ComplaintModerator")
   chatsAsUser1           Chat[]                 @relation("ChatUser1")
   chatsAsUser2           Chat[]                 @relation("ChatUser2")
   chatMessages           ChatMessage[]
@@ -229,12 +231,13 @@ model Chat {
 }
 
 model ChatMessage {
-  id        String   @id @default(uuid()) @db.Uuid
-  chatId    String   @map("chat_id") @db.Uuid
-  senderId  String   @map("sender_id") @db.Uuid
-  text      String   @db.Text
+  id        String    @id @default(uuid()) @db.Uuid
+  chatId    String    @map("chat_id") @db.Uuid
+  senderId  String    @map("sender_id") @db.Uuid
+  text      String    @db.Text
   readAt    DateTime? @map("read_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
 
   chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   sender User @relation(fields: [senderId], references: [id])
@@ -1303,15 +1306,16 @@ model Media {
 // ============================================================
 
 model Review {
-  id        String   @id @default(uuid()) @db.Uuid
-  gameId    String   @map("game_id") @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  gameId    String    @map("game_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
   rating    Int
   text      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  game      Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
 
   @@index([gameId])
   @@index([userId])
@@ -1607,4 +1611,61 @@ enum EventType {
   TIMER_END
   ERROR_OCCURRED
   LEADERBOARD_UPDATE
+}
+
+// ============================================================
+// COMPLAINT / REPORT SYSTEM
+// ============================================================
+
+enum ComplaintStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ComplaintReason {
+  SPAM
+  ABUSE
+  NSFW
+  COPYRIGHT
+  FRAUD
+  HARASSMENT
+  IMPERSONATION
+  FALSE_INFO
+  OTHER
+}
+
+enum ComplaintTargetType {
+  GAME
+  SCENARIO
+  COMMENT
+  REVIEW
+  MARKETPLACE_REVIEW
+  USER
+  TEAM
+  CHAT_MESSAGE
+}
+
+model Complaint {
+  id             String              @id @default(uuid()) @db.Uuid
+  reporterId     String              @map("reporter_id") @db.Uuid
+  targetType     ComplaintTargetType @map("target_type")
+  targetId       String              @map("target_id") @db.VarChar(100)
+  reason         ComplaintReason
+  description    String?             @db.Text
+  status         ComplaintStatus     @default(PENDING)
+  moderatedBy    String?             @map("moderated_by") @db.Uuid
+  moderatedAt    DateTime?           @map("moderated_at")
+  moderationNote String?             @map("moderation_note") @db.Text
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  reporter  User @relation("ComplaintReporter", fields: [reporterId], references: [id])
+  moderator User? @relation("ComplaintModerator", fields: [moderatedBy], references: [id])
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@index([reporterId])
+  @@index([createdAt])
+  @@map("complaints")
 }

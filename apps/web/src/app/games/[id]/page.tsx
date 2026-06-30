@@ -22,6 +22,7 @@ import {
 } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import ImageModal from '@/components/ui/ImageModal';
+import ReportButton from '@/components/complaints/ReportButton';
 
 const DEFAULT_LOGO = '/images/logo/logo-full-light.svg';
 
@@ -399,7 +400,15 @@ export default function GameDetailsPage() {
               </div>
             )}
 
-            <h1 className="text-3xl font-bold mb-4 text-text-primary">{game.title}</h1>
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-3xl font-bold text-text-primary">{game.title}</h1>
+              <ReportButton
+                targetType="GAME"
+                targetId={game.id}
+                targetLabel={game.title}
+                variant="icon"
+              />
+            </div>
             
             <div className="flex flex-wrap gap-4 mb-6">
               <div className="card flex items-center gap-2">

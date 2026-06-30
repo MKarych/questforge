@@ -10,6 +10,7 @@ interface AdminNavProps {
 const NAV_ITEMS = [
   { href: '/admin/dashboard', label: '📊 Дашборд', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/games', label: '🎮 Все игры', roles: ['ADMIN', 'MODERATOR'] },
+  { href: '/admin/complaints', label: '🚨 Жалобы', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/organizers/applications', label: '📋 Заявки организаторов', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/support', label: '📬 Поддержка', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/users', label: '👥 Пользователи', roles: ['ADMIN'] },

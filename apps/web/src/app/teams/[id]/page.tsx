@@ -27,6 +27,7 @@ import {
 import Header from '@/components/ui/Header';
 import InviteModal from '@/components/teams/InviteModal';
 import JoinRequestModal from '@/components/teams/JoinRequestModal';
+import ReportButton from '@/components/complaints/ReportButton';
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Активна',
@@ -340,7 +341,15 @@ export default function TeamDetailsPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-text-primary mb-1">{team.name}</h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-text-primary mb-1">{team.name}</h1>
+                    <ReportButton
+                      targetType="TEAM"
+                      targetId={team.id}
+                      targetLabel={team.name}
+                      variant="icon"
+                    />
+                  </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[team.status] || STATUS_COLORS.ACTIVE}`}>
                       {STATUS_LABELS[team.status] || team.status}
