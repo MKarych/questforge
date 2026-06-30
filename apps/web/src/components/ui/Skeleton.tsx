@@ -8,7 +8,7 @@ interface SkeletonProps {
 }
 
 export default function Skeleton({ className, variant = 'text', width, height }: SkeletonProps) {
-  const baseClasses = 'animate-pulse bg-surface-elevated rounded';
+  const baseClasses = 'skeleton-shimmer rounded';
 
   const variantClasses = {
     text: 'h-4 w-full',

@@ -135,15 +135,15 @@ textarea:focus {
 /* Component styles */
 @layer components {
   .btn-primary {
-    @apply bg-primary hover:bg-primary-hover text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200;
+    @apply bg-primary hover:bg-primary-hover text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200 btn-press;
   }
 
   .btn-secondary {
-    @apply bg-surface hover:bg-surface-elevated text-text-primary font-medium py-2.5 px-5 rounded-lg border border-border transition-all duration-200;
+    @apply bg-surface hover:bg-surface-elevated text-text-primary font-medium py-2.5 px-5 rounded-lg border border-border transition-all duration-200 btn-press;
   }
 
   .btn-outline {
-    @apply bg-transparent hover:bg-surface text-primary font-medium py-2.5 px-5 rounded-lg border border-primary transition-all duration-200;
+    @apply bg-transparent hover:bg-surface text-primary font-medium py-2.5 px-5 rounded-lg border border-primary transition-all duration-200 btn-press;
   }
 
   .card {
@@ -151,7 +151,7 @@ textarea:focus {
   }
 
   .card-hover {
-    @apply card hover:border-primary transition-colors duration-200;
+    @apply card hover:border-primary card-hover-lift;
   }
 
   .input-field {
@@ -321,3 +321,101 @@ textarea:focus {
 .animate-float-slow {
   animation: float-slow 6s ease-in-out infinite;
 }
+
+/* ===== Utility Animation Classes ===== */
+
+/* Hover lift для карточек */
+.card-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Press effect для кнопок */
+.btn-press {
+  transition: transform 0.1s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Анимированное подчёркивание для ссылок */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+}
+
+.link-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: currentColor;
+  transition: width 0.2s ease;
+}
+
+.link-underline:hover::after {
+  width: 100%;
+}
+
+/* Shimmer для скелетонов */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface, #f0f0f0) 25%,
+    var(--color-surface-elevated, #e0e0e0) 50%,
+    var(--color-surface, #f0f0f0) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Stagger animation для списков */
+.stagger-enter > * {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fade-in-up 0.4s ease forwards;
+}
+
+.stagger-enter > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-enter > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-enter > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-enter > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-enter > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-enter > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-enter > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-enter > *:nth-child(8) { animation-delay: 350ms; }
+
+/* Modal overlay */
+.modal-overlay {
+  animation: fade-in 0.2s ease;
+}
+
+.modal-content {
+  animation: scale-in 0.2s ease;
+}
+
+/* Dropdown menu */
+.dropdown-enter {
+  animation: slide-down 0.2s ease;
+}
+
+/* Scroll-triggered visibility (для Intersection Observer) */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== /Utility Animation Classes ===== */
