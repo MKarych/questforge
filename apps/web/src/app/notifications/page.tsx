@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Header from '@/components/ui/Header';
+import Footer from '@/components/ui/Footer';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/api/client';
 
 interface NotificationItem {
@@ -93,12 +95,16 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-20 bg-surface-elevated rounded-xl" />
-          ))}
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 container mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-20 bg-surface-elevated rounded-xl" />
+            ))}
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -109,25 +115,33 @@ export default function NotificationsPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Уведомления</h1>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-3xl">
+        <div className="mb-6">
+          <button onClick={() => window.history.back()} className="text-primary hover:underline text-sm">
+            ← Назад
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">Уведомления</h1>
+            {unreadCount > 0 && (
+              <p className="text-sm text-text-muted mt-1">
+                {unreadCount} непрочитанных
+              </p>
+            )}
+          </div>
           {unreadCount > 0 && (
-            <p className="text-sm text-text-muted mt-1">
-              {unreadCount} непрочитанных
-            </p>
+            <button
+              onClick={handleMarkAllRead}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors"
+            >
+              Прочитать всё
+            </button>
           )}
         </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllRead}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors"
-          >
-            Прочитать всё
-          </button>
-        )}
-      </div>
 
       {notifications.length === 0 ? (
         <div className="text-center py-16">
@@ -138,12 +152,6 @@ export default function NotificationsPage() {
           <p className="text-text-muted">
             Здесь будут появляться уведомления о играх, командах и других событиях
           </p>
-          <Link
-            href="/games"
-            className="inline-block mt-6 px-6 py-3 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors"
-          >
-            К играм
-          </Link>
         </div>
       ) : (
         <>
@@ -236,6 +244,8 @@ export default function NotificationsPage() {
           )}
         </>
       )}
+      </main>
+      <Footer />
     </div>
   );
 }
