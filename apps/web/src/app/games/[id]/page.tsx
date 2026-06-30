@@ -749,6 +749,16 @@ export default function GameDetailsPage() {
                         Перенаправление в лобби...
                       </p>
                     </div>
+                  ) : game.isRegistered && ['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) ? (
+                    <div className="text-center">
+                      <p className="text-text-secondary text-sm mb-3">Ваша команда уже зарегистрирована</p>
+                      <Link
+                        href={`/play/${game.shareLink}`}
+                        className="btn-primary w-full inline-block"
+                      >
+                        🚪 Перейти в лобби
+                      </Link>
+                    </div>
                   ) : (game.status === 'REGISTRATION_OPEN' || game.status === 'PUBLISHED') ? (
                     <div className="space-y-4">
                       {/* Регистрация через существующую команду */}

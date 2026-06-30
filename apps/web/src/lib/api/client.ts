@@ -242,6 +242,7 @@ export interface GameDetails extends Game {
   commentsCount: number;
   createdAt: string;
   updatedAt: string;
+  isRegistered: boolean;
 }
 
 export interface Review {
