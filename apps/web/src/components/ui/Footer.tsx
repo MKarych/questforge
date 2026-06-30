@@ -266,21 +266,6 @@ export default function Footer({ featureFlags, stats }: FooterProps) {
           </div>
         </div>
 
-        {/* Cookie Banner */}
-        <div className="border-t border-border pt-6 mt-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-text-muted">
-              Мы используем cookie-файлы для улучшения работы платформы. Продолжая использование, вы соглашаетесь с{' '}
-              <Link href="/privacy" className="text-primary hover:text-primary-hover underline">
-                политикой конфиденциальности
-              </Link>.
-            </p>
-            <button className="btn-primary text-xs py-1.5 px-4 shrink-0">
-              Принять
-            </button>
-          </div>
-        </div>
-
         {/* Bottom Bar */}
         <div className="border-t border-border pt-6 mt-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
