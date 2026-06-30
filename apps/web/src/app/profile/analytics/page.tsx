@@ -55,8 +55,8 @@ export default function AnalyticsPage() {
           getMyEarningsHistory({ limit: 20 }),
         ]);
         setSummary(summaryRes.data);
-        setAnalytics(analyticsRes.data?.data || analyticsRes.data || []);
-        setEarnings(earningsRes.data || []);
+        setAnalytics(analyticsRes.data?.items || []);
+        setEarnings(earningsRes.data?.items || []);
       } catch {
         setError('Ошибка загрузки аналитики');
       } finally {

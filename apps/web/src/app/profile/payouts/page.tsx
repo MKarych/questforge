@@ -36,7 +36,7 @@ export default function PayoutsPage() {
           getMyPayouts(),
           getMyBalance(),
         ]);
-        setPayouts(payoutsRes.data || []);
+        setPayouts(payoutsRes.data?.items || []);
         setBalance(balanceRes.data);
       } catch {
         setError('Ошибка загрузки данных');
@@ -60,7 +60,7 @@ export default function PayoutsPage() {
         getMyPayouts(),
         getMyBalance(),
       ]);
-      setPayouts(payoutsRes.data || []);
+      setPayouts(payoutsRes.data?.items || []);
       setBalance(balanceRes.data);
     } catch (err: any) {
       setError(err.message || 'Ошибка запроса выплаты');
