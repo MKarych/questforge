@@ -25,7 +25,7 @@ interface HeaderProps {
 }
 
 /** Выпадающее меню для десктопной шапки */
-function DropdownNav({ label, icon, items, pathname }: { label: string; icon: string; items: { label: string; href: string }[]; pathname: string }) {
+function DropdownNav({ label, items, pathname }: { label: string; items: { label: string; href: string }[]; pathname: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -52,7 +52,6 @@ function DropdownNav({ label, icon, items, pathname }: { label: string; icon: st
             : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
         }`}
       >
-        <span>{icon}</span>
         <span>{label}</span>
         <svg
           className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -179,13 +178,19 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
   const showOrganizer = ['ORGANIZER', 'ADMIN'].includes(userRole as any);
 
-  // Админка — только ADMIN
-  const adminNavItems = [
-    { label: 'Админка', href: '/admin/dashboard', roles: ['ADMIN'] },
+  // Админка — выпадающее меню, только ADMIN
+  const adminDropdownItems = [
+    { label: 'Дашборд', href: '/admin/dashboard' },
+    { label: 'Все игры', href: '/admin/games' },
+    { label: 'Заявки', href: '/admin/requests' },
+    { label: 'Поддержка', href: '/admin/support' },
+    { label: 'Пользователи', href: '/admin/users' },
+    { label: 'Команды', href: '/admin/teams' },
   ];
 
+  const showAdmin = userRole === 'ADMIN';
+
   const visibleMainNav = mainNavItems.filter((item) => item.roles.includes(userRole as any));
-  const visibleAdminNav = adminNavItems.filter((item) => item.roles.includes(userRole as any));
 
   const renderNavLink = (item: { label: string; href: string }, mobile = false) => (
     <Link
@@ -245,16 +250,16 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
               {showOrganizer && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
-                  <DropdownNav label="Игры" icon="🎮" items={gamesDropdownItems} pathname={pathname} />
-                  <DropdownNav label="Сценарии" icon="📝" items={scenariosDropdownItems} pathname={pathname} />
+                  <DropdownNav label="Игры" items={gamesDropdownItems} pathname={pathname} />
+                  <DropdownNav label="Сценарии" items={scenariosDropdownItems} pathname={pathname} />
                 </>
               )}
 
-              {/* Админка — только на десктопе (lg+) */}
-              {visibleAdminNav.length > 0 && (
+              {/* Админка — выпадающее меню, только на десктопе (lg+) */}
+              {showAdmin && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
-                  {visibleAdminNav.map((item) => renderNavLink(item))}
+                  <DropdownNav label="Администрирование" items={adminDropdownItems} pathname={pathname} />
                 </>
               )}
             </nav>
@@ -464,7 +469,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                     </p>
 
                     {/* Игры */}
-                    <p className="px-3 py-1 text-xs font-medium text-text-muted">🎮 Игры</p>
+                    <p className="px-3 py-1 text-xs font-medium text-text-muted">Игры</p>
                     {gamesDropdownItems.map((item) => (
                       <Link
                         key={item.href}
@@ -481,7 +486,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                     ))}
 
                     {/* Сценарии */}
-                    <p className="px-3 py-1 text-xs font-medium text-text-muted mt-2">📝 Сценарии</p>
+                    <p className="px-3 py-1 text-xs font-medium text-text-muted mt-2">Сценарии</p>
                     {scenariosDropdownItems.map((item) => (
                       <Link
                         key={item.href}
@@ -499,13 +504,13 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   </div>
                 )}
 
-                {/* Админка */}
-                {visibleAdminNav.length > 0 && (
+                {/* Админка — выпадающий список */}
+                {showAdmin && (
                   <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-border">
                     <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Администрирование
                     </p>
-                    {visibleAdminNav.map((item) => (
+                    {adminDropdownItems.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
