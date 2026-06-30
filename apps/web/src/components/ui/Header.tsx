@@ -24,6 +24,68 @@ interface HeaderProps {
   };
 }
 
+/** Выпадающее меню для десктопной шапки */
+function DropdownNav({ label, icon, items, pathname }: { label: string; icon: string; items: { label: string; href: string }[]; pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const isActive = items.some((item) => pathname.startsWith(item.href));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+          isActive
+            ? 'text-primary bg-primary/10 font-medium'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+        }`}
+      >
+        <span>{icon}</span>
+        <span>{label}</span>
+        <svg
+          className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-48 bg-background border border-border rounded-lg shadow-xl py-1 z-50">
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className={`block px-4 py-2 text-sm transition-colors ${
+                pathname.startsWith(item.href)
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header({ systemStatus = null, featureFlags = { search: true, notifications: true } }: HeaderProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -104,13 +166,18 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
     { label: 'Команды', href: '/teams', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
   ];
 
-  // Организаторская навигация — только ORGANIZER / ADMIN
-  const organizerNavItems = [
-    { label: 'Мои игры', href: '/organizer/dashboard', roles: ['ORGANIZER', 'ADMIN'] },
-    { label: 'Мои сценарии', href: '/organizer/scenarios', roles: ['ORGANIZER', 'ADMIN'] },
-    { label: 'Создать игру', href: '/organizer/games/create', roles: ['ORGANIZER', 'ADMIN'] },
-    { label: 'Создать сценарий', href: '/organizer/scenarios/create', roles: ['ORGANIZER', 'ADMIN'] },
+  // Организаторские выпадающие меню — только ORGANIZER / ADMIN
+  const gamesDropdownItems = [
+    { label: 'Мои игры', href: '/organizer/dashboard' },
+    { label: 'Создать игру', href: '/organizer/games/create' },
   ];
+
+  const scenariosDropdownItems = [
+    { label: 'Мои сценарии', href: '/organizer/scenarios' },
+    { label: 'Создать сценарий', href: '/organizer/scenarios/create' },
+  ];
+
+  const showOrganizer = ['ORGANIZER', 'ADMIN'].includes(userRole as any);
 
   // Админка — только ADMIN
   const adminNavItems = [
@@ -118,7 +185,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   ];
 
   const visibleMainNav = mainNavItems.filter((item) => item.roles.includes(userRole as any));
-  const visibleOrganizerNav = organizerNavItems.filter((item) => item.roles.includes(userRole as any));
   const visibleAdminNav = adminNavItems.filter((item) => item.roles.includes(userRole as any));
 
   const renderNavLink = (item: { label: string; href: string }, mobile = false) => (
@@ -175,11 +241,12 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             <nav className="hidden lg:flex items-center gap-1">
               {visibleMainNav.map((item) => renderNavLink(item))}
 
-              {/* Организаторские пункты — только на десктопе (lg+) */}
-              {visibleOrganizerNav.length > 0 && (
+              {/* Организаторские выпадающие меню — только на десктопе (lg+) */}
+              {showOrganizer && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
-                  {visibleOrganizerNav.map((item) => renderNavLink(item))}
+                  <DropdownNav label="Игры" icon="🎮" items={gamesDropdownItems} pathname={pathname} />
+                  <DropdownNav label="Сценарии" icon="📝" items={scenariosDropdownItems} pathname={pathname} />
                 </>
               )}
 
@@ -389,13 +456,33 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   ))}
                 </div>
 
-                {/* Организаторские пункты */}
-                {visibleOrganizerNav.length > 0 && (
+                {/* Организаторские пункты — выпадающие группы */}
+                {showOrganizer && (
                   <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-border">
                     <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Организатору
                     </p>
-                    {visibleOrganizerNav.map((item) => (
+
+                    {/* Игры */}
+                    <p className="px-3 py-1 text-xs font-medium text-text-muted">🎮 Игры</p>
+                    {gamesDropdownItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                          pathname.startsWith(item.href)
+                            ? 'text-primary bg-primary/10 font-medium'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                        }`}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+
+                    {/* Сценарии */}
+                    <p className="px-3 py-1 text-xs font-medium text-text-muted mt-2">📝 Сценарии</p>
+                    {scenariosDropdownItems.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
