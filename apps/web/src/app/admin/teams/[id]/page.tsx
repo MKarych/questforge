@@ -266,7 +266,7 @@ export default function AdminTeamDetailsPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="input w-full"
+                    className="input-field w-full"
                   />
                 </div>
 
@@ -275,7 +275,7 @@ export default function AdminTeamDetailsPage() {
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="input w-full min-h-[100px]"
+                    className="input-field w-full min-h-[100px]"
                   />
                 </div>
 
@@ -286,7 +286,7 @@ export default function AdminTeamDetailsPage() {
                       type="text"
                       value={form.city}
                       onChange={(e) => setForm({ ...form, city: e.target.value })}
-                      className="input w-full"
+                      className="input-field w-full"
                     />
                   </div>
                   <div>
@@ -295,7 +295,7 @@ export default function AdminTeamDetailsPage() {
                       type="text"
                       value={form.country}
                       onChange={(e) => setForm({ ...form, country: e.target.value })}
-                      className="input w-full"
+                      className="input-field w-full"
                     />
                   </div>
                 </div>
@@ -306,7 +306,7 @@ export default function AdminTeamDetailsPage() {
                     type="text"
                     value={form.website}
                     onChange={(e) => setForm({ ...form, website: e.target.value })}
-                    className="input w-full"
+                    className="input-field w-full"
                   />
                 </div>
 
@@ -316,7 +316,7 @@ export default function AdminTeamDetailsPage() {
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value })}
-                      className="input w-full"
+                      className="input-field w-full"
                     >
                       <option value="ACTIVE">Активна</option>
                       <option value="INACTIVE">Неактивна</option>
@@ -328,7 +328,7 @@ export default function AdminTeamDetailsPage() {
                     <select
                       value={form.privacy}
                       onChange={(e) => setForm({ ...form, privacy: e.target.value })}
-                      className="input w-full"
+                      className="input-field w-full"
                     >
                       <option value="PUBLIC">Публичная</option>
                       <option value="PRIVATE">Приватная</option>
@@ -339,7 +339,7 @@ export default function AdminTeamDetailsPage() {
                     <select
                       value={form.joinPolicy}
                       onChange={(e) => setForm({ ...form, joinPolicy: e.target.value })}
-                      className="input w-full"
+                      className="input-field w-full"
                     >
                       <option value="OPEN">Свободное</option>
                       <option value="INVITE">По приглашению</option>
@@ -355,7 +355,7 @@ export default function AdminTeamDetailsPage() {
                     type="text"
                     value={form.tags}
                     onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                    className="input w-full"
+                    className="input-field w-full"
                     placeholder="quest, adventure, puzzle"
                   />
                 </div>

@@ -154,12 +154,12 @@ export default function AdminTeamsPage() {
             placeholder="Поиск по названию..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            className="input flex-1 min-w-[200px]"
+            className="input-field flex-1 min-w-[200px]"
           />
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-            className="input w-auto"
+            className="input-field w-auto"
           >
             <option value="">Все статусы</option>
             <option value="ACTIVE">Активна</option>
@@ -172,7 +172,7 @@ export default function AdminTeamsPage() {
             placeholder="Город..."
             value={cityFilter}
             onChange={(e) => { setCityFilter(e.target.value); setPage(0); }}
-            className="input w-auto"
+            className="input-field w-auto"
           />
         </div>
 

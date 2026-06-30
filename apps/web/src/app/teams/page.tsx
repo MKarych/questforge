@@ -116,7 +116,7 @@ export default function TeamsPage() {
                 setCityFilter(e.target.value);
                 setOffset(0);
               }}
-              className="input max-w-xs"
+              className="input-field max-w-xs"
             />
           </div>
         )}
