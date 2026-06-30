@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ActivityService } from '../activity/activity.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { validateTransition, canCancel, canReschedule } from './state-machine/game-state-machine';
@@ -69,7 +70,10 @@ const GAME_STATUS = {
 export class GamesService {
   private readonly logger = new Logger(GamesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   // ============================================================
   // Domain Validation (Раздел 13)
@@ -622,7 +626,7 @@ export class GamesService {
     };
   }
 
-  async findOnePublic(gameId: string) {
+  async findOnePublic(gameId: string, userId?: string) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(gameId)) {
       throw new NotFoundException('Игра не найдена');
@@ -684,12 +688,30 @@ export class GamesService {
 
     const count = game._count || { gameTeams: 0, reviews: 0, comments: 0 };
 
+    // Проверка: зарегистрирована ли команда текущего пользователя на эту игру
+    let isRegistered = false;
+    if (userId) {
+      const registration = await this.prisma.gameRegistration.findFirst({
+        where: {
+          gameId,
+          team: {
+            members: {
+              some: { userId },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      isRegistered = !!registration;
+    }
+
     return {
       ...game,
       averageRating: Math.round(avgRating * 100) / 100,
       reviewsCount: count.reviews,
       teamsCount: count.gameTeams,
       commentsCount: count.comments,
+      isRegistered,
     };
   }
 
@@ -1308,13 +1330,28 @@ export class GamesService {
 
     this.logger.log(`Game starting: ${gameId} by user ${userId}`);
 
-    return this.prisma.game.update({
+    const updatedGame = await this.prisma.game.update({
       where: { id: gameId },
       data: {
         status: GAME_STATUS.RUNNING,
         startedAt: new Date(),
       },
     });
+
+    // Создаём событие активности
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, avatarUrl: true },
+    });
+    await this.activityService.createEvent(
+      'GAME_STARTED',
+      userId,
+      user?.name || 'Организатор',
+      user?.avatarUrl || null,
+      { gameId: game.id, gameTitle: game.title },
+    );
+
+    return updatedGame;
   }
 
   /**
@@ -1330,13 +1367,28 @@ export class GamesService {
 
     this.logger.log(`Game finished: ${gameId} by user ${userId}`);
 
-    return this.prisma.game.update({
+    const updatedGame = await this.prisma.game.update({
       where: { id: gameId },
       data: {
         status: GAME_STATUS.FINISHED,
         finishedAt: new Date(),
       },
     });
+
+    // Создаём событие активности
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, avatarUrl: true },
+    });
+    await this.activityService.createEvent(
+      'GAME_FINISHED',
+      userId,
+      user?.name || 'Организатор',
+      user?.avatarUrl || null,
+      { gameId: game.id, gameTitle: game.title },
+    );
+
+    return updatedGame;
   }
 
   /**
@@ -1865,6 +1917,14 @@ export class GamesService {
         },
       },
     });
+
+    await this.activityService.createEvent(
+      'REVIEW_LEFT',
+      userId,
+      review.user?.name || 'Пользователь',
+      review.user?.avatarUrl || null,
+      { gameId, rating, reviewId: review.id },
+    );
 
     this.logger.log(`Review added: game ${gameId} by user ${userId}, rating ${rating}`);
 

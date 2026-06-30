@@ -194,6 +194,7 @@ interface HomePageResponse {
   topTeams: TeamCard[];
   recentWinners: WinnerCard[];
   recentReviews: ReviewCard[];
+  liveActivity: ActivityEvent[];  // последние события для блока "Прямо сейчас"
   faq: FAQItem[];
   featureFlags: FeatureFlags;
   systemStatus: SystemStatus;
@@ -214,12 +215,157 @@ text
 4.4. Быстрый поиск (QuickSearch)
 text
 [Игра]   [Город]   [Дата]   [Категория]   [Найти →]
-4.5. Live Activity (Лента активности)
-text
-🔴 Прямо сейчас
-Игрок Алексей зарегистрировался
-Команда Победа выиграла игру
-Новый сценарий опубликован
+4.5. Live Activity (Лента активности "Прямо сейчас")
+
+Блок показывает последние события на платформе в реальном времени: кто запустил игру, кто зарегистрировался, кто получил достижение и т.д.
+
+4.5.1. Prisma-модель
+
+```prisma
+enum ActivityEventType {
+  GAME_STARTED
+  GAME_FINISHED
+  TEAM_CREATED
+  SCENARIO_PUBLISHED
+  REVIEW_LEFT
+  USER_REGISTERED
+  ACHIEVEMENT_UNLOCKED
+}
+
+model ActivityEvent {
+  id         String             @id @default(uuid()) @db.Uuid
+  type       ActivityEventType  @map("type")
+  userId     String             @map("user_id") @db.Uuid
+  userName   String             @map("user_name") @db.VarChar(100)
+  userAvatar String?            @map("user_avatar")
+  payload    Json               @default("{}")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([userId])
+  @@map("activity_events")
+}
+```
+
+4.5.2. API эндпоинт
+
+```
+GET /api/activity/live?limit=10
+```
+
+Публичный эндпоинт (без аутентификации). Возвращает последние события активности.
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "type": "GAME_STARTED",
+      "userId": "uuid",
+      "userName": "Алексей",
+      "userAvatar": null,
+      "payload": { "gameId": "uuid", "gameTitle": "Тайны старого города" },
+      "createdAt": "2026-06-30T11:45:00.000Z"
+    }
+  ]
+}
+```
+
+**Параметры:**
+- `limit` — количество событий (max 50, default 10)
+
+4.5.3. WebSocket-канал
+
+- **Namespace:** `/realtime`
+- **Комната:** `activity:live`
+- **Подписка:** клиент отправляет `join:activity`
+- **Отписка:** клиент отправляет `leave:activity`
+- **Событие:** сервер шлёт `activity:event` с тем же DTO, что и REST API
+
+**Схема подключения (клиент):**
+```typescript
+const socket = io(`${wsUrl}/realtime`, { transports: ['websocket', 'polling'] });
+socket.on('connect', () => socket.emit('join:activity'));
+socket.on('activity:event', (event) => { /* добавить в начало списка */ });
+// при размонтировании:
+socket.emit('leave:activity');
+socket.disconnect();
+```
+
+4.5.4. Типы событий и иконки
+
+| Тип события | Иконка | Описание | Где создаётся |
+|---|---|---|---|
+| `GAME_STARTED` | 🎮 | Игра запущена | `GamesService.startGame()` |
+| `GAME_FINISHED` | 🏁 | Игра завершена | `GamesService.finishGame()` |
+| `TEAM_CREATED` | 👥 | Создана новая команда | `TeamsService.create()` |
+| `SCENARIO_PUBLISHED` | 📝 | Опубликован новый сценарий | `ScenariosService.publish()` |
+| `REVIEW_LEFT` | ⭐ | Оставлен отзыв на игру | `GamesService.addReview()` |
+| `USER_REGISTERED` | 👤 | Новый пользователь зарегистрировался | `AuthService.register()` |
+| `ACHIEVEMENT_UNLOCKED` | 🏆 | Пользователь получил достижение | `AchievementsService.checkAndAward()` |
+
+4.5.5. Текстовые шаблоны (локализация)
+
+| Тип события | Шаблон (RU) |
+|---|---|
+| `GAME_STARTED` | `{userName} запустил игру` |
+| `GAME_FINISHED` | `{userName} завершил игру` |
+| `TEAM_CREATED` | `{userName} создал команду` |
+| `SCENARIO_PUBLISHED` | `{userName} опубликовал сценарий` |
+| `REVIEW_LEFT` | `{userName} оставил отзыв` |
+| `USER_REGISTERED` | `{userName} зарегистрировался` |
+| `ACHIEVEMENT_UNLOCKED` | `{userName} получил достижение` |
+
+4.5.6. Формат времени
+
+| Интервал | Отображение |
+|---|---|
+| < 60 сек | "только что" |
+| < 60 мин | "X мин. назад" |
+| < 24 ч | "X ч. назад" |
+| >= 24 ч | "X д. назад" |
+
+4.5.7. Компонент `LiveActivity`
+
+- **Путь:** [`apps/web/src/components/home/LiveActivity.tsx`](apps/web/src/components/home/LiveActivity.tsx)
+- **Тип:** Client Component (`'use client'`)
+- **Пропсы:** `{ enabled: boolean }` — управляется через `featureFlags.liveActivity`
+- **Загрузка:** Skeleton (3 строки с анимацией pulse)
+- **Пустое состояние:** "Нет активности" в карточке
+- **WebSocket:** подключается при монтировании, отключается при размонтировании
+- **REST:** первичная загрузка через `GET /api/activity/live?limit=10`
+- **Error Boundary:** обёрнут в `<ErrorBoundary blockName="Активность">`
+
+4.5.8. Интеграции (сервисы, которые создают события)
+
+| Сервис | Файл | Метод | Событие |
+|---|---|---|---|
+| `GamesService` | [`apps/api/src/modules/games/games.service.ts`](apps/api/src/modules/games/games.service.ts) | `startGame()` | `GAME_STARTED` |
+| `GamesService` | [`apps/api/src/modules/games/games.service.ts`](apps/api/src/modules/games/games.service.ts) | `finishGame()` | `GAME_FINISHED` |
+| `GamesService` | [`apps/api/src/modules/games/games.service.ts`](apps/api/src/modules/games/games.service.ts) | `addReview()` | `REVIEW_LEFT` |
+| `TeamsService` | [`apps/api/src/modules/teams/teams.service.ts`](apps/api/src/modules/teams/teams.service.ts) | `create()` | `TEAM_CREATED` |
+| `AuthService` | [`apps/api/src/modules/auth/auth.service.ts`](apps/api/src/modules/auth/auth.service.ts) | `register()` | `USER_REGISTERED` |
+| `ScenariosService` | [`apps/api/src/modules/scenarios/scenarios.service.ts`](apps/api/src/modules/scenarios/scenarios.service.ts) | `publish()` | `SCENARIO_PUBLISHED` |
+| `AchievementsService` | [`apps/api/src/modules/achievements/achievements.service.ts`](apps/api/src/modules/achievements/achievements.service.ts) | `checkAndAward()` | `ACHIEVEMENT_UNLOCKED` |
+
+4.5.9. Модуль `ActivityModule`
+
+- **Путь:** [`apps/api/src/modules/activity/activity.module.ts`](apps/api/src/modules/activity/activity.module.ts)
+- **Imports:** `PrismaModule`, `RealtimeModule`
+- **Controllers:** `ActivityController`
+- **Providers:** `ActivityService`
+- **Exports:** `ActivityService` (для внедрения в другие сервисы)
+
+4.5.10. Архитектурные заметки
+
+- Блок не критичен для страницы — тихая ошибка при загрузке (блок скрывается)
+- WebSocket-события приходят в реальном времени и добавляются в начало списка (макс. 10)
+- REST API используется для первичной загрузки (SSR/CSR), WebSocket — для дополнений
+- `payload` содержит контекст события (например, `gameId`, `gameTitle` для `GAME_STARTED`)
+- Все события создаются в сервисах после успешного выполнения бизнес-операции
+
 4.6. Блок "Доступные игры" (Featured Games)
 text
 Доступные игры   [Смотреть все →]
@@ -326,6 +472,7 @@ Hero	SSG	∞
 Статистика	ISR	5 минут
 Популярные игры	ISR	1 минута
 Новые игры	ISR	1 минута
+Live Activity	CSR (REST + WebSocket)	— (live)
 Категории	SSG	∞
 Топ организаторы	ISR	5 минут
 Топ команды	ISR	5 минут
@@ -405,6 +552,7 @@ Mobile	< 768px	Гамбургер-меню, карточки в 1 колонку
 GET /home	5 минут
 GET /games/public	1 минута
 GET /stats	10 минут
+GET /api/activity/live	Не кэшируется (live-данные)
 12. Аналитика и Телеметрия
 12.1. Аналитика (события)
 hero_cta_click

@@ -18,6 +18,7 @@ import { HomeModule } from './modules/home/home.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { ActivityFeedModule } from './modules/activity-feed/activity-feed.module';
+import { ActivityModule } from './modules/activity/activity.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { SupportModule } from './modules/support/support.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
@@ -59,6 +60,7 @@ import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config/conf
     NotificationsModule,
     AchievementsModule,
     ActivityFeedModule,
+    ActivityModule,
     BillingModule,
     SupportModule,
     RealtimeModule,

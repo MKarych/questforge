@@ -8,6 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ActivityService } from '../activity/activity.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -83,7 +85,16 @@ export class AuthService {
     this.logger.log(`🔑 Токен верификации для ${dto.email}: ${verificationToken}`);
     this.logger.log(`🔗 Ссылка для подтверждения: http://localhost:3001/auth/verify-email?token=${verificationToken}`);
 
-    // 10. Generate JWT
+    // 10. Create activity event
+    await this.activityService.createEvent(
+      'USER_REGISTERED',
+      user.id,
+      user.name || user.username,
+      null,
+      { email: user.email },
+    );
+
+    // 11. Generate JWT
     const tokens = await this.generateTokens(user);
 
     return {

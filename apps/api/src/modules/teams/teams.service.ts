@@ -6,6 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ActivityService } from '../activity/activity.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
@@ -38,7 +39,10 @@ function slugify(name: string): string {
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   // ================================================================
   // CREATE
@@ -103,6 +107,14 @@ export class TeamsService {
       entityId: team.id,
       newValue: { name: team.name, slug: team.slug },
     });
+
+    await this.activityService.createEvent(
+      'TEAM_CREATED',
+      userId,
+      team.captain?.name || 'Пользователь',
+      team.captain?.avatarUrl || null,
+      { teamId: team.id, teamName: team.name },
+    );
 
     return {
       id: team.id,

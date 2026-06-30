@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GamesController } from './games.controller';
 import { GamesService } from './games.service';
 import { ChatService } from './chat.service';
+import { ActivityModule } from '../activity/activity.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ChatService } from './chat.service';
       }),
       inject: [ConfigService],
     }),
+    ActivityModule,
   ],
   controllers: [GamesController],
   providers: [GamesService, ChatService],

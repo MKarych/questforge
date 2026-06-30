@@ -21,6 +21,7 @@ import { ChatService } from './chat.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalAuthGuard } from '../auth/guards/optional-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { diskStorage } from 'multer';
@@ -74,8 +75,9 @@ export class GamesController {
   }
 
   @Get('public/:id')
-  async findOnePublic(@Param('id') id: string) {
-    return this.gamesService.findOnePublic(id);
+  @UseGuards(OptionalAuthGuard)
+  async findOnePublic(@Param('id') id: string, @Request() req: any) {
+    return this.gamesService.findOnePublic(id, req.user?.id);
   }
 
   @Get('public/:id/reviews')

@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateScenarioDto } from './dto/create-scenario.dto';
+import { ActivityService } from '../activity/activity.service';
 
 @Injectable()
 export class ScenariosService {
   private readonly logger = new Logger(ScenariosService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   async create(userId: string, dto: CreateScenarioDto) {
     // Debug: log raw dto
@@ -202,7 +206,7 @@ export class ScenariosService {
       throw new ForbiddenException('You do not have access to this scenario');
     }
 
-    return this.prisma.scenario.update({
+    const updated = await this.prisma.scenario.update({
       where: { id: scenarioId },
       data: {
         isPublished: true,
@@ -211,6 +215,22 @@ export class ScenariosService {
         ...(licenseType !== undefined && { licenseType }),
       },
     });
+
+    // Получаем данные автора для события активности
+    const author = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, avatarUrl: true },
+    });
+
+    await this.activityService.createEvent(
+      'SCENARIO_PUBLISHED',
+      userId,
+      author?.name || 'Пользователь',
+      author?.avatarUrl || null,
+      { scenarioId: updated.id, scenarioName: updated.name },
+    );
+
+    return updated;
   }
 
   async delete(userId: string, scenarioId: string) {

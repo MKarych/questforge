@@ -377,6 +377,35 @@ model ActivityLog {
 }
 
 // ============================================================
+// ACTIVITY EVENT (живая лента "Прямо сейчас")
+// ============================================================
+
+enum ActivityEventType {
+  GAME_STARTED
+  GAME_FINISHED
+  TEAM_CREATED
+  SCENARIO_PUBLISHED
+  REVIEW_LEFT
+  USER_REGISTERED
+  ACHIEVEMENT_UNLOCKED
+}
+
+model ActivityEvent {
+  id         String             @id @default(uuid()) @db.Uuid
+  type       ActivityEventType  @map("type")
+  userId     String             @map("user_id") @db.Uuid
+  userName   String             @map("user_name") @db.VarChar(100)
+  userAvatar String?            @map("user_avatar")
+  payload    Json               @default("{}")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([userId])
+  @@map("activity_events")
+}
+
+// ============================================================
 // GAME — Aggregate Root
 // ============================================================
 

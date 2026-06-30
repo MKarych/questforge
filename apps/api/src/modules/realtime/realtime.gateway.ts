@@ -232,6 +232,39 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(clientId).emit('realtime:event', event);
   }
 
+  /**
+   * Отправить событие всем подписчикам канала activity:live.
+   */
+  broadcastToActivity(event: {
+    id: string;
+    type: string;
+    userId: string;
+    userName: string;
+    userAvatar: string | null;
+    payload: Record<string, unknown>;
+    createdAt: string;
+  }): void {
+    this.server.to('activity:live').emit('activity:event', event);
+  }
+
+  // ================================================================
+  // Подписка на канал активности
+  // ================================================================
+
+  @SubscribeMessage('join:activity')
+  handleJoinActivity(@ConnectedSocket() client: Socket) {
+    client.join('activity:live');
+    this.logger.log(`Client ${client.id} joined activity:live room`);
+    return { success: true };
+  }
+
+  @SubscribeMessage('leave:activity')
+  handleLeaveActivity(@ConnectedSocket() client: Socket) {
+    client.leave('activity:live');
+    this.logger.log(`Client ${client.id} left activity:live room`);
+    return { success: true };
+  }
+
   // ================================================================
   // Приватные методы
   // ================================================================
