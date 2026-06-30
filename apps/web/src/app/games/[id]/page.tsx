@@ -382,7 +382,7 @@ export default function GameDetailsPage() {
                   fill
                   className="object-cover hover:scale-105 transition-transform duration-300"
                   quality={85}
-                  unoptimized={game.imageUrl.includes('placehold.co')}
+                  unoptimized={game.imageUrl.includes('placehold.co') || game.imageUrl.startsWith('/uploads/')}
                 />
               </button>
             )}
