@@ -681,7 +681,7 @@ export default function GameDetailsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-text-secondary">
                   <span className="text-lg">📋</span>
-                  <span className="text-sm">{game.status === 'REGISTRATION_OPEN' ? 'Регистрация открыта' : game.status === 'RUNNING' ? 'Идёт игра' : game.status === 'FINISHED' ? 'Завершена' : game.status === 'LOBBY' ? 'Ожидание старта' : game.status}</span>
+                  <span className="text-sm">{game.status === 'REGISTRATION_OPEN' || game.status === 'PUBLISHED' ? 'Регистрация открыта' : game.status === 'RUNNING' ? 'Идёт игра' : game.status === 'FINISHED' ? 'Завершена' : game.status === 'LOBBY' ? 'Ожидание старта' : game.status}</span>
                 </div>
               </div>
 
@@ -749,7 +749,7 @@ export default function GameDetailsPage() {
                         Перенаправление в лобби...
                       </p>
                     </div>
-                  ) : game.status === 'REGISTRATION_OPEN' ? (
+                  ) : (game.status === 'REGISTRATION_OPEN' || game.status === 'PUBLISHED') ? (
                     <div className="space-y-4">
                       {/* Регистрация через существующую команду */}
                       {myTeams.length > 0 && (
