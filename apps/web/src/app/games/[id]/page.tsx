@@ -710,7 +710,7 @@ export default function GameDetailsPage() {
                   )}
                   
                   {/* Кнопка запуска игры */}
-                  {(game.status === 'LOBBY' || game.status === 'REGISTRATION_OPEN' || game.status === 'REGISTRATION_CLOSED') && (
+                  {(game.status === 'LOBBY' || game.status === 'REGISTRATION_OPEN' || game.status === 'REGISTRATION_CLOSED' || game.status === 'PUBLISHED') && (
                     <div>
                       {startError && (
                         <div className="p-2 rounded bg-error/10 text-error text-xs mb-2">

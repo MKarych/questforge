@@ -109,9 +109,9 @@ text
 DRAFT (черновик) — создана, видна только организатору
   ↓  publishGame()
 PUBLISHED (опубликована) — в каталоге, можно регистрироваться
-  ↓  openRegistration()
+  ↓  openRegistration()  |  startGame() (если есть команды)
 REGISTRATION_OPEN (регистрация открыта)
-  ↓  closeRegistration()
+  ↓  closeRegistration()  |  startGame() (если есть команды)
 REGISTRATION_CLOSED (регистрация закрыта)
   ↓  moveToLobby()
 LOBBY (ожидание старта, чат доступен)
@@ -144,10 +144,12 @@ DRAFT -> PUBLISHED
 DRAFT -> CANCELLED
 
 PUBLISHED -> REGISTRATION_OPEN
+PUBLISHED -> RUNNING (ручной старт, если есть команды)
 PUBLISHED -> CANCELLED
 PUBLISHED -> RESCHEDULED
 
 REGISTRATION_OPEN -> REGISTRATION_CLOSED
+REGISTRATION_OPEN -> RUNNING (ручной старт, если есть команды)
 REGISTRATION_OPEN -> CANCELLED
 REGISTRATION_OPEN -> RESCHEDULED
 
