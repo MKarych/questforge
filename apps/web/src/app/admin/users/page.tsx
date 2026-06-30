@@ -169,14 +169,14 @@ export default function AdminUsersPage() {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <AdminNav userRole={userRole} />
-        
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">👥 Пользователи</h1>
             <p className="text-text-secondary mt-1">Всего: {total}</p>
           </div>
         </div>
+
+        <AdminNav userRole={userRole} />
 
         {error && (
           <div className="p-3 rounded-lg bg-error/10 text-error text-sm mb-4">{error}</div>

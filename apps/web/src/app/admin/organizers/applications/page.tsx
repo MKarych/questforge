@@ -121,8 +121,6 @@ export default function AdminApplicationsPage() {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <AdminNav userRole={userRole} />
-        
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">📋 Заявки организаторов</h1>
@@ -133,6 +131,8 @@ export default function AdminApplicationsPage() {
             </p>
           </div>
         </div>
+
+        <AdminNav userRole={userRole} />
 
         {error && (
           <div className="p-3 rounded-lg bg-error/10 text-error text-sm mb-4">{error}</div>

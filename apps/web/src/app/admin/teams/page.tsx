@@ -126,14 +126,14 @@ export default function AdminTeamsPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <AdminNav userRole={userRole} />
-
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-text-primary">👥 Управление командами</h1>
           <span className="text-sm text-text-secondary">
             {isAdmin ? 'Администратор' : 'Модератор'}
           </span>
         </div>
+
+        <AdminNav userRole={userRole} />
 
         {/* Success/Error Messages */}
         {success && (

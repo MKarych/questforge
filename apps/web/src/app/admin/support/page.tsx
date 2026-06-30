@@ -180,14 +180,14 @@ export default function AdminSupportPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <AdminNav userRole={userRole} />
-
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-text-primary">📬 Заявки в поддержку</h1>
           <span className="text-sm text-text-secondary">
             {userRole === 'ADMIN' ? 'Администратор' : 'Модератор'}
           </span>
         </div>
+
+        <AdminNav userRole={userRole} />
 
         {/* Stats */}
         {stats && (

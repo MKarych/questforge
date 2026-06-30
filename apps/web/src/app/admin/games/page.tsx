@@ -187,8 +187,6 @@ export default function AdminGamesPage() {
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <AdminNav userRole={userRole} />
-        
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">🎮 Все игры</h1>
@@ -197,6 +195,8 @@ export default function AdminGamesPage() {
             </p>
           </div>
         </div>
+
+        <AdminNav userRole={userRole} />
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
