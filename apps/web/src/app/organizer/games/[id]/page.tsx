@@ -306,7 +306,7 @@ export default function GamePage() {
                 <Link href={`/organizer/games/${gameId}/edit`} className="btn-secondary text-center">
                   Редактировать
                 </Link>
-                {game.status === 'CREATED' && (
+                {['DRAFT', 'HIDDEN'].includes(game.status) && (
                   <button
                     className="btn-primary text-center"
                     onClick={handlePublish}
@@ -315,7 +315,7 @@ export default function GamePage() {
                     {actionLoading === 'publish' ? '...' : 'Опубликовать'}
                   </button>
                 )}
-                {game.status !== 'PUBLISHED' && game.status !== 'FINISHED' && (
+                {!['PUBLISHED', 'FINISHED', 'RUNNING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) && (
                   <button
                     className="btn-secondary text-center text-error hover:border-error"
                     onClick={handleDelete}
@@ -324,7 +324,7 @@ export default function GamePage() {
                     {actionLoading === 'delete' ? '...' : 'Удалить'}
                   </button>
                 )}
-                {game.status !== 'PUBLISHED' && (
+                {!['PUBLISHED', 'FINISHED', 'RUNNING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) && (
                   <button
                     className="btn-secondary text-center"
                     onClick={handleSaveDraft}
