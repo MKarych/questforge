@@ -17,6 +17,7 @@ export default function GameCard({ game }: GameCardProps) {
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
   const isPlaceholder = hasCustomImage && game.imageUrl?.includes('placehold.co');
+  const isLocalUpload = hasCustomImage && game.imageUrl?.startsWith('/uploads/');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -57,7 +58,7 @@ export default function GameCard({ game }: GameCardProps) {
               fill
               className={`${hasCustomImage ? 'object-cover group-hover:scale-105' : 'object-contain p-6'} transition-transform duration-300 pointer-events-none`}
               quality={hasCustomImage && !isPlaceholder ? 85 : 100}
-              unoptimized={!hasCustomImage || isPlaceholder}
+              unoptimized={!hasCustomImage || isPlaceholder || isLocalUpload}
             />
             {!hasCustomImage && (
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />

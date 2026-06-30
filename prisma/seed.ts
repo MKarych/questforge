@@ -74,6 +74,8 @@ async function main() {
   await prisma.$executeRaw`DELETE FROM "GameTeam";`;
   await prisma.$executeRaw`DELETE FROM "GameComment";`;
   await prisma.$executeRaw`DELETE FROM "GameQuestion";`;
+  await prisma.$executeRaw`DELETE FROM "Event";`;
+  await prisma.$executeRaw`DELETE FROM "SessionState";`;
   await prisma.$executeRaw`DELETE FROM "Game";`;
   await prisma.$executeRaw`DELETE FROM "Scenario";`;
   await prisma.$executeRaw`DELETE FROM "TeamMember";`;
@@ -81,13 +83,13 @@ async function main() {
   await prisma.$executeRaw`DELETE FROM "JoinRequest";`;
   await prisma.$executeRaw`DELETE FROM "OwnershipTransfer";`;
   await prisma.$executeRaw`DELETE FROM "Team";`;
-  await prisma.$executeRaw`DELETE FROM "SessionState";`;
-  await prisma.$executeRaw`DELETE FROM "Event";`;
   await prisma.$executeRaw`DELETE FROM "Media";`;
   await prisma.$executeRaw`DELETE FROM "Inventory";`;
   await prisma.$executeRaw`DELETE FROM "Resource";`;
   await prisma.$executeRaw`DELETE FROM "AuditLog";`;
   await prisma.$executeRaw`DELETE FROM "Follow";`;
+  await prisma.$executeRaw`DELETE FROM "ledger_entries";`;
+  await prisma.$executeRaw`DELETE FROM "user_limits";`;
   await prisma.$executeRaw`DELETE FROM "User";`;
 
   const passwordHash = await hashPassword(PASSWORD);
@@ -129,7 +131,7 @@ async function main() {
         verificationToken: null,
         verified: { email: true, phone: false, telegram: false },
         profile: {
-          avatar: `https://placehold.co/128x128/EEE/999?text=${u.username.substring(0, 2)}`,
+          avatar: `https://placehold.co/128x128/EEE/999.png?text=${u.username.substring(0, 2)}`,
           bio: '',
           city: '',
           socialLinks: { tg: '', vk: '', discord: '', youtube: '', github: '' },
@@ -295,7 +297,7 @@ async function main() {
         organizerId: organizer.id,
         scenarioId: scenario.id,
         status: g.status as GameStatus,
-        imageUrl: `https://placehold.co/800x600/1a1a2e/EEE?text=${encodeURIComponent(g.title.substring(0, 6))}`,
+        imageUrl: `https://placehold.co/800x600/1a1a2e/EEE.png?text=${encodeURIComponent(g.title.substring(0, 6))}`,
         tags: g.tags,
         autoStart: false,
         autoStartDelay: 0,
@@ -636,7 +638,7 @@ async function main() {
         mimeType: 'image/jpeg',
         size: 1024 * 100,
         path: `/uploads/games/${game.id}/cover.jpg`,
-        url: `https://placehold.co/800x600/1a1a2e/EEE?text=Game+${index + 1}`,
+        url: `https://placehold.co/800x600/1a1a2e/EEE.png?text=Game+${index + 1}`,
         gameId: game.id,
       },
     });
@@ -651,7 +653,7 @@ async function main() {
         mimeType: 'image/jpeg',
         size: 1024 * 200,
         path: `/uploads/games/${game.id}/banner.jpg`,
-        url: `https://placehold.co/1200x400/16213e/EEE?text=Banner+${index + 1}`,
+        url: `https://placehold.co/1200x400/16213e/EEE.png?text=Banner+${index + 1}`,
         gameId: game.id,
       },
     });
@@ -667,7 +669,7 @@ async function main() {
           mimeType: 'image/jpeg',
           size: 1024 * 50,
           path: `/uploads/scenarios/${scenario.id}/image-${i + 1}.jpg`,
-          url: `https://placehold.co/400x300/0f3460/EEE?text=Scene+${index + 1}-${i + 1}`,
+          url: `https://placehold.co/400x300/0f3460/EEE.png?text=Scene+${index + 1}-${i + 1}`,
         },
       });
     }
@@ -682,7 +684,7 @@ async function main() {
         mimeType: 'image/jpeg',
         size: 1024 * 10,
         path: `/uploads/users/${user.id}/avatar.jpg`,
-        url: `https://placehold.co/128x128/533483/EEE?text=U${index + 1}`,
+        url: `https://placehold.co/128x128/533483/EEE.png?text=U${index + 1}`,
       },
     });
   }
@@ -696,7 +698,7 @@ async function main() {
         mimeType: 'image/jpeg',
         size: 1024 * 10,
         path: `/uploads/teams/${team.id}/avatar.jpg`,
-        url: `https://placehold.co/128x128/533483/EEE?text=T${index + 1}`,
+        url: `https://placehold.co/128x128/533483/EEE.png?text=T${index + 1}`,
         teamId: team.id,
       },
     });
@@ -1162,8 +1164,8 @@ async function main() {
         shortDescription: ld.shortDescription,
         category: ld.category,
         tags: ld.tags,
-        coverUrl: `https://placehold.co/800x450/1a1a2e/EEE?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
-        bannerUrl: `https://placehold.co/1200x400/16213e/EEE?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
+        coverUrl: `https://placehold.co/800x450/1a1a2e/EEE.png?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
+        bannerUrl: `https://placehold.co/1200x400/16213e/EEE.png?text=${encodeURIComponent(ld.title.substring(0, 20))}`,
         price: ld.price,
         licenseType: ld.licenseType,
         updatePolicy: ld.updatePolicy,
