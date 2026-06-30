@@ -81,7 +81,7 @@ export default function FollowingPage() {
       <main className="flex-1 container mx-auto px-4 py-8">
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 text-sm text-text-secondary mb-6">
-          <Link href="/profile" className="hover:text-primary">Профиль</Link>
+          <button onClick={() => window.history.back()} className="hover:text-primary">← Назад</button>
           <span>/</span>
           <span className="text-text-primary">Подписки</span>
         </div>

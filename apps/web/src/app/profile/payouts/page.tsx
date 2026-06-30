@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
@@ -96,9 +97,9 @@ export default function PayoutsPage() {
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-6">
-          <Link href="/profile/edit" className="text-primary hover:underline text-sm">
-            ← Настройки профиля
-          </Link>
+          <button onClick={() => window.history.back()} className="text-primary hover:underline text-sm">
+            ← Назад
+          </button>
         </div>
 
         <h1 className="text-3xl font-bold mb-8">Выплаты</h1>
