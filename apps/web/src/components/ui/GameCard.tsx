@@ -16,7 +16,7 @@ export default function GameCard({ game }: GameCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
-  const isPlaceholder = hasCustomImage && game.imageUrl?.includes('placehold.co');
+  const isPlaceholder = hasCustomImage && (game.imageUrl?.includes('placehold.co') || game.imageUrl?.includes('picsum.photos'));
   const isLocalUpload = hasCustomImage && game.imageUrl?.startsWith('/uploads/');
 
   const formatDate = (dateString: string) => {

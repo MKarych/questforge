@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# ============================================================
+# stop — убивает процессы на портах 3000 и 3001
+# Поддерживает macOS и Windows (Git Bash / WSL / Cygwin)
+# ============================================================
+
+set -e
+
+PORTS=(3000 3001)
+
+OS="$(uname -s)"
+
+for PORT in "${PORTS[@]}"; do
+  case "$OS" in
+    Darwin*)
+      # macOS — используем lsof
+      PID=$(lsof -ti tcp:"$PORT" -sTCP:LISTEN -F pid 2>/dev/null | tail -n +2 | head -1)
+      if [ -n "$PID" ]; then
+        echo "🔴 [macOS] Убиваю процесс на порту $PORT (PID: $PID)..."
+        kill -9 "$PID" 2>/dev/null && echo "✅ Порт $PORT освобождён" || echo "⚠️  Не удалось убить процесс на порту $PORT"
+      else
+        echo "✅ Порт $PORT свободен"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      # Windows (Git Bash / MSYS2 / Cygwin) — используем netstat + find
+      PID=$(netstat -ano 2>/dev/null | findstr ":$PORT " | findstr "LISTENING" | awk '{print $NF}' | head -1)
+      if [ -n "$PID" ]; then
+        echo "🔴 [Windows] Убиваю процесс на порту $PORT (PID: $PID)..."
+        taskkill //F //PID "$PID" 2>/dev/null && echo "✅ Порт $PORT освобождён" || echo "⚠️  Не удалось убить процесс на порту $PORT"
+      else
+        echo "✅ Порт $PORT свободен"
+      fi
+      ;;
+    *)
+      echo "❌ Неизвестная ОС: $OS"
+      exit 1
+      ;;
+  esac
+done
+
+echo ""
+echo "✅ Готово. Все процессы на портах 3000 и 3001 завершены."

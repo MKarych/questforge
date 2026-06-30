@@ -12,6 +12,9 @@ import { ActivityService } from '../activity/activity.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { validateTransition, canCancel, canReschedule } from './state-machine/game-state-machine';
+import * as path from 'path';
+import * as fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 type GameStatus = $Enums.GameStatus;
 
@@ -1188,6 +1191,55 @@ export class GamesService {
     });
 
     this.logger.log(`Game admin-deleted: ${gameId} by moderator ${moderatorId}`);
+  }
+
+  // ============================================================
+  // Upload Cover
+  // ============================================================
+
+  async uploadCover(userId: string, gameId: string, file: Express.Multer.File) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Игра не найдена');
+    }
+
+    if (game.organizerId !== userId) {
+      throw new ForbiddenException('У вас нет доступа к этой игре');
+    }
+
+    // Generate unique filename with UUID
+    const ext = path.extname(file.originalname) || this.getExtension(file.mimetype);
+    const filename = `${uuidv4()}${ext}`;
+    const destPath = path.join(process.cwd(), 'public', 'uploads', 'covers', filename);
+
+    // Move file from multer temp location to final destination
+    fs.renameSync(file.path, destPath);
+
+    // Generate URL
+    const url = `/uploads/covers/${filename}`;
+
+    // Update game with image URL
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: { imageUrl: url },
+    });
+
+    this.logger.log(`Cover uploaded for game ${gameId}: ${url}`);
+    return { url };
+  }
+
+  private getExtension(mimeType: string): string {
+    const extensions: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+    };
+    return extensions[mimeType] || '.jpg';
   }
 
   // ============================================================

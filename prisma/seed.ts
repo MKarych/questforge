@@ -297,7 +297,7 @@ async function main() {
         organizerId: organizer.id,
         scenarioId: scenario.id,
         status: g.status as GameStatus,
-        imageUrl: `https://placehold.co/800x600/1a1a2e/EEE.png?text=${encodeURIComponent(g.title.substring(0, 6))}`,
+        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(g.title.replace(/\s+/g, '-'))}/800/600`,
         tags: g.tags,
         autoStart: false,
         autoStartDelay: 0,

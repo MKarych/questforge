@@ -362,7 +362,34 @@ export class GamesController {
   }
 
   // ============================================================
-  // 29.6. Админские эндпоинты (ADMIN/MODERATOR only)
+  // 29.6. Загрузка обложки игры
+  // ============================================================
+
+  @Post(':id/upload-cover')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './public/uploads/covers',
+        filename: (_req: any, file: Express.Multer.File, callback: (error: Error | null, filename: string) => void) => {
+          const ext = extname(file.originalname);
+          const filename = `${uuidv4()}${ext}`;
+          callback(null, filename);
+        },
+      }),
+    }),
+  )
+  async uploadCover(
+    @Request() req: any,
+    @Param('id') gameId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const userId = req.user?.userId;
+    return this.gamesService.uploadCover(userId, gameId, file);
+  }
+
+  // ============================================================
+  // 29.7. Админские эндпоинты (ADMIN/MODERATOR only)
   // ============================================================
 
   @Get('admin/all')
