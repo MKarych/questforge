@@ -36,6 +36,7 @@ export interface Scene {
     conditions?: Condition[];
     loop?: LoopConfig;
     subScenario?: SubScenarioConfig;
+    multiplayer?: MultiplayerMechanicConfig;
   };
 }
 
@@ -786,6 +787,38 @@ export interface LoopConfig {
   onCompleteSceneId?: string; // сцена после завершения цикла
 }
 
+// ==================== Multiplayer Mechanic Types (spec 3.1) ====================
+export type MultiplayerMechanicType =
+  | 'voting'       // голосование (все выбирают вариант)
+  | 'auction'      // аукцион (ставки)
+  | 'simultaneous' // одновременный выбор (не видят выбор других)
+  | 'timer_sync'   // синхронизированный таймер
+  | 'role_reveal'  // раскрытие роли
+  | 'trade'        // обмен между игроками
+  | 'challenge';   // челлендж (кто быстрее)
+
+export interface MultiplayerMechanicConfig {
+  type: MultiplayerMechanicType;
+  // Voting
+  options?: string[];
+  maxVotes?: number; // 0 = unlimited
+  voteVisibility: 'hidden' | 'after_vote' | 'always';
+  // Auction
+  startingBid?: number;
+  minBidStep?: number;
+  currency?: string;
+  // Timer
+  duration: number; // секунд
+  autoComplete: boolean;
+  // Trade
+  allowPartial: boolean;
+  // Общие
+  minPlayers: number;
+  maxPlayers: number;
+  resultAction: 'continue' | 'branch' | 'trigger_event';
+  resultEventName?: string;
+}
+
 // ==================== Константы блоков ====================
 export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   // Базовые
@@ -823,6 +856,11 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   // Персонажи
   { type: 'dialogue', label: 'NPC', icon: '🗣', description: 'Взаимодействие с персонажем', color: 'bg-cyan-500', category: 'Персонажи' },
   { type: 'dialogue', label: 'Диалог', icon: '💬', description: 'Ветка диалога с NPC', color: 'bg-teal-400', category: 'Персонажи' },
+  // Мультиплеер
+  { type: 'custom', label: 'Голосование', icon: '🗳️', description: 'Голосование всех игроков', color: 'bg-orange-500', category: 'Мультиплеер' },
+  { type: 'custom', label: 'Аукцион', icon: '🔨', description: 'Аукцион со ставками', color: 'bg-yellow-500', category: 'Мультиплеер' },
+  { type: 'custom', label: 'Одновременный выбор', icon: '🤫', description: 'Выбор без показа другим', color: 'bg-purple-500', category: 'Мультиплеер' },
+  { type: 'custom', label: 'Челлендж', icon: '⚡', description: 'Кто быстрее выполнит', color: 'bg-red-500', category: 'Мультиплеер' },
   // Экспериментальные
   { type: 'custom', label: 'AR', icon: '🧩', description: 'Дополненная реальность', color: 'bg-gray-500', category: 'Экспериментальные', experimental: true },
   { type: 'custom', label: 'Битва', icon: '⚔️', description: 'Мини-битва', color: 'bg-red-600', category: 'Экспериментальные', experimental: true },
@@ -837,6 +875,7 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: 'Достижения', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Достижения') },
   { name: 'Персонажи', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Персонажи') },
   { name: 'Роли', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Роли') },
+  { name: 'Мультиплеер', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Мультиплеер') },
   { name: 'Экспериментальные', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Экспериментальные') },
 ];
 

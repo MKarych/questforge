@@ -11,6 +11,8 @@ import {
   LoopConfig,
   LoopType,
   SubScenarioConfig,
+  MultiplayerMechanicConfig,
+  MultiplayerMechanicType,
   BLOCK_DEFINITIONS,
 } from '@/lib/editor-store/editor.types';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
@@ -298,6 +300,17 @@ export default function NodeSettings({
             <SubScenarioSettingsSection
               subScenario={node.metadata?.subScenario || null}
               onUpdate={(sub) => handleMetadataChange('subScenario', sub)}
+            />
+          </div>
+        )}
+
+        {/* Multiplayer Settings — для блоков мультиплеера */}
+        {['Голосование', 'Аукцион', 'Одновременный выбор', 'Челлендж'].includes(node.title) && (
+          <div className="pt-2 border-t border-border">
+            <MultiplayerSettingsSection
+              multiplayer={node.metadata?.multiplayer || null}
+              blockTitle={node.title}
+              onUpdate={(mp) => handleMetadataChange('multiplayer', mp)}
             />
           </div>
         )}
@@ -1311,6 +1324,235 @@ function SubScenarioSettingsSection({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ==================== MultiplayerSettingsSection Component ====================
+function MultiplayerSettingsSection({
+  multiplayer,
+  blockTitle,
+  onUpdate,
+}: {
+  multiplayer: MultiplayerMechanicConfig | null;
+  blockTitle: string;
+  onUpdate: (config: MultiplayerMechanicConfig | null) => void;
+}) {
+  const getDefaultType = (title: string): MultiplayerMechanicType => {
+    switch (title) {
+      case 'Голосование': return 'voting';
+      case 'Аукцион': return 'auction';
+      case 'Одновременный выбор': return 'simultaneous';
+      case 'Челлендж': return 'challenge';
+      default: return 'voting';
+    }
+  };
+
+  const config = multiplayer || {
+    type: getDefaultType(blockTitle),
+    voteVisibility: 'hidden' as const,
+    duration: 60,
+    autoComplete: true,
+    allowPartial: false,
+    minPlayers: 2,
+    maxPlayers: 10,
+    resultAction: 'continue' as const,
+  };
+
+  const update = (partial: Partial<MultiplayerMechanicConfig>) => {
+    onUpdate({ ...config, ...partial });
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="label text-sm">🎮 Настройки мультиплеера</label>
+
+      {/* Тип механики */}
+      <div>
+        <label className="text-xs text-text-secondary">Тип</label>
+        <select
+          value={config.type}
+          onChange={(e) => update({ type: e.target.value as MultiplayerMechanicType })}
+          className="input-field text-sm"
+        >
+          <option value="voting">🗳️ Голосование</option>
+          <option value="auction">🔨 Аукцион</option>
+          <option value="simultaneous">🤫 Одновременный выбор</option>
+          <option value="challenge">⚡ Челлендж</option>
+          <option value="timer_sync">⏱ Синхр. таймер</option>
+          <option value="role_reveal">🎭 Раскрытие роли</option>
+          <option value="trade">🤝 Обмен</option>
+        </select>
+      </div>
+
+      {/* Длительность */}
+      <div>
+        <label className="text-xs text-text-secondary">⏱ Длительность (сек)</label>
+        <input
+          type="number"
+          value={config.duration}
+          onChange={(e) => update({ duration: Math.max(1, parseInt(e.target.value) || 60) })}
+          className="input-field text-sm"
+          min={1}
+          max={3600}
+        />
+      </div>
+
+      {/* Игроки */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-text-secondary">Мин. игроков</label>
+          <input
+            type="number"
+            value={config.minPlayers}
+            onChange={(e) => update({ minPlayers: Math.max(1, parseInt(e.target.value) || 2) })}
+            className="input-field text-sm"
+            min={1}
+            max={100}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-text-secondary">Макс. игроков</label>
+          <input
+            type="number"
+            value={config.maxPlayers}
+            onChange={(e) => update({ maxPlayers: Math.max(config.minPlayers, parseInt(e.target.value) || 10) })}
+            className="input-field text-sm"
+            min={1}
+            max={100}
+          />
+        </div>
+      </div>
+
+      {/* Опции голосования (только для voting) */}
+      {config.type === 'voting' && (
+        <>
+          <div>
+            <label className="text-xs text-text-secondary">Видимость голосов</label>
+            <select
+              value={config.voteVisibility}
+              onChange={(e) => update({ voteVisibility: e.target.value as 'hidden' | 'after_vote' | 'always' })}
+              className="input-field text-sm"
+            >
+              <option value="hidden">Скрыты до конца</option>
+              <option value="after_vote">После своего голоса</option>
+              <option value="always">Всегда видны</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">Макс. голосов на игрока (0 = без лимита)</label>
+            <input
+              type="number"
+              value={config.maxVotes ?? 1}
+              onChange={(e) => update({ maxVotes: parseInt(e.target.value) || 0 })}
+              className="input-field text-sm"
+              min={0}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">Варианты голосования (через запятую)</label>
+            <input
+              type="text"
+              value={(config.options || []).join(', ')}
+              onChange={(e) => update({ options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+              className="input-field text-sm"
+              placeholder="Да, Нет, Воздержался"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Настройки аукциона (только для auction) */}
+      {config.type === 'auction' && (
+        <>
+          <div>
+            <label className="text-xs text-text-secondary">💰 Стартовая ставка</label>
+            <input
+              type="number"
+              value={config.startingBid ?? 100}
+              onChange={(e) => update({ startingBid: Math.max(0, parseInt(e.target.value) || 100) })}
+              className="input-field text-sm"
+              min={0}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">📈 Минимальный шаг</label>
+            <input
+              type="number"
+              value={config.minBidStep ?? 10}
+              onChange={(e) => update({ minBidStep: Math.max(1, parseInt(e.target.value) || 10) })}
+              className="input-field text-sm"
+              min={1}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">Валюта</label>
+            <input
+              type="text"
+              value={config.currency || 'монет'}
+              onChange={(e) => update({ currency: e.target.value || 'монет' })}
+              className="input-field text-sm"
+              placeholder="монет"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Настройки обмена (только для trade) */}
+      {config.type === 'trade' && (
+        <div>
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={config.allowPartial}
+              onChange={(e) => update({ allowPartial: e.target.checked })}
+              className="accent-primary"
+            />
+            Разрешить частичный обмен
+          </label>
+        </div>
+      )}
+
+      {/* Автозавершение */}
+      <div>
+        <label className="flex items-center gap-2 text-xs text-text-secondary">
+          <input
+            type="checkbox"
+            checked={config.autoComplete}
+            onChange={(e) => update({ autoComplete: e.target.checked })}
+            className="accent-primary"
+          />
+          Автоматически завершить по таймеру
+        </label>
+      </div>
+
+      {/* Результат */}
+      <div>
+        <label className="text-xs text-text-secondary">Действие по результату</label>
+        <select
+          value={config.resultAction}
+          onChange={(e) => update({ resultAction: e.target.value as 'continue' | 'branch' | 'trigger_event' })}
+          className="input-field text-sm"
+        >
+          <option value="continue">Продолжить сценарий</option>
+          <option value="branch">Ветвление по результату</option>
+          <option value="trigger_event">Отправить событие</option>
+        </select>
+      </div>
+
+      {/* Имя события (только для trigger_event) */}
+      {config.resultAction === 'trigger_event' && (
+        <div>
+          <label className="text-xs text-text-secondary">Имя события</label>
+          <input
+            type="text"
+            value={config.resultEventName || ''}
+            onChange={(e) => update({ resultEventName: e.target.value || undefined })}
+            className="input-field text-sm"
+            placeholder="multiplayer_completed"
+          />
+        </div>
+      )}
     </div>
   );
 }

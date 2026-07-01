@@ -2184,3 +2184,492 @@ export class MultiScenarioOrchestrator {
     }
   }
 }
+
+// ==================== 12. Multiplayer Engine (spec 3.1) ====================
+
+export interface VotingSession {
+  id: string;
+  status: 'active' | 'completed';
+  options: string[];
+  votes: Record<string, number>; // playerId -> optionIndex
+  results: Record<number, number>; // optionIndex -> count
+  startedAt: number;
+  duration: number;
+}
+
+export interface AuctionSession {
+  id: string;
+  status: 'active' | 'completed';
+  itemName: string;
+  startingBid: number;
+  minBidStep: number;
+  currency: string;
+  bids: AuctionBid[];
+  currentWinnerId: string | null;
+  currentBid: number;
+  startedAt: number;
+  duration: number;
+}
+
+export interface AuctionBid {
+  playerId: string;
+  amount: number;
+  timestamp: number;
+}
+
+export interface AuctionResult {
+  winnerId: string | null;
+  winningBid: number;
+  totalBids: number;
+  participants: string[];
+}
+
+export interface ChoiceSession {
+  id: string;
+  status: 'active' | 'completed';
+  choices: Record<string, any>; // playerId -> choice
+  startedAt: number;
+  duration: number;
+}
+
+export interface ChallengeSession {
+  id: string;
+  status: 'active' | 'completed';
+  results: ChallengeResultEntry[];
+  startedAt: number;
+  duration: number;
+}
+
+export interface ChallengeResultEntry {
+  playerId: string;
+  time: number; // ms
+  completedAt: number;
+}
+
+export interface ChallengeResult {
+  winnerId: string | null;
+  rankings: Array<{ playerId: string; time: number }>;
+  totalParticipants: number;
+}
+
+export interface VotingResults {
+  totalVotes: number;
+  results: Record<number, number>; // optionIndex -> count
+  winnerIndex: number | null;
+  participationRate: number; // 0..1
+}
+
+export class MultiplayerEngine {
+  private votingSessions: Map<string, VotingSession> = new Map();
+  private auctionSessions: Map<string, AuctionSession> = new Map();
+  private choiceSessions: Map<string, ChoiceSession> = new Map();
+  private challengeSessions: Map<string, ChallengeSession> = new Map();
+  private syncTimers: Map<string, { remaining: number; startedAt: number; duration: number }> = new Map();
+
+  // ==================== Voting ====================
+
+  /**
+   * Начать голосование.
+   */
+  startVoting(config: { id: string; options: string[]; duration: number }): VotingSession {
+    const session: VotingSession = {
+      id: config.id,
+      status: 'active',
+      options: config.options,
+      votes: {},
+      results: {},
+      startedAt: Date.now(),
+      duration: config.duration,
+    };
+
+    // Инициализируем результаты нулями
+    for (let i = 0; i < config.options.length; i++) {
+      session.results[i] = 0;
+    }
+
+    this.votingSessions.set(config.id, session);
+
+    // Автозавершение по таймеру
+    if (config.duration > 0) {
+      setTimeout(() => {
+        this.completeVoting(config.id);
+      }, config.duration * 1000);
+    }
+
+    return session;
+  }
+
+  /**
+   * Голосование игрока.
+   */
+  castVote(sessionId: string, playerId: string, optionIndex: number): boolean {
+    const session = this.votingSessions.get(sessionId);
+    if (!session || session.status !== 'active') return false;
+    if (optionIndex < 0 || optionIndex >= session.options.length) return false;
+
+    // Если игрок уже голосовал — уменьшаем счётчик предыдущего голоса
+    if (session.votes[playerId] !== undefined) {
+      const prevOption = session.votes[playerId];
+      session.results[prevOption] = Math.max(0, (session.results[prevOption] || 1) - 1);
+    }
+
+    // Записываем новый голос
+    session.votes[playerId] = optionIndex;
+    session.results[optionIndex] = (session.results[optionIndex] || 0) + 1;
+
+    return true;
+  }
+
+  /**
+   * Получить результаты голосования.
+   */
+  getVotingResults(sessionId: string): VotingResults | null {
+    const session = this.votingSessions.get(sessionId);
+    if (!session) return null;
+
+    const totalVotes = Object.keys(session.votes).length;
+    const winnerIndex = this.determineVotingWinner(session.results);
+
+    return {
+      totalVotes,
+      results: { ...session.results },
+      winnerIndex,
+      participationRate: totalVotes > 0 ? 1 : 0,
+    };
+  }
+
+  /**
+   * Завершить голосование принудительно.
+   */
+  completeVoting(sessionId: string): VotingSession | null {
+    const session = this.votingSessions.get(sessionId);
+    if (!session) return null;
+
+    session.status = 'completed';
+    return session;
+  }
+
+  private determineVotingWinner(results: Record<number, number>): number | null {
+    const entries = Object.entries(results).map(([k, v]) => [Number(k), v] as [number, number]);
+    if (entries.length === 0) return null;
+
+    const maxVotes = Math.max(...entries.map(([, v]) => v));
+    if (maxVotes === 0) return null;
+
+    const winners = entries.filter(([, v]) => v === maxVotes);
+    // Если ничья — возвращаем null (нужна переголосовка)
+    return winners.length === 1 ? winners[0][0] : null;
+  }
+
+  // ==================== Auction ====================
+
+  /**
+   * Начать аукцион.
+   */
+  startAuction(config: {
+    id: string;
+    itemName: string;
+    startingBid: number;
+    minBidStep: number;
+    currency: string;
+    duration: number;
+  }): AuctionSession {
+    const session: AuctionSession = {
+      id: config.id,
+      status: 'active',
+      itemName: config.itemName,
+      startingBid: config.startingBid,
+      minBidStep: config.minBidStep,
+      currency: config.currency,
+      bids: [],
+      currentWinnerId: null,
+      currentBid: config.startingBid,
+      startedAt: Date.now(),
+      duration: config.duration,
+    };
+
+    this.auctionSessions.set(config.id, session);
+
+    // Автозавершение по таймеру
+    if (config.duration > 0) {
+      setTimeout(() => {
+        this.completeAuction(config.id);
+      }, config.duration * 1000);
+    }
+
+    return session;
+  }
+
+  /**
+   * Сделать ставку.
+   */
+  placeBid(sessionId: string, playerId: string, amount: number): boolean {
+    const session = this.auctionSessions.get(sessionId);
+    if (!session || session.status !== 'active') return false;
+
+    // Первая ставка должна быть >= стартовой цены
+    // Последующие — >= текущая ставка + минимальный шаг
+    if (session.bids.length === 0) {
+      if (amount < session.startingBid) return false;
+    } else {
+      if (amount < session.currentBid + session.minBidStep) return false;
+    }
+
+    session.bids.push({ playerId, amount, timestamp: Date.now() });
+    session.currentWinnerId = playerId;
+    session.currentBid = amount;
+
+    return true;
+  }
+
+  /**
+   * Получить результат аукциона.
+   */
+  getAuctionResult(sessionId: string): AuctionResult | null {
+    const session = this.auctionSessions.get(sessionId);
+    if (!session) return null;
+
+    const participants = [...new Set(session.bids.map((b) => b.playerId))];
+
+    return {
+      winnerId: session.currentWinnerId,
+      winningBid: session.currentBid,
+      totalBids: session.bids.length,
+      participants,
+    };
+  }
+
+  /**
+   * Завершить аукцион принудительно.
+   */
+  completeAuction(sessionId: string): AuctionSession | null {
+    const session = this.auctionSessions.get(sessionId);
+    if (!session) return null;
+
+    session.status = 'completed';
+    return session;
+  }
+
+  // ==================== Simultaneous Choice ====================
+
+  /**
+   * Начать одновременный выбор.
+   */
+  startSimultaneousChoice(config: { id: string; duration: number }): ChoiceSession {
+    const session: ChoiceSession = {
+      id: config.id,
+      status: 'active',
+      choices: {},
+      startedAt: Date.now(),
+      duration: config.duration,
+    };
+
+    this.choiceSessions.set(config.id, session);
+
+    if (config.duration > 0) {
+      setTimeout(() => {
+        this.completeSimultaneousChoice(config.id);
+      }, config.duration * 1000);
+    }
+
+    return session;
+  }
+
+  /**
+   * Отправить выбор игрока.
+   */
+  submitChoice(sessionId: string, playerId: string, choice: any): boolean {
+    const session = this.choiceSessions.get(sessionId);
+    if (!session || session.status !== 'active') return false;
+
+    session.choices[playerId] = choice;
+    return true;
+  }
+
+  /**
+   * Получить все выборы.
+   */
+  getChoices(sessionId: string): Record<string, any> | null {
+    const session = this.choiceSessions.get(sessionId);
+    if (!session) return null;
+
+    return { ...session.choices };
+  }
+
+  /**
+   * Завершить одновременный выбор принудительно.
+   */
+  completeSimultaneousChoice(sessionId: string): ChoiceSession | null {
+    const session = this.choiceSessions.get(sessionId);
+    if (!session) return null;
+
+    session.status = 'completed';
+    return session;
+  }
+
+  // ==================== Challenge ====================
+
+  /**
+   * Начать челлендж.
+   */
+  startChallenge(config: { id: string; duration: number }): ChallengeSession {
+    const session: ChallengeSession = {
+      id: config.id,
+      status: 'active',
+      results: [],
+      startedAt: Date.now(),
+      duration: config.duration,
+    };
+
+    this.challengeSessions.set(config.id, session);
+
+    if (config.duration > 0) {
+      setTimeout(() => {
+        this.completeChallengeSession(config.id);
+      }, config.duration * 1000);
+    }
+
+    return session;
+  }
+
+  /**
+   * Завершить челлендж игроком (с указанием времени).
+   */
+  completeChallenge(sessionId: string, playerId: string, time: number): boolean {
+    const session = this.challengeSessions.get(sessionId);
+    if (!session || session.status !== 'active') return false;
+
+    // Проверяем, не завершил ли игрок уже
+    if (session.results.some((r) => r.playerId === playerId)) return false;
+
+    session.results.push({
+      playerId,
+      time,
+      completedAt: Date.now(),
+    });
+
+    return true;
+  }
+
+  /**
+   * Получить результат челленджа.
+   */
+  getChallengeResult(sessionId: string): ChallengeResult | null {
+    const session = this.challengeSessions.get(sessionId);
+    if (!session) return null;
+
+    const sorted = [...session.results].sort((a, b) => a.time - b.time);
+
+    return {
+      winnerId: sorted.length > 0 ? sorted[0].playerId : null,
+      rankings: sorted.map((r) => ({ playerId: r.playerId, time: r.time })),
+      totalParticipants: session.results.length,
+    };
+  }
+
+  /**
+   * Завершить сессию челленджа принудительно.
+   */
+  completeChallengeSession(sessionId: string): ChallengeSession | null {
+    const session = this.challengeSessions.get(sessionId);
+    if (!session) return null;
+
+    session.status = 'completed';
+    return session;
+  }
+
+  // ==================== Sync Timer ====================
+
+  /**
+   * Запустить синхронизированный таймер.
+   */
+  startSyncTimer(timerId: string, duration: number): void {
+    this.syncTimers.set(timerId, {
+      remaining: duration,
+      startedAt: Date.now(),
+      duration,
+    });
+  }
+
+  /**
+   * Получить оставшееся время синхронизированного таймера (в секундах).
+   */
+  getRemainingTime(timerId: string): number {
+    const timer = this.syncTimers.get(timerId);
+    if (!timer) return 0;
+
+    const elapsed = (Date.now() - timer.startedAt) / 1000;
+    const remaining = Math.max(0, timer.duration - elapsed);
+
+    return remaining;
+  }
+
+  /**
+   * Остановить синхронизированный таймер.
+   */
+  stopSyncTimer(timerId: string): void {
+    this.syncTimers.delete(timerId);
+  }
+
+  // ==================== Session Management ====================
+
+  /**
+   * Получить активную сессию голосования.
+   */
+  getVotingSession(sessionId: string): VotingSession | null {
+    return this.votingSessions.get(sessionId) || null;
+  }
+
+  /**
+   * Получить активную сессию аукциона.
+   */
+  getAuctionSession(sessionId: string): AuctionSession | null {
+    return this.auctionSessions.get(sessionId) || null;
+  }
+
+  /**
+   * Получить активную сессию одновременного выбора.
+   */
+  getChoiceSession(sessionId: string): ChoiceSession | null {
+    return this.choiceSessions.get(sessionId) || null;
+  }
+
+  /**
+   * Получить активную сессию челленджа.
+   */
+  getChallengeSession(sessionId: string): ChallengeSession | null {
+    return this.challengeSessions.get(sessionId) || null;
+  }
+
+  /**
+   * Очистить все завершённые сессии.
+   */
+  cleanupCompletedSessions(): void {
+    const now = Date.now();
+    const timeout = 3600000; // 1 час
+
+    for (const [id, session] of this.votingSessions) {
+      if (session.status === 'completed' && now - session.startedAt > timeout) {
+        this.votingSessions.delete(id);
+      }
+    }
+
+    for (const [id, session] of this.auctionSessions) {
+      if (session.status === 'completed' && now - session.startedAt > timeout) {
+        this.auctionSessions.delete(id);
+      }
+    }
+
+    for (const [id, session] of this.choiceSessions) {
+      if (session.status === 'completed' && now - session.startedAt > timeout) {
+        this.choiceSessions.delete(id);
+      }
+    }
+
+    for (const [id, session] of this.challengeSessions) {
+      if (session.status === 'completed' && now - session.startedAt > timeout) {
+        this.challengeSessions.delete(id);
+      }
+    }
+  }
+}
