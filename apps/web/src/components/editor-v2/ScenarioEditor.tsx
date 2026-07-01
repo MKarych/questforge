@@ -26,6 +26,7 @@ import {
   BLOCK_DEFINITIONS,
   MissionType,
   Condition,
+  GameSettings,
 } from '@/lib/editor-store/editor.types';
 import BlockPalette from './BlockPalette';
 import NodeSettings from './NodeSettings';
@@ -778,22 +779,22 @@ function ScenarioEditorInner({
             title="Управление триггерами и событиями"
           >
             {tbContent('⚡', 'Триггеры')}
+            {store.triggers.filter(t => t.enabled).length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-yellow-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                {store.triggers.filter(t => t.enabled).length}
+              </span>
+            )}
+          </button>
 
-          /* 📑 Параллельные */
+          {/* 📑 Параллельные */}
           <button onClick={() => setShowParallelManager(true)}
             className={`${tbBtn()} ${showParallelManager ? "bg-primary/20" : ""} relative`}
             title="Управление параллельными сценариями"
           >
-            {tbContent('📑', 'Паралл')}
+            {tbContent('📑', 'Парал.')}
             {store.parallelScenarios.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
                 {store.parallelScenarios.length}
-              </span>
-            )}
-          </button>
-            {store.triggers.filter(t => t.enabled).length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-yellow-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                {store.triggers.filter(t => t.enabled).length}
               </span>
             )}
           </button>
@@ -1104,22 +1105,52 @@ function ScenarioEditorInner({
       {store.showTemplates && (
         <ScenarioTemplatesModal
           onSelect={(template) => {
+            // 1. Загружаем сцены и рёбра
+            const mergedSettings: GameSettings = {
+              totalTime: template.settings?.totalTime ?? 0,
+              defaultPoints: template.settings?.defaultPoints ?? 10,
+              defaultPenalty: template.settings?.defaultPenalty ?? 0,
+              hintLimit: template.settings?.hintLimit ?? 3,
+              maxAttempts: template.settings?.maxAttempts ?? 3,
+              variables: template.variables ?? [],
+              roles: template.roles ?? [],
+            };
+
             store.loadScenario({
               name: template.name,
               description: template.description,
               scenes: template.scenes,
               edges: template.edges,
-              variables: [],
-              settings: {
-                totalTime: 0,
-                defaultPoints: 10,
-                defaultPenalty: 0,
-                hintLimit: 3,
-                maxAttempts: 3,
-                variables: [],
-                roles: [],
-              },
+              variables: template.variables || [],
+              settings: mergedSettings,
             });
+
+            // 2. Загружаем триггеры
+            if (template.triggers) {
+              template.triggers.forEach(t => store.addTrigger(t));
+            }
+
+            // 3. Загружаем роли
+            if (template.roles) {
+              template.roles.forEach(r => store.addRole(r));
+            }
+
+            // 4. Загружаем параллельные сценарии
+            if (template.parallelScenarios) {
+              template.parallelScenarios.forEach(ps => store.addParallelScenario(ps));
+            }
+
+            // 5. Загружаем точки синхронизации
+            if (template.syncPoints) {
+              template.syncPoints.forEach(sp => store.addSyncPoint(sp));
+            }
+
+            // 6. Загружаем настройки (дополнительный мерж поверх того, что передали в loadScenario)
+            if (template.settings) {
+              store.setSettings({ ...store.settings, ...template.settings });
+            }
+
+            // 7. Закрываем модалку
             store.setShowTemplates(false);
             store.addAuthorAchievement('first_scenario');
           }}

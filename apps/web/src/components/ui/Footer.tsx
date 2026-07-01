@@ -257,7 +257,7 @@ export default function Footer({ featureFlags, stats }: FooterProps) {
                 </h3>
                 <div className="bg-surface-elevated rounded-lg p-3">
                   <p className="text-sm text-text-muted italic">
-                    "Город Приключений — лучшая платформа для городских квестов"
+                    &laquo;Город Приключений — лучшая платформа для городских квестов&raquo;
                   </p>
                   <p className="text-xs text-text-muted mt-1">— Источник</p>
                 </div>

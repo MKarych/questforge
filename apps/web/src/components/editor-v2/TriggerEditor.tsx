@@ -412,7 +412,7 @@ function TriggerForm({ trigger, onChange }: TriggerFormProps) {
         </div>
         {trigger.actions.length === 0 ? (
           <div className="text-xs text-text-secondary text-center py-4 bg-background-modifier-hover/20 rounded-lg border border-dashed border-border">
-            Нет действий. Нажмите "+ Добавить действие"
+            Нет действий. Нажмите &laquo;+ Добавить действие&raquo;
           </div>
         ) : (
           <div className="space-y-2">

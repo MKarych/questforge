@@ -31,10 +31,10 @@ function WinnersContent({ winners }: { winners: WinnerCard[] }) {
             </span>
             <div>
               <p className="text-sm font-medium text-text-primary">
-                Команда <span className="text-primary">"{winner.teamName}"</span>
+                Команда <span className="text-primary">&laquo;{winner.teamName}&raquo;</span>
               </p>
               <p className="text-xs text-text-muted mt-0.5">
-                Игра "{winner.gameName}"
+                Игра &laquo;{winner.gameName}&raquo;
               </p>
             </div>
           </Link>

@@ -34,7 +34,7 @@ function ReviewsContent({ reviews }: { reviews: ReviewCard[] }) {
               ))}
             </div>
             <p className="text-sm text-text-secondary mb-3 line-clamp-3">
-              "{review.text}"
+              &laquo;{review.text}&raquo;
             </p>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">

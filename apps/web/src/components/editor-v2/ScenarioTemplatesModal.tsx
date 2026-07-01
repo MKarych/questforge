@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { getResolvedTemplates, ScenarioTemplate } from '@/lib/scenario-templates/scenario-templates';
 
 interface ScenarioTemplatesModalProps {
@@ -47,6 +48,13 @@ export default function ScenarioTemplatesModal({ onSelect, onClose, onDontShowAg
             <button onClick={onClose} className="btn-secondary text-sm">
               Начать с пустого
             </button>
+            <Link
+              href="/help/editor-guide"
+              target="_blank"
+              className="btn-ghost text-sm flex items-center gap-1"
+            >
+              📖 Инструкция по редактору
+            </Link>
             {onDontShowAgain && (
               <button
                 onClick={() => {

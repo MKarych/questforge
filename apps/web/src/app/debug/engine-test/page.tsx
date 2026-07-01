@@ -154,7 +154,7 @@ export default function EngineTestPage() {
         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-sm text-yellow-800">
           <strong>📋 Инструкция:</strong>
           <ol className="list-decimal ml-5 mt-1 space-y-1">
-            <li>Нажмите <strong>"Запустить все тесты"</strong></li>
+            <li>Нажмите <strong>&laquo;Запустить все тесты&raquo;</strong></li>
             <li>Дождитесь завершения (обычно {'<'}1 сек)</li>
             <li>Проверьте сводку — если все зелёное, значит <strong>ВСЁ РАБОТАЕТ</strong></li>
             <li>Если есть красное — откройте консоль (F12) для деталей</li>
