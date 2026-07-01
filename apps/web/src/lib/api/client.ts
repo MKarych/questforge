@@ -1158,6 +1158,18 @@ class ApiClient {
 
   // ==================== Gameplay (Организатор) ====================
 
+  async openRegistration(gameId: string): Promise<ApiResponse<{ id: string; status: string }>> {
+    return this.request(`/games/${gameId}/open-registration`, {
+      method: 'POST',
+    });
+  }
+
+  async closeRegistration(gameId: string): Promise<ApiResponse<{ id: string; status: string }>> {
+    return this.request(`/games/${gameId}/close-registration`, {
+      method: 'POST',
+    });
+  }
+
   async cancelGame(gameId: string): Promise<ApiResponse<{ id: string; status: string; message: string }>> {
     return this.request(`/games/${gameId}/cancel`, {
       method: 'POST',
@@ -1173,6 +1185,12 @@ class ApiClient {
 
   async moveToLobby(gameId: string): Promise<ApiResponse<{ id: string; status: string; message: string }>> {
     return this.request(`/games/${gameId}/move-to-lobby`, {
+      method: 'POST',
+    });
+  }
+
+  async finishGame(gameId: string): Promise<ApiResponse<{ id: string; status: string; finishedAt: string }>> {
+    return this.request(`/games/${gameId}/finish`, {
       method: 'POST',
     });
   }
@@ -1699,10 +1717,13 @@ export const registerTeam = (gameId: string, teamId: string) => apiClient.regist
 export const registerTeamByName = (gameId: string, teamName: string) => apiClient.registerTeamByName(gameId, teamName);
 export const addReview = (gameId: string, rating: number, text?: string) => apiClient.addReview(gameId, rating, text);
 export const startGame = (gameId: string) => apiClient.startGame(gameId);
+export const finishGame = (gameId: string) => apiClient.finishGame(gameId);
 export const getGameRegistrations = (gameId: string) => apiClient.getGameRegistrations(gameId);
 export const cancelGame = (gameId: string) => apiClient.cancelGame(gameId);
 export const rescheduleGame = (gameId: string, date: string, time: string) => apiClient.rescheduleGame(gameId, date, time);
 export const moveToLobby = (gameId: string) => apiClient.moveToLobby(gameId);
+export const openRegistration = (gameId: string) => apiClient.openRegistration(gameId);
+export const closeRegistration = (gameId: string) => apiClient.closeRegistration(gameId);
 export const setTeamReady = (gameId: string, teamId: string) => apiClient.setTeamReady(gameId, teamId);
 export const askQuestion = (gameId: string, text: string) => apiClient.askQuestion(gameId, text);
 export const getQuestions = (gameId: string) => apiClient.getQuestions(gameId);

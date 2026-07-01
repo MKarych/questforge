@@ -1692,6 +1692,14 @@ export class GamesService {
       },
     });
 
+    // Также добавляем в gameTeams (как в registerTeamByName)
+    await this.prisma.gameTeam.create({
+      data: {
+        gameId,
+        teamId,
+      },
+    });
+
     this.logger.log(`Team ${teamId} registered for game ${gameId} by user ${userId}`);
 
     return registration;
@@ -1875,6 +1883,62 @@ export class GamesService {
       readyAt: r.readyAt,
       registeredAt: r.createdAt,
     }));
+  }
+
+  // ============================================================
+  // Registration Status Methods
+  // ============================================================
+
+  /**
+   * getTeamRegistrationStatus: проверить, зарегистрирована ли команда на игру.
+   */
+  async getTeamRegistrationStatus(gameId: string, teamId: string) {
+    const registration = await this.prisma.gameRegistration.findUnique({
+      where: { gameId_teamId: { gameId, teamId } },
+    });
+    return { isRegistered: !!registration, status: registration?.status || null };
+  }
+
+  /**
+   * getGameProgress: получить прогресс всех команд для организатора.
+   * Доступно только для статусов LOBBY, RUNNING, FINISHED.
+   */
+  async getGameProgress(gameId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    const teams = await this.prisma.gameTeam.findMany({
+      where: { gameId },
+      include: {
+        team: {
+          select: { id: true, name: true, slug: true, avatar: true },
+        },
+      },
+    });
+
+    // Для каждой команды получаем состояние сессии
+    const progress = await Promise.all(
+      teams.map(async (gt) => {
+        const snapshot = await this.prisma.sessionState.findFirst({
+          where: { teamId: gt.teamId },
+          orderBy: { sequence: 'desc' },
+        });
+
+        const state = snapshot?.state as Record<string, unknown> | null;
+
+        return {
+          teamId: gt.teamId,
+          teamName: gt.team.name,
+          score: (state?.score as number) || 0,
+          penalties: (state?.penalties as number) || 0,
+          currentNodeId: (state?.currentNodeId as string) || null,
+          currentNodeIndex: Array.isArray(state?.history) ? (state.history as unknown[]).length : 0,
+          status: (state?.status as string) || 'not_started',
+          startedAt: state?.startedAt ? new Date(state.startedAt as number).toISOString() : null,
+        };
+      }),
+    );
+
+    return progress;
   }
 
   // ============================================================

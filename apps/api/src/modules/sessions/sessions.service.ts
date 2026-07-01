@@ -63,8 +63,14 @@ export class SessionsService {
         throw new NotFoundException('Team not found');
       }
 
-      if (existingTeam.captainId !== userId) {
-        throw new ConflictException('Only team captain can start a session');
+      // Любой член команды может начать сессию (не только капитан)
+      // Проверяем, что пользователь является членом команды
+      const isMember = await this.prisma.teamMember.findFirst({
+        where: { teamId: dto.teamId, userId },
+      });
+
+      if (!isMember) {
+        throw new ConflictException('Only team members can start a session');
       }
 
       teamId = existingTeam.id;

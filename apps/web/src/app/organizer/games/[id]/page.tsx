@@ -1,11 +1,62 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getGame, publishGame, removeGame, updateGame, type GameDetails } from '@/lib/api/client';
+import {
+  getGame, publishGame, removeGame, updateGame,
+  openRegistration, closeRegistration, moveToLobby,
+  startGame, finishGame, cancelGame,
+  getGameRegistrations, type GameDetails,
+} from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+
+interface TeamStatus {
+  teamId: string;
+  team: { id: string; name: string; slug: string; avatar: string | null };
+  status: string;
+  readyAt: string | null;
+  registeredAt: string;
+}
+
+interface TimerInfo {
+  canStart: boolean;
+  timeUntilStart: number;
+  status: string;
+  startTime: string;
+  now: string;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Черновик',
+  PUBLISHED: 'Опубликована',
+  REGISTRATION_OPEN: 'Регистрация открыта',
+  REGISTRATION_CLOSED: 'Регистрация закрыта',
+  LOBBY: 'Ожидание старта',
+  RUNNING: 'Идёт игра',
+  FINISHED: 'Завершена',
+  CANCELLED: 'Отменена',
+  ARCHIVED: 'В архиве',
+  HIDDEN: 'Скрыта',
+  BLOCKED: 'Заблокирована',
+  RESCHEDULED: 'Перенесена',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  DRAFT: 'bg-surface-elevated text-text-muted',
+  PUBLISHED: 'bg-success/10 text-success',
+  REGISTRATION_OPEN: 'bg-success/10 text-success',
+  REGISTRATION_CLOSED: 'bg-info/10 text-info',
+  LOBBY: 'bg-warning/10 text-warning',
+  RUNNING: 'bg-warning/10 text-warning',
+  FINISHED: 'bg-surface-elevated text-text-muted',
+  CANCELLED: 'bg-error/10 text-error',
+  ARCHIVED: 'bg-surface-elevated text-text-muted',
+  HIDDEN: 'bg-surface-elevated text-text-muted',
+  BLOCKED: 'bg-error/10 text-error',
+  RESCHEDULED: 'bg-warning/10 text-warning',
+};
 
 export default function GamePage() {
   const router = useRouter();
@@ -13,85 +64,107 @@ export default function GamePage() {
   const gameId = params.id as string;
   
   const [game, setGame] = useState<GameDetails | null>(null);
+  const [teams, setTeams] = useState<TeamStatus[]>([]);
+  const [timer, setTimer] = useState<TimerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadGame() {
-      try {
-        const response = await getGame(gameId);
-        setGame(response.data);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Не удалось загрузить игру';
-        setError(message);
-        if (err instanceof Error && err.message.includes('401')) {
-          router.push('/auth/login');
-        }
-      } finally {
-        setLoading(false);
+  const loadGame = useCallback(async () => {
+    try {
+      const response = await getGame(gameId);
+      setGame(response.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось загрузить игру';
+      setError(message);
+      if (err instanceof Error && err.message.includes('401')) {
+        router.push('/auth/login');
       }
-    }
-
-    if (gameId) {
-      loadGame();
+    } finally {
+      setLoading(false);
     }
   }, [gameId, router]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PUBLISHED':
-        return 'bg-success/10 text-success';
-      case 'STARTED':
-        return 'bg-warning/10 text-warning';
-      case 'IN_PROGRESS':
-        return 'bg-warning/10 text-warning';
-      case 'FINISHED':
-        return 'bg-surface-elevated text-text-muted';
-      default:
-        return 'bg-surface-elevated text-text-muted';
-    }
-  };
-
-  const handlePublish = async () => {
-    if (!game) return;
-    if (!confirm('Вы уверены, что хотите опубликовать игру?')) return;
-    setActionLoading('publish');
+  const loadTeams = useCallback(async () => {
+    if (!gameId) return;
     try {
-      const updated = await publishGame(gameId);
-      setGame(updated.data);
+      const response = await getGameRegistrations(gameId);
+      if (response.data && Array.isArray(response.data)) {
+        setTeams(response.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [gameId]);
+
+  const loadTimer = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      const response = await fetch(`/api/games/${gameId}/timer`);
+      if (response.ok) {
+        const data = await response.json();
+        setTimer(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [gameId]);
+
+  useEffect(() => {
+    if (gameId) {
+      loadGame();
+    }
+  }, [gameId, loadGame]);
+
+  // Загружаем команды и таймер, если нужно
+  useEffect(() => {
+    if (game && ['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status)) {
+      loadTeams();
+      if (game.status === 'LOBBY') {
+        loadTimer();
+      }
+    }
+  }, [game, loadTeams, loadTimer]);
+
+  // Авто-обновление команд и таймера
+  useEffect(() => {
+    if (!game || !['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status)) return;
+
+    const interval = setInterval(() => {
+      loadTeams();
+      if (game.status === 'LOBBY') {
+        loadTimer();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [game, loadTeams, loadTimer]);
+
+  const handleAction = async (action: string, actionFn: () => Promise<any>, successMessage?: string) => {
+    if (!game) return;
+    setActionLoading(action);
+    setError(null);
+    try {
+      const result = await actionFn();
+      if (result?.data) {
+        setGame(result.data);
+      }
+      await loadGame();
+      await loadTeams();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка публикации');
+      const message = err instanceof Error ? err.message : `Ошибка: ${action}`;
+      setError(message);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleDelete = async () => {
-    if (!game) return;
-    if (!confirm('Вы уверены, что хотите удалить игру? Это действие нельзя отменить.')) return;
-    setActionLoading('delete');
-    try {
-      await removeGame(gameId);
-      router.push('/organizer/games');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка удаления');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    if (!game) return;
-    setActionLoading('save');
-    try {
-      const updated = await updateGame(gameId, { status: 'CREATED' });
-      setGame(updated.data);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка сохранения');
-    } finally {
-      setActionLoading(null);
-    }
+  const formatTime = (ms: number): string => {
+    if (ms <= 0) return '00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -121,6 +194,9 @@ export default function GamePage() {
     );
   }
 
+  const readyCount = teams.filter((t) => t.status === 'READY').length;
+  const totalCount = teams.length;
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -135,27 +211,23 @@ export default function GamePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Game Header */}
             <div className="card">
               <div className="flex items-start justify-between mb-4">
-                <h1 className="text-2xl font-bold text-text-primary">{game.title}</h1>
-                <span className={`inline-block px-3 py-1 rounded text-sm font-medium ${getStatusColor(game.status)}`}>
-                  {game.status}
+                <div>
+                  <h1 className="text-2xl font-bold text-text-primary">{game.title}</h1>
+                  <p className="text-sm text-text-secondary mt-1">
+                    Ссылка: /play/{game.shareLink}
+                  </p>
+                </div>
+                <span className={`inline-block px-3 py-1 rounded text-sm font-medium ${STATUS_COLORS[game.status] || 'bg-surface-elevated text-text-muted'}`}>
+                  {STATUS_LABELS[game.status] || game.status}
                 </span>
               </div>
               
               <p className="text-text-secondary mb-6">{game.description}</p>
-              
-              {game.imageUrl && (
-                <div className="mb-6">
-                  <img
-                    src={game.imageUrl}
-                    alt={game.title}
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <span className="text-sm text-text-secondary">Город</span>
                   <p className="text-text-primary font-medium">{game.city}</p>
@@ -180,6 +252,77 @@ export default function GamePage() {
                 </div>
               </div>
             </div>
+
+            {/* Teams List */}
+            {['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status) && (
+              <div className="card">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-text-primary">
+                    📋 Команды ({totalCount})
+                  </h2>
+                  {game.status === 'LOBBY' && (
+                    <span className="text-sm text-text-secondary">
+                      Готовы: {readyCount}/{totalCount}
+                    </span>
+                  )}
+                </div>
+
+                {teams.length === 0 ? (
+                  <p className="text-text-secondary text-center py-4">
+                    Пока нет зарегистрированных команд
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {teams.map((t) => (
+                      <div
+                        key={t.teamId}
+                        className="flex items-center justify-between p-3 rounded-lg bg-surface-elevated"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-semibold text-primary">
+                            {t.team.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="text-text-primary font-medium">{t.team.name}</span>
+                            <div className="text-xs text-text-muted">
+                              Зарегистрированы: {new Date(t.registeredAt).toLocaleString('ru-RU')}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {t.readyAt && (
+                            <span className="text-xs text-text-muted">
+                              Готовы с: {new Date(t.readyAt).toLocaleTimeString('ru-RU')}
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            t.status === 'READY' ? 'bg-success/10 text-success' : 'bg-surface text-text-muted'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'READY' ? 'bg-success' : 'bg-text-muted'}`} />
+                            {t.status === 'READY' ? 'Готовы' : 'Ожидание'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Timer for LOBBY */}
+            {game.status === 'LOBBY' && timer && (
+              <div className="card">
+                <h2 className="text-lg font-semibold text-text-primary mb-4">⏱ Таймер до старта</h2>
+                <div className="text-center p-4 rounded-lg bg-surface-elevated">
+                  <div className={`text-4xl font-bold font-mono ${timer.canStart ? 'text-success' : 'text-text-primary'}`}>
+                    {timer.canStart ? '🚀 МОЖНО СТАРТОВАТЬ!' : formatTime(timer.timeUntilStart)}
+                  </div>
+                  <div className="text-sm text-text-secondary mt-2">
+                    Старт: {new Date(timer.startTime).toLocaleString('ru-RU')}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Scenario */}
             <div className="card">
@@ -282,7 +425,7 @@ export default function GamePage() {
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/game/${game.shareLink}`}
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/play/${game.shareLink}`}
                   readOnly
                   className="input-field flex-1 text-sm"
                 />
@@ -299,38 +442,130 @@ export default function GamePage() {
               </div>
             </div>
 
+            {/* Error */}
+            {error && (
+              <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="card">
               <h2 className="text-lg font-semibold text-text-primary mb-4">Действия</h2>
               <div className="flex flex-col gap-2">
-                <Link href={`/organizer/games/${gameId}/edit`} className="btn-secondary text-center">
-                  Редактировать
-                </Link>
-                {['DRAFT', 'HIDDEN'].includes(game.status) && (
+                {/* Редактировать — всегда доступно, кроме RUNNING/FINISHED */}
+                {!['RUNNING', 'FINISHED', 'ARCHIVED', 'CANCELLED'].includes(game.status) && (
+                  <Link href={`/organizer/games/${gameId}/edit`} className="btn-secondary text-center">
+                    ✏️ Редактировать
+                  </Link>
+                )}
+
+                {/* DRAFT → PUBLISHED */}
+                {game.status === 'DRAFT' && (
                   <button
                     className="btn-primary text-center"
-                    onClick={handlePublish}
+                    onClick={() => handleAction('publish', () => publishGame(gameId))}
                     disabled={actionLoading === 'publish'}
                   >
-                    {actionLoading === 'publish' ? '...' : 'Опубликовать'}
+                    {actionLoading === 'publish' ? '...' : '📢 Опубликовать'}
                   </button>
                 )}
-                {!['PUBLISHED', 'FINISHED', 'RUNNING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) && (
+
+                {/* PUBLISHED → REGISTRATION_OPEN */}
+                {game.status === 'PUBLISHED' && (
+                  <button
+                    className="btn-primary text-center"
+                    onClick={() => handleAction('openRegistration', () => openRegistration(gameId))}
+                    disabled={actionLoading === 'openRegistration'}
+                  >
+                    {actionLoading === 'openRegistration' ? '...' : '📝 Открыть регистрацию'}
+                  </button>
+                )}
+
+                {/* REGISTRATION_OPEN → REGISTRATION_CLOSED */}
+                {game.status === 'REGISTRATION_OPEN' && (
+                  <button
+                    className="btn-primary text-center"
+                    onClick={() => handleAction('closeRegistration', () => closeRegistration(gameId))}
+                    disabled={actionLoading === 'closeRegistration'}
+                  >
+                    {actionLoading === 'closeRegistration' ? '...' : '🔒 Закрыть регистрацию'}
+                  </button>
+                )}
+
+                {/* REGISTRATION_CLOSED → LOBBY */}
+                {game.status === 'REGISTRATION_CLOSED' && (
+                  <button
+                    className="btn-primary text-center"
+                    onClick={() => handleAction('moveToLobby', () => moveToLobby(gameId))}
+                    disabled={actionLoading === 'moveToLobby'}
+                  >
+                    {actionLoading === 'moveToLobby' ? '...' : '🔄 Перейти в лобби'}
+                  </button>
+                )}
+
+                {/* LOBBY → RUNNING */}
+                {game.status === 'LOBBY' && (
+                  <button
+                    className="btn-success text-center"
+                    onClick={() => handleAction('startGame', () => startGame(gameId))}
+                    disabled={actionLoading === 'startGame'}
+                  >
+                    {actionLoading === 'startGame' ? '...' : '🚀 Запустить игру'}
+                  </button>
+                )}
+
+                {/* RUNNING → FINISHED */}
+                {game.status === 'RUNNING' && (
+                  <>
+                    <Link
+                      href={`/organizer/games/${gameId}/running`}
+                      className="btn-primary text-center"
+                    >
+                      📊 Управление игрой
+                    </Link>
+                    <button
+                      className="btn-warning text-center"
+                      onClick={() => {
+                        if (confirm('Вы уверены, что хотите завершить игру?')) {
+                          handleAction('finishGame', () => finishGame(gameId));
+                        }
+                      }}
+                      disabled={actionLoading === 'finishGame'}
+                    >
+                      {actionLoading === 'finishGame' ? '...' : '⏹ Завершить игру'}
+                    </button>
+                  </>
+                )}
+
+                {/* Отмена — доступна из многих статусов */}
+                {['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) && (
                   <button
                     className="btn-secondary text-center text-error hover:border-error"
-                    onClick={handleDelete}
-                    disabled={actionLoading === 'delete'}
+                    onClick={() => {
+                      if (confirm('Вы уверены, что хотите отменить игру? Команды получат уведомление.')) {
+                        handleAction('cancelGame', () => cancelGame(gameId));
+                      }
+                    }}
+                    disabled={actionLoading === 'cancelGame'}
                   >
-                    {actionLoading === 'delete' ? '...' : 'Удалить'}
+                    {actionLoading === 'cancelGame' ? '...' : '❌ Отменить игру'}
                   </button>
                 )}
-                {!['PUBLISHED', 'FINISHED', 'RUNNING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY'].includes(game.status) && (
+
+                {/* Удаление — только для DRAFT */}
+                {game.status === 'DRAFT' && (
                   <button
-                    className="btn-secondary text-center"
-                    onClick={handleSaveDraft}
-                    disabled={actionLoading === 'save'}
+                    className="btn-secondary text-center text-error hover:border-error"
+                    onClick={() => {
+                      if (confirm('Вы уверены, что хотите удалить игру? Это действие нельзя отменить.')) {
+                        handleAction('delete', () => removeGame(gameId));
+                        router.push('/organizer/games');
+                      }
+                    }}
+                    disabled={actionLoading === 'delete'}
                   >
-                    {actionLoading === 'save' ? 'Сохранение...' : 'Сохранить черновик'}
+                    {actionLoading === 'delete' ? '...' : '🗑 Удалить'}
                   </button>
                 )}
               </div>

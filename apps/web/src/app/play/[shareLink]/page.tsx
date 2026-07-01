@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiClient, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
@@ -13,6 +13,7 @@ interface PlayLobbyPageParams {
 
 export default function PlayLobbyPage() {
   const params = useParams<PlayLobbyPageParams>();
+  const router = useRouter();
   const shareLink = params.shareLink;
 
   const [game, setGame] = useState<GameDetails | null>(null);
@@ -63,8 +64,9 @@ export default function PlayLobbyPage() {
 
     try {
       const response = await registerTeam(game.id, selectedTeamId);
-      setSuccess(`Команда "${response.data.team.name}" зарегистрирована на игру!`);
       localStorage.setItem('currentTeamId', selectedTeamId);
+      // Редирект в лобби после успешной регистрации
+      router.push(`/play/${shareLink}/lobby`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка регистрации на игру');
     } finally {

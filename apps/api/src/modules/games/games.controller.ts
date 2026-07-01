@@ -362,7 +362,30 @@ export class GamesController {
   }
 
   // ============================================================
-  // 29.6. Загрузка обложки игры
+  // 29.6. Статус регистрации команды
+  // ============================================================
+
+  @Get(':id/registration-status/:teamId')
+  @UseGuards(JwtAuthGuard)
+  async getTeamRegistrationStatus(
+    @Param('id') gameId: string,
+    @Param('teamId') teamId: string,
+  ) {
+    return this.gamesService.getTeamRegistrationStatus(gameId, teamId);
+  }
+
+  // ============================================================
+  // 29.7. Прогресс игры (для организатора)
+  // ============================================================
+
+  @Get(':id/progress')
+  @UseGuards(JwtAuthGuard)
+  async getGameProgress(@Param('id') gameId: string) {
+    return this.gamesService.getGameProgress(gameId);
+  }
+
+  // ============================================================
+  // 29.8. Загрузка обложки игры
   // ============================================================
 
   @Post(':id/upload-cover')
