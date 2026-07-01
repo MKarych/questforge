@@ -1900,6 +1900,65 @@ export class GamesService {
   }
 
   /**
+   * getMyTeamStatus: получить статус команды текущего пользователя относительно игры.
+   * Проверяет, зарегистрирована ли команда пользователя, и возвращает:
+   * - статус регистрации
+   * - статус игры
+   * - sessionId (если игра RUNNING)
+   */
+  async getMyTeamStatus(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    // Находим все команды пользователя
+    const myMemberships = await this.prisma.teamMember.findMany({
+      where: { userId },
+      include: {
+        team: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    // Для каждой команды проверяем регистрацию на игру
+    for (const membership of myMemberships) {
+      const registration = await this.prisma.gameRegistration.findUnique({
+        where: { gameId_teamId: { gameId, teamId: membership.teamId } },
+      });
+
+      if (registration) {
+        // Команда зарегистрирована — проверяем sessionId если игра RUNNING
+        let sessionId: string | null = null;
+        if (game.status === 'RUNNING') {
+          const snapshot = await this.prisma.sessionState.findFirst({
+            where: { teamId: membership.teamId },
+            orderBy: { sequence: 'desc' },
+          });
+          sessionId = snapshot?.id || null;
+        }
+
+        return {
+          registered: true,
+          teamId: membership.teamId,
+          teamName: membership.team.name,
+          registrationStatus: registration.status,
+          gameStatus: game.status,
+          sessionId,
+        };
+      }
+    }
+
+    // Команда не зарегистрирована
+    return {
+      registered: false,
+      teamId: null,
+      teamName: null,
+      registrationStatus: null,
+      gameStatus: game.status,
+      sessionId: null,
+    };
+  }
+
+  /**
    * getGameProgress: получить прогресс всех команд для организатора.
    * Доступно только для статусов LOBBY, RUNNING, FINISHED.
    */

@@ -1202,6 +1202,35 @@ class ApiClient {
     });
   }
 
+  /**
+   * getMyTeamStatus: получить статус команды текущего пользователя относительно игры.
+   * Используется для авто-редиректа при повторном входе.
+   */
+  async getMyTeamStatus(gameId: string): Promise<ApiResponse<{
+    registered: boolean;
+    teamId: string | null;
+    teamName: string | null;
+    registrationStatus: string | null;
+    gameStatus: string;
+    sessionId: string | null;
+  }>> {
+    return this.request(`/games/${gameId}/my-team-status`);
+  }
+
+  /**
+   * getSessionByTeamAndGame: получить последнюю сессию команды для данной игры.
+   * Используется для восстановления sessionId при повторном входе.
+   */
+  async getSessionByTeamAndGame(teamId: string, gameId: string): Promise<ApiResponse<{
+    sessionId: string | null;
+    teamId: string;
+    status: string;
+    score?: number;
+    currentNodeId?: string | null;
+  }>> {
+    return this.request(`/sessions/by-team/${teamId}/game/${gameId}`);
+  }
+
   async askQuestion(gameId: string, text: string): Promise<ApiResponse<{ id: string; text: string; createdAt: string }>> {
     return this.request(`/games/${gameId}/questions`, {
       method: 'POST',
@@ -1731,6 +1760,8 @@ export const sendChatMessage = (gameId: string, text: string) => apiClient.sendC
 export const getChatMessages = (gameId: string) => apiClient.getChatMessages(gameId);
 export const sendOrganizerMessage = (gameId: string, text: string) => apiClient.sendOrganizerMessage(gameId, text);
 export const getOrganizerMessages = (gameId: string) => apiClient.getOrganizerMessages(gameId);
+export const getMyTeamStatus = (gameId: string) => apiClient.getMyTeamStatus(gameId);
+export const getSessionByTeamAndGame = (teamId: string, gameId: string) => apiClient.getSessionByTeamAndGame(teamId, gameId);
 export const uploadCover = (gameId: string, formData: FormData) => apiClient.uploadCover(gameId, formData);
 export const requestHint = (teamId: string) => apiClient.requestHint(teamId);
 export const getCurrentNode = (teamId: string) => apiClient.getCurrentNode(teamId);

@@ -123,4 +123,17 @@ export class SessionsController {
   async finish(@Param('teamId') teamId: string) {
     return this.sessionsService.finish(teamId);
   }
+
+  /**
+   * Получить сессию команды для конкретной игры.
+   * Используется для восстановления sessionId при повторном входе.
+   */
+  @Get('by-team/:teamId/game/:gameId')
+  @UseGuards(JwtAuthGuard)
+  async getSessionByTeamAndGame(
+    @Param('teamId') teamId: string,
+    @Param('gameId') gameId: string,
+  ) {
+    return this.sessionsService.getSessionByTeamAndGame(teamId, gameId);
+  }
 }

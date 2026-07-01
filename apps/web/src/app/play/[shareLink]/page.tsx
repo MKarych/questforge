@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiClient, getMyTeams, registerTeam, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { apiClient, getMyTeams, registerTeam, getMyTeamStatus, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface PlayLobbyPageParams {
@@ -22,16 +22,41 @@ export default function PlayLobbyPage() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Fetch game by shareLink — use the dedicated endpoint
+        // 1. Загружаем игру по shareLink
         const gameResponse = await apiClient.get<any>(`/games/public/share/${shareLink}`);
-        setGame((gameResponse as any).data);
+        const gameData = (gameResponse as any).data;
+        setGame(gameData);
 
-        // Fetch user's teams (if logged in)
+        // 2. Проверяем, авторизован ли пользователь и зарегистрирована ли его команда
+        try {
+          const statusResponse = await getMyTeamStatus(gameData.id);
+          if (statusResponse.data?.registered) {
+            // Команда уже зарегистрирована — редиректим в зависимости от статуса игры
+            const { gameStatus, sessionId } = statusResponse.data;
+
+            if (gameStatus === 'RUNNING' && sessionId) {
+              router.replace(`/play/${shareLink}/${sessionId}`);
+              return;
+            }
+
+            if (gameStatus === 'FINISHED' && sessionId) {
+              router.replace(`/play/${shareLink}/${sessionId}/finish`);
+              return;
+            }
+
+            // LOBBY, REGISTRATION_OPEN, REGISTRATION_CLOSED — редирект в лобби
+            router.replace(`/play/${shareLink}/lobby`);
+            return;
+          }
+        } catch {
+          // Пользователь не авторизован или ошибка — показываем форму регистрации
+        }
+
+        // 3. Загружаем команды пользователя (если авторизован)
         try {
           const teamsResponse = await getMyTeams();
           if (teamsResponse.data && Array.isArray(teamsResponse.data)) {
@@ -53,20 +78,19 @@ export default function PlayLobbyPage() {
     }
 
     loadData();
-  }, [shareLink]);
+  }, [shareLink, router]);
 
   const handleRegister = async () => {
     if (!selectedTeamId || !game) return;
 
     setRegistering(true);
     setError(null);
-    setSuccess(null);
 
     try {
-      const response = await registerTeam(game.id, selectedTeamId);
+      await registerTeam(game.id, selectedTeamId);
       localStorage.setItem('currentTeamId', selectedTeamId);
       // Редирект в лобби после успешной регистрации
-      router.push(`/play/${shareLink}/lobby`);
+      router.replace(`/play/${shareLink}/lobby`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка регистрации на игру');
     } finally {
@@ -133,78 +157,59 @@ export default function PlayLobbyPage() {
               )}
             </div>
 
-            {success ? (
-              <div className="text-center">
-                <div className="p-4 rounded-lg bg-success/10 text-success mb-4">
-                  {success}
+            {myTeams.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="label">Выберите команду</label>
+                  <select
+                    value={selectedTeamId}
+                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">-- Выберите команду --</option>
+                    {myTeams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name} {team.myRole === 'captain' ? '👑' : ''} ({team.membersCount} уч.)
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <p className="text-text-secondary text-sm mb-4">
-                  Ожидайте начала игры. Организатор запустит игру, когда все команды будут готовы.
-                </p>
-                <Link
-                  href={`/play/${shareLink}/lobby`}
-                  className="btn-primary w-full"
-                >
-                  Перейти в лобби
-                </Link>
-              </div>
-            ) : (
-              <>
-                {myTeams.length > 0 ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="label">Выберите команду</label>
-                      <select
-                        value={selectedTeamId}
-                        onChange={(e) => setSelectedTeamId(e.target.value)}
-                        className="input-field"
-                      >
-                        <option value="">-- Выберите команду --</option>
-                        {myTeams.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name} {team.myRole === 'captain' ? '👑' : ''} ({team.membersCount} уч.)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
 
-                    {error && (
-                      <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
-                        {error}
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleRegister}
-                      disabled={registering || !selectedTeamId}
-                      className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {registering ? 'Регистрация...' : 'Зарегистрироваться на игру'}
-                    </button>
-
-                    <div className="text-center">
-                      <Link
-                        href="/teams/create"
-                        className="text-primary hover:text-primary-hover text-sm"
-                      >
-                        + Создать новую команду
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center space-y-4">
-                    <p className="text-text-secondary">
-                      У вас пока нет команд. Создайте команду, чтобы участвовать в игре.
-                    </p>
-                    <Link
-                      href="/teams/create"
-                      className="btn-primary w-full"
-                    >
-                      Создать команду
-                    </Link>
+                {error && (
+                  <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                    {error}
                   </div>
                 )}
-              </>
+
+                <button
+                  onClick={handleRegister}
+                  disabled={registering || !selectedTeamId}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {registering ? 'Регистрация...' : 'Зарегистрироваться на игру'}
+                </button>
+
+                <div className="text-center">
+                  <Link
+                    href="/teams/create"
+                    className="text-primary hover:text-primary-hover text-sm"
+                  >
+                    + Создать новую команду
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center space-y-4">
+                <p className="text-text-secondary">
+                  У вас пока нет команд. Создайте команду, чтобы участвовать в игре.
+                </p>
+                <Link
+                  href="/teams/create"
+                  className="btn-primary w-full"
+                >
+                  Создать команду
+                </Link>
+              </div>
             )}
 
             <div className="mt-6 pt-6 border-t border-border">

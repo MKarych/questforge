@@ -424,6 +424,44 @@ export class SessionsService {
     };
   }
 
+  /**
+   * getSessionByTeamAndGame: получить последнюю сессию команды для данной игры.
+   * Используется для восстановления sessionId при повторном входе.
+   */
+  async getSessionByTeamAndGame(teamId: string, gameId: string) {
+    // Проверяем, что команда участвует в этой игре
+    const gameTeam = await this.prisma.gameTeam.findUnique({
+      where: { teamId_gameId: { teamId, gameId } },
+    });
+
+    if (!gameTeam) {
+      throw new NotFoundException('Team is not registered for this game');
+    }
+
+    const snapshot = await this.prisma.sessionState.findFirst({
+      where: { teamId },
+      orderBy: { sequence: 'desc' },
+    });
+
+    if (!snapshot) {
+      return {
+        sessionId: null,
+        teamId,
+        status: 'not_started',
+      };
+    }
+
+    const state = snapshot.state as Record<string, unknown>;
+
+    return {
+      sessionId: snapshot.id,
+      teamId,
+      status: (state?.status as string) || 'unknown',
+      score: (state?.score as number) || 0,
+      currentNodeId: (state?.currentNodeId as string) || null,
+    };
+  }
+
   async finish(teamId: string) {
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },

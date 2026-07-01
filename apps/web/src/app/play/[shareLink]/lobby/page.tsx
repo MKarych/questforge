@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { apiClient, getMyTeams, setTeamReady, getGameRegistrations, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { apiClient, getMyTeams, setTeamReady, getGameRegistrations, getMyTeamStatus, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface LobbyPageParams {
@@ -53,14 +53,31 @@ export default function PlayLobbyPage() {
 
       // Если игра RUNNING — редирект на страницу прохождения
       if (gameData.status === 'RUNNING') {
-        // Нужно узнать sessionId — пока редиректим на страницу игры
-        router.push(`/play/${shareLink}/${gameData.id}`);
+        try {
+          const statusResponse = await getMyTeamStatus(gameData.id);
+          if (statusResponse.data?.sessionId) {
+            router.replace(`/play/${shareLink}/${statusResponse.data.sessionId}`);
+            return;
+          }
+        } catch {
+          // Не удалось получить статус — редиректим на страницу игры
+        }
+        router.replace(`/play/${shareLink}/${gameData.id}`);
         return;
       }
 
       // Если игра FINISHED — редирект на финиш
       if (gameData.status === 'FINISHED') {
-        router.push(`/play/${shareLink}/${gameData.id}/finish`);
+        try {
+          const statusResponse = await getMyTeamStatus(gameData.id);
+          if (statusResponse.data?.sessionId) {
+            router.replace(`/play/${shareLink}/${statusResponse.data.sessionId}/finish`);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        router.replace(`/play/${shareLink}/${gameData.id}/finish`);
         return;
       }
 
