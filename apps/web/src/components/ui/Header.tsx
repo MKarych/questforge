@@ -197,6 +197,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const gamesDropdownItems = [
     { label: 'Мои игры', href: '/organizer/dashboard' },
     { label: 'Создать игру', href: '/organizer/games/create' },
+    { label: 'Инструкция', href: '/help/game-guide' },
   ];
 
   const scenariosDropdownItems = [
