@@ -22,6 +22,8 @@ export default function PlayLobbyPage() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
+  const [fallbackInfo, setFallbackInfo] = useState<{ gameStatus: string; sessionId: string | null } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -37,6 +39,10 @@ export default function PlayLobbyPage() {
           if (statusResponse.data?.registered) {
             // Команда уже зарегистрирована — редиректим в зависимости от статуса игры
             const { gameStatus, sessionId } = statusResponse.data;
+
+            // Сохраняем fallback-информацию на случай, если редирект не сработает
+            setShowFallback(true);
+            setFallbackInfo({ gameStatus, sessionId });
 
             if (gameStatus === 'RUNNING' && sessionId) {
               router.replace(`/play/${shareLink}/${sessionId}`);
@@ -139,6 +145,23 @@ export default function PlayLobbyPage() {
       
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto">
+          {/* Fallback-баннер: если пользователь уже зарегистрирован, но редирект не сработал */}
+          {showFallback && fallbackInfo && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-yellow-800 font-medium">Вы уже зарегистрированы в этой игре!</p>
+              <Link
+                href={
+                  fallbackInfo.gameStatus === 'RUNNING' && fallbackInfo.sessionId
+                    ? `/play/${shareLink}/${fallbackInfo.sessionId}`
+                    : `/play/${shareLink}/lobby`
+                }
+                className="mt-2 inline-block bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+              >
+                {fallbackInfo.gameStatus === 'RUNNING' ? '🎮 Перейти к игре' : '🔄 Перейти в лобби'}
+              </Link>
+            </div>
+          )}
+
           <div className="card">
             <div className="text-center mb-6">
               <div className="text-5xl mb-4">🎮</div>

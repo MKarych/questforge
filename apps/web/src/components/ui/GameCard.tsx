@@ -10,9 +10,10 @@ const DEFAULT_LOGO = '/images/logo/logo-full-light.svg';
 
 interface GameCardProps {
   game: GameCardType;
+  isParticipating?: boolean;
 }
 
-export default function GameCard({ game }: GameCardProps) {
+export default function GameCard({ game, isParticipating }: GameCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const coverImage = game.imageUrl || DEFAULT_LOGO;
   const hasCustomImage = !!game.imageUrl;
@@ -43,7 +44,12 @@ export default function GameCard({ game }: GameCardProps) {
 
   return (
     <>
-      <Link href={`/games/${game.id}`} className="card-hover block group">
+      <Link href={`/games/${game.id}`} className="card-hover block group relative">
+        {isParticipating && (
+          <span className="absolute top-2 right-2 z-20 bg-green-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-md">
+            ✓ Вы участвуете
+          </span>
+        )}
         <div className="overflow-hidden rounded-lg mb-4">
           <div className="relative w-full h-48 bg-surface-elevated">
             <button

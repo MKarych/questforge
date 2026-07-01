@@ -454,7 +454,7 @@ export class SessionsService {
     const state = snapshot.state as Record<string, unknown>;
 
     return {
-      sessionId: snapshot.id,
+      sessionId: (state?.sessionId as string) || snapshot.id,
       teamId,
       status: (state?.status as string) || 'unknown',
       score: (state?.score as number) || 0,

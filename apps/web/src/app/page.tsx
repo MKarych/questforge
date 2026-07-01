@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { getHomePage, type HomePageResponse } from '@/lib/api/client';
+import { getHomePage, getMyActiveRegistrations, type HomePageResponse } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import HeroBlock from '@/components/home/HeroBlock';
@@ -27,6 +27,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [participatingGameIds, setParticipatingGameIds] = useState<Set<string>>(new Set());
 
   const loadHomePage = useCallback(async () => {
     try {
@@ -49,9 +50,22 @@ export default function HomePage() {
     }
   }, [retryCount]);
 
+  // Загружаем активные регистрации для бейджей "Вы участвуете"
+  const loadParticipating = useCallback(async () => {
+    try {
+      const response = await getMyActiveRegistrations();
+      if (response.data && Array.isArray(response.data)) {
+        setParticipatingGameIds(new Set(response.data.map((r: any) => r.gameId)));
+      }
+    } catch {
+      // not logged in — ok
+    }
+  }, []);
+
   useEffect(() => {
     loadHomePage();
-  }, [loadHomePage]);
+    loadParticipating();
+  }, [loadHomePage, loadParticipating]);
 
   const featureFlags = data?.featureFlags || {
     search: true,
@@ -123,6 +137,7 @@ export default function HomePage() {
             link="/games"
             games={data?.games?.featured || null}
             loading={loading}
+            participatingGameIds={participatingGameIds}
           />
 
           {/* Popular Games */}
@@ -131,6 +146,7 @@ export default function HomePage() {
             link="/games?sort=popular"
             games={data?.games?.popular || null}
             loading={loading}
+            participatingGameIds={participatingGameIds}
           />
 
           {/* Recent Games */}
@@ -139,6 +155,7 @@ export default function HomePage() {
             link="/games?sort=recent"
             games={data?.games?.recent || null}
             loading={loading}
+            participatingGameIds={participatingGameIds}
           />
 
           {/* Trending */}

@@ -315,7 +315,33 @@ flowchart TD
 5. **Игрок видит только свои задания.** Не может подглядывать за другими.
 6. **Организатор видит всё.** Прогресс всех команд, ответы, чат.
 7. **Повторный вход — через my-team-status.** Страница регистрации проверяет статус команды и редиректит.
-8. **SessionId восстанавливается.** Если игра RUNNING, sessionId берётся из последней SessionState.
+8. **SessionId восстанавливается.** Если игра RUNNING, sessionId берётся из `state.sessionId` JSON-поля последней SessionState (не из `snapshot.id`).
+9. **Сессии создаются при старте игры.** `startGame()` вызывает `engineOrchestrator.startSession()` для каждой зарегистрированной команды.
+10. **Fallback-баннер.** Если авто-редирект не сработал, страница регистрации показывает кнопку "Перейти в лобби/игру".
+
+### 9.1. Важное исправление: sessionId
+
+`sessionId` для страницы прохождения (`/play/:shareLink/:sessionId`) — это Engine UUID, который генерируется в `engineOrchestrator.startSession()` и сохраняется внутри JSON-поля `state` как `state.sessionId`. Prisma `SessionState.id` — это другой UUID (ID записи в БД), он НЕ используется для навигации.
+
+**Где берётся правильный sessionId:**
+- `getMyTeamStatus()` — читает `snapshot.state.sessionId`
+- `getMyActiveRegistrations()` — читает `snapshot.state.sessionId`
+- `getSessionByTeamAndGame()` — читает `snapshot.state.sessionId`
+
+### 9.2. Важное исправление: создание сессий
+
+При запуске игры (`startGame()`) сессии создаются автоматически для всех зарегистрированных команд. Раньше сессии создавались только через `POST /sessions`, который никто не вызывал при старте.
+
+```typescript
+// В startGame() после обновления статуса на RUNNING:
+const registrations = await this.prisma.gameRegistration.findMany({
+  where: { gameId },
+  include: { team: { select: { name: true } } },
+});
+for (const reg of registrations) {
+  await this.engineOrchestrator.startSession(reg.teamId, gameId, reg.team.name, startNodeId);
+}
+```
 
 ---
 
@@ -336,3 +362,8 @@ flowchart TD
 - [ ] Повторный вход: FINISHED → редирект на финиш
 - [ ] State Machine: PUBLISHED → RUNNING (прямой запуск)
 - [ ] State Machine: REGISTRATION_OPEN → RUNNING (прямой запуск)
+- [ ] sessionId = state.sessionId (не snapshot.id)
+- [ ] startGame() создаёт сессии для всех команд
+- [ ] Fallback-баннер на странице регистрации
+- [ ] Бейдж "Вы участвуете" на GameCard
+- [ ] MyActiveGames в сетке 4 колонки

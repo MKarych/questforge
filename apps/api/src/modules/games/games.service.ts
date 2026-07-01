@@ -9,6 +9,7 @@ import {
 import { Prisma, $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service';
+import { EngineOrchestrator } from '../../engine/orchestrator/engine-orchestrator';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { validateTransition, canCancel, canReschedule } from './state-machine/game-state-machine';
@@ -76,6 +77,7 @@ export class GamesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly engineOrchestrator: EngineOrchestrator,
   ) {}
 
   // ============================================================
@@ -1403,6 +1405,40 @@ export class GamesService {
       { gameId: game.id, gameTitle: game.title },
     );
 
+    // Создаём сессии для всех зарегистрированных команд
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: { gameId },
+      include: { team: { select: { name: true } } },
+    });
+
+    // Определяем стартовый узел из сценария
+    let startNodeId = 'start';
+    if (game.scenarioId) {
+      const scenario = await this.prisma.scenario.findUnique({
+        where: { id: game.scenarioId },
+        select: { nodes: true },
+      });
+      const nodes = scenario?.nodes as Array<{ id: string }> | undefined;
+      if (nodes && nodes.length > 0) {
+        startNodeId = nodes[0].id;
+      }
+    }
+
+    for (const reg of registrations) {
+      try {
+        await this.engineOrchestrator.startSession(
+          reg.teamId,
+          gameId,
+          reg.team.name,
+          startNodeId,
+        );
+        this.logger.log(`Session started for team ${reg.teamId} in game ${gameId}`);
+      } catch (err) {
+        this.logger.error(`Failed to start session for team ${reg.teamId}: ${err}`);
+        // Не прерываем запуск игры — продолжаем с остальными командами
+      }
+    }
+
     return updatedGame;
   }
 
@@ -1933,7 +1969,8 @@ export class GamesService {
             where: { teamId: membership.teamId },
             orderBy: { sequence: 'desc' },
           });
-          sessionId = snapshot?.id || null;
+          const state = snapshot?.state as Record<string, unknown> | null;
+          sessionId = (state?.sessionId as string) || null;
         }
 
         return {
@@ -2020,7 +2057,8 @@ export class GamesService {
             where: { teamId: reg.teamId },
             orderBy: { sequence: 'desc' },
           });
-          sessionId = snapshot?.id || null;
+          const state = snapshot?.state as Record<string, unknown> | null;
+          sessionId = (state?.sessionId as string) || null;
         }
 
         // Вычисляем таймер

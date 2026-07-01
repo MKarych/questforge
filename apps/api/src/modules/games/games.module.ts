@@ -5,6 +5,7 @@ import { GamesController } from './games.controller';
 import { GamesService } from './games.service';
 import { ChatService } from './chat.service';
 import { ActivityModule } from '../activity/activity.module';
+import { EngineModule } from '../../engine/engine.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ActivityModule } from '../activity/activity.module';
       inject: [ConfigService],
     }),
     ActivityModule,
+    EngineModule,
   ],
   controllers: [GamesController],
   providers: [GamesService, ChatService],

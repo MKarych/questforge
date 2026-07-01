@@ -13,9 +13,10 @@ interface GamesSectionProps {
   games: GameCard[] | null;
   loading?: boolean;
   error?: string | null;
+  participatingGameIds?: Set<string>;
 }
 
-function GamesContent({ title, link, games }: { title: string; link: string; games: GameCard[] }) {
+function GamesContent({ title, link, games, participatingGameIds }: { title: string; link: string; games: GameCard[]; participatingGameIds?: Set<string> }) {
   return (
     <section className="mb-12">
       <div className="flex items-center justify-between mb-6">
@@ -30,7 +31,7 @@ function GamesContent({ title, link, games }: { title: string; link: string; gam
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {games.map((game) => (
-            <GameCardComponent key={game.id} game={game} />
+            <GameCardComponent key={game.id} game={game} isParticipating={participatingGameIds?.has(game.id)} />
           ))}
         </div>
       )}
@@ -60,7 +61,7 @@ export default function GamesSection(props: GamesSectionProps) {
 
   return (
     <ErrorBoundary blockName={props.title}>
-      <GamesContent title={props.title} link={props.link} games={props.games} />
+      <GamesContent title={props.title} link={props.link} games={props.games} participatingGameIds={props.participatingGameIds} />
     </ErrorBoundary>
   );
 }
