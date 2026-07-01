@@ -19,6 +19,7 @@ export class AdminService {
       activeGames,
       totalScenarios,
       pendingApplications,
+      pendingComplaints,
       newSupportTickets,
       inProgressSupportTickets,
     ] = await Promise.all([
@@ -37,6 +38,9 @@ export class AdminService {
       this.prisma.organizerApplication.count({
         where: { status: 'PENDING' },
       }),
+      this.prisma.complaint.count({
+        where: { status: 'PENDING' },
+      }),
       this.prisma.supportTicket.count({
         where: { status: 'NEW' },
       }),
@@ -53,8 +57,33 @@ export class AdminService {
       totalScenarios,
       pendingGames: 0,
       pendingApplications,
+      pendingComplaints,
       newSupportTickets,
       inProgressSupportTickets,
+    };
+  }
+
+  // ============================================================
+  // Admin Notification Counts
+  // ============================================================
+
+  async getNotificationCounts() {
+    const [pendingApplications, pendingComplaints, newSupportTickets] = await Promise.all([
+      this.prisma.organizerApplication.count({
+        where: { status: 'PENDING' },
+      }),
+      this.prisma.complaint.count({
+        where: { status: 'PENDING' },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: 'NEW' },
+      }),
+    ]);
+
+    return {
+      pendingApplications,
+      pendingComplaints,
+      newSupportTickets,
     };
   }
 

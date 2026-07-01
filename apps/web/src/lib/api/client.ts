@@ -1362,10 +1362,19 @@ class ApiClient {
     totalScenarios: number;
     pendingGames: number;
     pendingApplications: number;
+    pendingComplaints: number;
     newSupportTickets: number;
     inProgressSupportTickets: number;
   }>> {
     return this.request('/admin/stats');
+  }
+
+  async getAdminNotificationCounts(): Promise<ApiResponse<{
+    pendingApplications: number;
+    pendingComplaints: number;
+    newSupportTickets: number;
+  }>> {
+    return this.request('/admin/notification-counts');
   }
 
   // ==================== Admin Games (пост-модерация) ====================

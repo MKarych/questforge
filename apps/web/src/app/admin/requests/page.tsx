@@ -26,7 +26,7 @@ interface Application {
   };
 }
 
-export default function AdminApplicationsPage() {
+export default function AdminRequestsPage() {
   const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);

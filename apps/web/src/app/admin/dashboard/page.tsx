@@ -16,6 +16,7 @@ interface AdminStats {
   totalScenarios: number;
   pendingGames: number;
   pendingApplications: number;
+  pendingComplaints: number;
   newSupportTickets: number;
   inProgressSupportTickets: number;
 }
@@ -137,8 +138,33 @@ export default function AdminDashboardPage() {
               {stats.pendingApplications > 0 ? '🟡 Заявок на рассмотрении' : 'Заявок организаторов'}
             </div>
             {stats.pendingApplications > 0 && (
-              <Link href="/admin/organizers/applications" className="text-xs text-primary hover:underline mt-1 inline-block">
+              <Link href="/admin/requests" className="text-xs text-primary hover:underline mt-1 inline-block">
                 Перейти к заявкам →
+              </Link>
+            )}
+          </div>
+          {/* Complaints Widget */}
+          <div className={`card ${stats.pendingComplaints > 0 ? 'border-error' : ''}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-text-primary">🚨 Жалобы</h3>
+              <Link href="/admin/complaints" className="text-xs text-primary hover:underline">
+                Все жалобы →
+              </Link>
+            </div>
+            <div className={`text-3xl font-bold mb-1 ${stats.pendingComplaints > 0 ? 'text-error' : 'text-text-primary'}`}>
+              {stats.pendingComplaints}
+            </div>
+            <div className="text-sm text-text-secondary">
+              {stats.pendingComplaints > 0 ? '🔴 Требуют рассмотрения' : 'Новых жалоб нет'}
+            </div>
+            {stats.pendingComplaints > 0 && (
+              <Link
+                href="/admin/complaints"
+                className="mt-3 w-full px-3 py-2 bg-error/10 text-error rounded-xl text-sm font-medium hover:bg-error/20 transition-colors inline-block text-center"
+              >
+                {stats.pendingComplaints === 1
+                  ? 'Рассмотреть 1 жалобу'
+                  : `Рассмотреть ${stats.pendingComplaints} жалоб${stats.pendingComplaints >= 2 && stats.pendingComplaints <= 4 ? 'ы' : ''}`}
               </Link>
             )}
           </div>
@@ -192,13 +218,22 @@ export default function AdminDashboardPage() {
                 : 'Нет игр на проверке'}
             </p>
           </Link>
-          <Link href="/admin/organizers/applications" className="card card-hover">
+          <Link href="/admin/requests" className="card card-hover">
             <div className="text-3xl mb-3">📋</div>
             <h3 className="font-semibold text-text-primary mb-1">Заявки организаторов</h3>
             <p className="text-sm text-text-secondary">
               {stats.pendingApplications > 0
                 ? `${stats.pendingApplications} заяв${stats.pendingApplications === 1 ? 'ка' : 'ки'} ожидает рассмотрения`
                 : 'Нет заявок на рассмотрении'}
+            </p>
+          </Link>
+          <Link href="/admin/complaints" className="card card-hover">
+            <div className="text-3xl mb-3">🚨</div>
+            <h3 className="font-semibold text-text-primary mb-1">Жалобы</h3>
+            <p className="text-sm text-text-secondary">
+              {stats.pendingComplaints > 0
+                ? `${stats.pendingComplaints} жалоб${stats.pendingComplaints === 1 ? 'а' : 'ы'} ожидает рассмотрения`
+                : 'Нет жалоб на рассмотрении'}
             </p>
           </Link>
           <Link href="/admin/support" className="card card-hover">

@@ -36,6 +36,16 @@ export class AdminController {
   }
 
   // ============================================================
+  // Notification Counts (для бейджей в шапке)
+  // ============================================================
+
+  @Get('notification-counts')
+  @Roles('ADMIN', 'MODERATOR')
+  async getNotificationCounts() {
+    return this.adminService.getNotificationCounts();
+  }
+
+  // ============================================================
   // Organizer Applications
   // ============================================================
 

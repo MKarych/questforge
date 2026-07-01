@@ -13,6 +13,7 @@ import NotificationBell from '@/components/header/NotificationBell';
 import ThemeSwitcher from '@/components/header/ThemeSwitcher';
 import LanguageSwitcher from '@/components/header/LanguageSwitcher';
 import UserMenu from '@/components/header/UserMenu';
+import AdminNotificationBadge, { AdminToastContainer, type AdminNotificationCounts } from '@/components/header/AdminNotificationBadge';
 
 const API_BASE = '/api';
 
@@ -25,7 +26,7 @@ interface HeaderProps {
 }
 
 /** Выпадающее меню для десктопной шапки */
-function DropdownNav({ label, items, pathname }: { label: string; items: { label: string; href: string }[]; pathname: string }) {
+function DropdownNav({ label, items, pathname, counts }: { label: string; items: { label: string; href: string }[]; pathname: string; counts?: AdminNotificationCounts | null }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -42,6 +43,19 @@ function DropdownNav({ label, items, pathname }: { label: string; items: { label
 
   const isActive = items.some((item) => pathname.startsWith(item.href));
 
+  // Считаем общее количество непрочитанных для админки
+  const totalUnread = counts
+    ? counts.pendingApplications + counts.pendingComplaints + counts.newSupportTickets
+    : 0;
+
+  // Маппинг href -> количество
+  const countMap: Record<string, number> = {};
+  if (counts) {
+    countMap['/admin/complaints'] = counts.pendingComplaints;
+    countMap['/admin/requests'] = counts.pendingApplications;
+    countMap['/admin/support'] = counts.newSupportTickets;
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -53,6 +67,10 @@ function DropdownNav({ label, items, pathname }: { label: string; items: { label
         }`}
       >
         <span>{label}</span>
+        {/* Индикатор на кнопке — красная точка если есть новые уведомления */}
+        {totalUnread > 0 && (
+          <span className="flex items-center justify-center w-2 h-2 bg-error rounded-full" />
+        )}
         <svg
           className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
@@ -64,21 +82,29 @@ function DropdownNav({ label, items, pathname }: { label: string; items: { label
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-background border border-border rounded-lg shadow-xl py-1 z-50">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={`block px-4 py-2 text-sm transition-colors ${
-                pathname.startsWith(item.href)
-                  ? 'text-primary bg-primary/10 font-medium'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <div className="absolute left-0 top-full mt-1 w-56 bg-background border border-border rounded-lg shadow-xl py-1 z-50">
+          {items.map((item) => {
+            const itemCount = countMap[item.href];
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`flex items-center justify-between px-4 py-2 text-sm transition-colors ${
+                  pathname.startsWith(item.href)
+                    ? 'text-primary bg-primary/10 font-medium'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                }`}
+              >
+                <span>{item.label}</span>
+                {itemCount !== undefined && itemCount > 0 && (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-error rounded-full">
+                    {itemCount > 9 ? '9+' : itemCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
@@ -92,6 +118,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userTier, setUserTier] = useState<string | null>(null);
+  const [adminCounts, setAdminCounts] = useState<AdminNotificationCounts | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -182,10 +209,12 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const adminDropdownItems = [
     { label: 'Дашборд', href: '/admin/dashboard' },
     { label: 'Все игры', href: '/admin/games' },
+    { label: 'Жалобы', href: '/admin/complaints' },
     { label: 'Заявки', href: '/admin/requests' },
     { label: 'Поддержка', href: '/admin/support' },
     { label: 'Пользователи', href: '/admin/users' },
     { label: 'Команды', href: '/admin/teams' },
+    { label: 'Настройки', href: '/admin/settings' },
   ];
 
   const showAdmin = userRole === 'ADMIN';
@@ -259,7 +288,23 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
               {showAdmin && (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
-                  <DropdownNav label="Администрирование" items={adminDropdownItems} pathname={pathname} />
+                  <AdminNotificationBadge
+                    renderButton={(totalUnread) => (
+                      <DropdownNav
+                        label="Администрирование"
+                        items={adminDropdownItems}
+                        pathname={pathname}
+                        counts={adminCounts || undefined}
+                      />
+                    )}
+                    renderMenuItems={(counts) => {
+                      // Сохраняем counts в состояние Header для передачи в DropdownNav
+                      if (JSON.stringify(counts) !== JSON.stringify(adminCounts)) {
+                        setAdminCounts(counts);
+                      }
+                      return null;
+                    }}
+                  />
                 </>
               )}
             </nav>
@@ -510,20 +555,34 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                     <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Администрирование
                     </p>
-                    {adminDropdownItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
-                          pathname.startsWith(item.href)
-                            ? 'text-primary bg-primary/10 font-medium'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                        }`}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
+                    {adminDropdownItems.map((item) => {
+                      const countMap: Record<string, number> = {};
+                      if (adminCounts) {
+                        countMap['/admin/complaints'] = adminCounts.pendingComplaints;
+                        countMap['/admin/requests'] = adminCounts.pendingApplications;
+                        countMap['/admin/support'] = adminCounts.newSupportTickets;
+                      }
+                      const itemCount = countMap[item.href];
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                            pathname.startsWith(item.href)
+                              ? 'text-primary bg-primary/10 font-medium'
+                              : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                          }`}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <span>{item.label}</span>
+                          {itemCount !== undefined && itemCount > 0 && (
+                            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-error rounded-full">
+                              {itemCount > 9 ? '9+' : itemCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -580,6 +639,9 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             </div>
           </div>
         )}
+
+      {/* Toast-уведомления для админки */}
+      <AdminToastContainer />
 
       {/* Command Palette (глобально) */}
       <CommandPalette user={user} />
