@@ -1959,6 +1959,102 @@ export class GamesService {
   }
 
   /**
+   * getMyActiveRegistrations: получить все активные регистрации текущего пользователя.
+   * Возвращает игры, на которые пользователь зарегистрирован, с статусом и sessionId.
+   * Используется для баннера в Header и виджета на главной.
+   */
+  async getMyActiveRegistrations(userId: string) {
+    // Находим все команды пользователя
+    const myMemberships = await this.prisma.teamMember.findMany({
+      where: { userId },
+      include: {
+        team: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (myMemberships.length === 0) {
+      return [];
+    }
+
+    const teamIds = myMemberships.map((m) => m.teamId);
+
+    // Находим все регистрации этих команд на игры
+    const registrations = await this.prisma.gameRegistration.findMany({
+      where: {
+        teamId: { in: teamIds },
+        game: {
+          status: {
+            in: ['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'],
+          },
+          deletedAt: null,
+        },
+      },
+      include: {
+        game: {
+          select: {
+            id: true,
+            title: true,
+            shareLink: true,
+            status: true,
+            date: true,
+            time: true,
+            duration: true,
+            city: true,
+            allowEarlyStart: true,
+          },
+        },
+        team: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    // Для каждой регистрации проверяем sessionId (если RUNNING)
+    const result = await Promise.all(
+      registrations.map(async (reg) => {
+        let sessionId: string | null = null;
+        if (reg.game.status === 'RUNNING') {
+          const snapshot = await this.prisma.sessionState.findFirst({
+            where: { teamId: reg.teamId },
+            orderBy: { sequence: 'desc' },
+          });
+          sessionId = snapshot?.id || null;
+        }
+
+        // Вычисляем таймер
+        let timer = null;
+        if (['LOBBY', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(reg.game.status)) {
+          const startTime = this.calculateStartTime(reg.game.date, reg.game.time);
+          const now = new Date();
+          const timeUntilStart = startTime.getTime() - now.getTime();
+          timer = {
+            canStart: now >= startTime,
+            timeUntilStart: Math.max(0, timeUntilStart),
+            startTime: startTime.toISOString(),
+          };
+        }
+
+        return {
+          gameId: reg.game.id,
+          gameTitle: reg.game.title,
+          shareLink: reg.game.shareLink,
+          gameStatus: reg.game.status,
+          teamId: reg.teamId,
+          teamName: reg.team.name,
+          sessionId,
+          timer,
+          city: reg.game.city,
+          duration: reg.game.duration,
+        };
+      }),
+    );
+
+    return result;
+  }
+
+  /**
    * getGameProgress: получить прогресс всех команд для организатора.
    * Доступно только для статусов LOBBY, RUNNING, FINISHED.
    */

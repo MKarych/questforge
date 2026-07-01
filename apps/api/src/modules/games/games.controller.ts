@@ -247,6 +247,16 @@ export class GamesController {
     return this.gamesService.findMyGames(req.user.userId);
   }
 
+  // ============================================================
+  // 29.4. Активные регистрации текущего пользователя
+  // ============================================================
+
+  @Get('my-active-registrations')
+  @UseGuards(JwtAuthGuard)
+  async getMyActiveRegistrations(@Request() req: any) {
+    return this.gamesService.getMyActiveRegistrations(req.user.userId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') gameId: string) {

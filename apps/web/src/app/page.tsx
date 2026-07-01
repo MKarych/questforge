@@ -20,6 +20,7 @@ import MapPreview from '@/components/home/MapPreview';
 import WhyUs from '@/components/home/WhyUs';
 import FAQBlock from '@/components/home/FAQBlock';
 import CTABlock from '@/components/home/CTABlock';
+import MyActiveGames from '@/components/game/MyActiveGames';
 
 export default function HomePage() {
   const [data, setData] = useState<HomePageResponse | null>(null);
@@ -103,6 +104,9 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-8">
           {/* Hero */}
           <HeroBlock hero={data?.hero || null} loading={loading} />
+
+          {/* My Active Games */}
+          <MyActiveGames />
 
           {/* Stats */}
           <StatsBar stats={data?.stats || null} loading={loading} />

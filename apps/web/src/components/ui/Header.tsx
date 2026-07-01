@@ -13,6 +13,7 @@ import NotificationBell from '@/components/header/NotificationBell';
 import ThemeSwitcher from '@/components/header/ThemeSwitcher';
 import LanguageSwitcher from '@/components/header/LanguageSwitcher';
 import UserMenu from '@/components/header/UserMenu';
+import ActiveGameBanner from '@/components/game/ActiveGameBanner';
 import AdminNotificationBadge, { AdminToastContainer, type AdminNotificationCounts } from '@/components/header/AdminNotificationBadge';
 
 const API_BASE = '/api';
@@ -260,6 +261,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   return (
     <>
       <SystemStatusBar status={systemStatus} />
+      <ActiveGameBanner />
 
       <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4">

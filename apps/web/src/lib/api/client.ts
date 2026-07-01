@@ -1231,6 +1231,29 @@ class ApiClient {
     return this.request(`/sessions/by-team/${teamId}/game/${gameId}`);
   }
 
+  /**
+   * getMyActiveRegistrations: получить все активные регистрации текущего пользователя.
+   * Используется для баннера в Header и виджета на главной.
+   */
+  async getMyActiveRegistrations(): Promise<ApiResponse<Array<{
+    gameId: string;
+    gameTitle: string;
+    shareLink: string;
+    gameStatus: string;
+    teamId: string;
+    teamName: string;
+    sessionId: string | null;
+    timer: {
+      canStart: boolean;
+      timeUntilStart: number;
+      startTime: string;
+    } | null;
+    city: string;
+    duration: number;
+  }>>> {
+    return this.request('/games/my-active-registrations');
+  }
+
   async askQuestion(gameId: string, text: string): Promise<ApiResponse<{ id: string; text: string; createdAt: string }>> {
     return this.request(`/games/${gameId}/questions`, {
       method: 'POST',
@@ -1746,6 +1769,7 @@ export const registerTeam = (gameId: string, teamId: string) => apiClient.regist
 export const registerTeamByName = (gameId: string, teamName: string) => apiClient.registerTeamByName(gameId, teamName);
 export const addReview = (gameId: string, rating: number, text?: string) => apiClient.addReview(gameId, rating, text);
 export const startGame = (gameId: string) => apiClient.startGame(gameId);
+export const getMyActiveRegistrations = () => apiClient.getMyActiveRegistrations();
 export const finishGame = (gameId: string) => apiClient.finishGame(gameId);
 export const getGameRegistrations = (gameId: string) => apiClient.getGameRegistrations(gameId);
 export const cancelGame = (gameId: string) => apiClient.cancelGame(gameId);
