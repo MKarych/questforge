@@ -21,7 +21,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
-import { BlockDefinition, BLOCK_DEFINITIONS, MissionType, Scene } from '@/lib/editor-store/editor.types';
+import {
+  BlockDefinition,
+  BLOCK_DEFINITIONS,
+  MissionType,
+  Scene,
+  Condition,
+} from '@/lib/editor-store/editor.types';
 import BlockPalette from './BlockPalette';
 import NodeSettings from './NodeSettings';
 import VariablesPanel from './VariablesPanel';
@@ -34,6 +40,9 @@ import ScenarioTemplatesModal from './ScenarioTemplatesModal';
 import AiChat from './AiChat';
 import AuthorAchievements from './AuthorAchievements';
 import ToolbarSettingsModal from './ToolbarSettingsModal';
+import RoleManager from './RoleManager';
+import ConditionBuilder from './ConditionBuilder';
+import TriggerEditor from './TriggerEditor';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
 // ==================== Node Types for React Flow ====================
@@ -70,6 +79,11 @@ const CustomEdge = ({
   });
 
   const { setEdges } = useReactFlow();
+  const [showConditionEditor, setShowConditionEditor] = useState(false);
+  const storeEdges = useEditorStore((s) => s.edges);
+  const setEdgesInStore = useEditorStore((s) => s.setEdges);
+
+  const hasCondition = data?.condition != null;
 
   const handleDeleteEdge = useCallback(
     (e: React.MouseEvent) => {
@@ -78,6 +92,47 @@ const CustomEdge = ({
     },
     [id, setEdges]
   );
+
+  const handleConditionClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConditionEditor(true);
+  }, []);
+
+  const handleConditionChange = useCallback((condition: Condition | null) => {
+    const cond = condition ?? undefined;
+    // Обновляем в React Flow
+    setEdges((eds: Edge[]) =>
+      eds.map((edge) =>
+        edge.id === id
+          ? {
+              ...edge,
+              data: {
+                ...edge.data,
+                condition: cond,
+                label: cond ? '⚡ Условие' : 'Всегда',
+                transitionType: cond ? 'conditional' : 'auto',
+              },
+            }
+          : edge
+      )
+    );
+    // Обновляем в store
+    const currentEdges = useEditorStore.getState().edges;
+    const updatedEdges = currentEdges.map((e) =>
+      e.id === id
+        ? {
+            ...e,
+            data: {
+              ...e.data,
+              condition: cond,
+              label: cond ? '⚡ Условие' : 'Всегда',
+              transitionType: cond ? 'conditional' as const : 'auto' as const,
+            },
+          }
+        : e
+    );
+    setEdgesInStore(updatedEdges);
+  }, [id, setEdges, setEdgesInStore]);
 
   return (
     <>
@@ -91,6 +146,7 @@ const CustomEdge = ({
           cursor: 'pointer',
         }}
       />
+      {/* Лейбл ребра */}
       {data?.label && (
         <div
           style={{
@@ -108,10 +164,44 @@ const CustomEdge = ({
           {data.label}
         </div>
       )}
+      {/* Иконка условия ⚡ — кликабельная */}
+      {hasCondition && (
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + 16}px)`,
+            cursor: 'pointer',
+            zIndex: 10,
+          }}
+          onClick={handleConditionClick}
+          title="Редактировать условие перехода"
+        >
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: '50%',
+              background: '#f59e0b',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              lineHeight: 1,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              transition: 'transform 0.15s',
+            }}
+            className="hover:scale-110"
+          >
+            ⚡
+          </div>
+        </div>
+      )}
+      {/* Кнопка удаления */}
       <div
         style={{
           position: 'absolute',
-          transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + 16}px)`,
+          transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + 32}px)`,
           opacity: 0,
           transition: 'opacity 0.15s',
           cursor: 'pointer',
@@ -138,6 +228,34 @@ const CustomEdge = ({
           ✕
         </div>
       </div>
+
+      {/* Модалка редактирования условия */}
+      {showConditionEditor && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1000,
+            width: 400,
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: 12,
+            padding: 16,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ConditionBuilder
+            value={data?.condition || null}
+            onChange={handleConditionChange}
+            title="Условие перехода"
+            showApply
+            onApply={() => setShowConditionEditor(false)}
+          />
+        </div>
+      )}
     </>
   );
 };
@@ -180,6 +298,8 @@ function ScenarioEditorInner({
   const initialized = useRef(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showTemplatesOnStart, setShowTemplatesOnStart] = useState(true);
+  const [showRoleManager, setShowRoleManager] = useState(false);
+  const [showTriggerEditor, setShowTriggerEditor] = useState(false);
 
   // Initialize store with initial data
   useEffect(() => {
@@ -644,6 +764,27 @@ function ScenarioEditorInner({
             {tbContent('📊', 'Перем')}
           </button>
 
+          {/* 👤 Роли */}
+          <button onClick={() => setShowRoleManager(true)}
+            className={`${tbBtn()} ${showRoleManager ? 'bg-primary/20' : ''}`}
+            title="Управление ролями"
+          >
+            {tbContent('👤', 'Роли')}
+          </button>
+
+          {/* ⚡ Триггеры */}
+          <button onClick={() => setShowTriggerEditor(true)}
+            className={`${tbBtn()} ${showTriggerEditor ? 'bg-primary/20' : ''} relative`}
+            title="Управление триггерами и событиями"
+          >
+            {tbContent('⚡', 'Триггеры')}
+            {store.triggers.filter(t => t.enabled).length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-yellow-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                {store.triggers.filter(t => t.enabled).length}
+              </span>
+            )}
+          </button>
+
           <button onClick={() => store.togglePanel('validation')}
             className={`${tbBtn()} ${store.openPanels.validation ? 'bg-primary/20' : ''}`}
             title="Валидация"
@@ -963,6 +1104,7 @@ function ScenarioEditorInner({
                 hintLimit: 3,
                 maxAttempts: 3,
                 variables: [],
+                roles: [],
               },
             });
             store.setShowTemplates(false);
@@ -1066,6 +1208,16 @@ function ScenarioEditorInner({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Role Manager Modal */}
+      {showRoleManager && (
+        <RoleManager onClose={() => setShowRoleManager(false)} />
+      )}
+
+      {/* Trigger Editor Modal */}
+      {showTriggerEditor && (
+        <TriggerEditor onClose={() => setShowTriggerEditor(false)} />
       )}
     </div>
   );

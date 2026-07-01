@@ -20,6 +20,11 @@ import {
   Condition,
   BLOCK_DEFINITIONS,
   ToolbarSettings,
+  RoleDefinition,
+  RoleAssignment,
+  TriggerDefinition,
+  TriggerAction,
+  TriggerEventType,
 } from './editor.types';
 import { validationEngine } from '../editor-validation/validation-engine';
 import { autoSaveManager, AutoSaveData } from './autosave';
@@ -127,6 +132,22 @@ export interface EditorActions {
   clearAll: () => void;
   addAuthorAchievement: (achievementId: string) => void;
   dismissNewAchievements: () => void;
+
+  // Role System
+  addRole: (role: RoleDefinition) => void;
+  updateRole: (roleId: string, data: Partial<RoleDefinition>) => void;
+  removeRole: (roleId: string) => void;
+  assignRole: (playerId: string, roleId: string) => void;
+  unassignRole: (playerId: string) => void;
+  getRolesByTeam: (team: string) => RoleDefinition[];
+
+  // Trigger System
+  addTrigger: (trigger: TriggerDefinition) => void;
+  updateTrigger: (triggerId: string, data: Partial<TriggerDefinition>) => void;
+  removeTrigger: (triggerId: string) => void;
+  duplicateTrigger: (triggerId: string) => void;
+  toggleTrigger: (triggerId: string) => void;
+  resetTriggerFireCount: (triggerId: string) => void;
 }
 
 // ==================== Initial State ====================
@@ -137,6 +158,7 @@ const initialSettings: GameSettings = {
   hintLimit: 3,
   maxAttempts: 3,
   variables: [],
+  roles: [],
 };
 
 const createInitialState = (): EditorState => ({
@@ -151,6 +173,13 @@ const createInitialState = (): EditorState => ({
   edges: [],
   variables: [],
   settings: { ...initialSettings },
+
+  // Role System
+  roles: [],
+  roleAssignments: [],
+
+  // Trigger System
+  triggers: [],
 
   viewport: { x: 0, y: 0, zoom: 1 },
   selectedNodes: [],
@@ -792,6 +821,129 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     });
   },
   dismissNewAchievements: () => set({ newAchievementAlerts: [] }),
+
+  // ==================== Role System ====================
+  addRole: (role) => {
+    set((state) => ({
+      roles: [...state.roles, role],
+      settings: {
+        ...state.settings,
+        roles: [...state.settings.roles, role],
+      },
+      isDirty: true,
+    }));
+  },
+
+  updateRole: (roleId, data) => {
+    set((state) => ({
+      roles: state.roles.map((r) =>
+        r.id === roleId ? { ...r, ...data } : r
+      ),
+      settings: {
+        ...state.settings,
+        roles: state.settings.roles.map((r) =>
+          r.id === roleId ? { ...r, ...data } : r
+        ),
+      },
+      isDirty: true,
+    }));
+  },
+
+  removeRole: (roleId) => {
+    set((state) => ({
+      roles: state.roles.filter((r) => r.id !== roleId),
+      roleAssignments: state.roleAssignments.filter((a) => a.roleId !== roleId),
+      settings: {
+        ...state.settings,
+        roles: state.settings.roles.filter((r) => r.id !== roleId),
+      },
+      isDirty: true,
+    }));
+  },
+
+  assignRole: (playerId, roleId) => {
+    const state = get();
+    // Удаляем предыдущее назначение для этого игрока, если было
+    const filtered = state.roleAssignments.filter((a) => a.playerId !== playerId);
+    set({
+      roleAssignments: [
+        ...filtered,
+        { playerId, roleId, assignedAt: Date.now() },
+      ],
+      isDirty: true,
+    });
+  },
+
+  unassignRole: (playerId) => {
+    set((state) => ({
+      roleAssignments: state.roleAssignments.filter((a) => a.playerId !== playerId),
+      isDirty: true,
+    }));
+  },
+
+  getRolesByTeam: (team) => {
+    return get().roles.filter((r) => r.team === team);
+  },
+
+  // ==================== Trigger System ====================
+  addTrigger: (trigger) => {
+    set((state) => ({
+      triggers: [...state.triggers, trigger],
+      isDirty: true,
+    }));
+  },
+
+  updateTrigger: (triggerId, data) => {
+    set((state) => ({
+      triggers: state.triggers.map((t) =>
+        t.id === triggerId ? { ...t, ...data } : t
+      ),
+      isDirty: true,
+    }));
+  },
+
+  removeTrigger: (triggerId) => {
+    set((state) => ({
+      triggers: state.triggers.filter((t) => t.id !== triggerId),
+      isDirty: true,
+    }));
+  },
+
+  duplicateTrigger: (triggerId) => {
+    const state = get();
+    const source = state.triggers.find((t) => t.id === triggerId);
+    if (!source) return;
+
+    const duplicate: TriggerDefinition = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: uuidv4(),
+      name: `${source.name} (копия)`,
+      fireCount: 0,
+    };
+
+    set((state) => ({
+      triggers: [...state.triggers, duplicate],
+      isDirty: true,
+    }));
+  },
+
+  toggleTrigger: (triggerId) => {
+    set((state) => ({
+      triggers: state.triggers.map((t) =>
+        t.id === triggerId ? { ...t, enabled: !t.enabled } : t
+      ),
+      isDirty: true,
+    }));
+  },
+
+  resetTriggerFireCount: (triggerId) => {
+    set((state) => ({
+      triggers: state.triggers.map((t) =>
+        t.id === triggerId ? { ...t, fireCount: 0 } : t
+      ),
+      isDirty: true,
+    }));
+  },
 }));
 
 // ==================== Helpers ====================

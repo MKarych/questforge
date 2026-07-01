@@ -5,7 +5,7 @@
 // ==================== 1. Core Runtime Primitives (spec 49.1.2) ====================
 
 // 1.2.1. Scene (Сцена)
-export type SceneType = 'location' | 'quiz' | 'dialogue' | 'game' | 'slide' | 'custom';
+export type SceneType = 'location' | 'quiz' | 'dialogue' | 'game' | 'slide' | 'custom' | 'loop';
 
 export interface Scene {
   id: string;
@@ -21,6 +21,7 @@ export interface Scene {
     timer?: number;
     requiredRole?: string;
     conditions?: Condition[];
+    loop?: LoopConfig;
   };
 }
 
@@ -351,9 +352,28 @@ export type VariableOperation =
   | 'set' | 'add' | 'subtract' | 'multiply' | 'divide'
   | 'increment' | 'decrement';
 
+// ==================== 4.5. Role System ====================
+export interface RoleDefinition {
+  id: string;
+  name: string;
+  description: string;
+  team: 'red' | 'blue' | 'neutral';
+  permissions: string[];
+  winCondition: ConditionGroup | null;
+  visibility: 'all' | 'role_only' | 'hidden';
+  icon: string;
+  count: number; // сколько игроков с этой ролью
+}
+
+export interface RoleAssignment {
+  playerId: string;
+  roleId: string;
+  assignedAt: number;
+}
+
 // ==================== 5. Reward Engine (spec 50.5) ====================
 export type RewardType =
-  | 'score' | 'money' | 'item' | 'achievement' | 'variable' | 'experience';
+  | 'score' | 'money' | 'item' | 'achievement' | 'variable' | 'experience' | 'role_assignment';
 
 export interface Reward {
   type: RewardType;
@@ -410,6 +430,8 @@ export interface GameSettings {
   hintLimit: number;
   maxAttempts: number;
   variables: VariableDefinition[];
+  roles: RoleDefinition[];
+  inventory?: InventoryItem[];
 }
 
 // ==================== 7. Editor State (spec 49.7.2) ====================
@@ -426,6 +448,13 @@ export interface EditorState {
   edges: Edge[];
   variables: VariableDefinition[];
   settings: GameSettings;
+
+  // Role System
+  roles: RoleDefinition[];
+  roleAssignments: RoleAssignment[];
+
+  // Trigger System
+  triggers: TriggerDefinition[];
 
   // Canvas
   viewport: { x: number; y: number; zoom: number };
@@ -574,6 +603,138 @@ export interface Trigger {
   actions: Action[];
 }
 
+// Расширенный список событий для триггеров
+export type TriggerEventType =
+  | 'onSceneEnter' | 'onSceneExit'
+  | 'onMissionStart' | 'onMissionComplete' | 'onMissionFail'
+  | 'onAnswerCorrect' | 'onAnswerWrong'
+  | 'onTimerStart' | 'onTimerEnd'
+  | 'onItemGet' | 'onItemSpend'
+  | 'onAchievementUnlock'
+  | 'onRoleAssigned'
+  | 'onVariableChange'
+  | 'onCustomEvent';
+
+// Действие триггера
+export interface TriggerAction {
+  id: string;
+  type: 'set_variable' | 'add_score' | 'teleport' | 'show_notification'
+      | 'start_timer' | 'stop_timer' | 'play_sound' | 'show_modal'
+      | 'assign_role' | 'give_item' | 'remove_item'
+      | 'emit_event' | 'call_api';
+  config: Record<string, any>;
+}
+
+// Триггер с действиями
+export interface TriggerDefinition {
+  id: string;
+  name: string;
+  description: string;
+  event: TriggerEventType;
+  eventFilter?: {
+    sceneId?: string;
+    missionId?: string;
+    itemId?: string;
+    roleId?: string;
+    variableName?: string;
+  };
+  conditions: ConditionGroup;
+  actions: TriggerAction[];
+  enabled: boolean;
+  cooldown: number;
+  maxFires: number;
+  fireCount: number;
+}
+
+// Конфигурация для каждого типа действия триггера
+export interface TriggerActionConfig {
+  set_variable: { variableName: string; value: any; operation: 'set' | 'add' | 'subtract' };
+  add_score: { amount: number };
+  teleport: { sceneId: string };
+  show_notification: { text: string; icon?: string; duration?: number };
+  start_timer: { timerId: string; duration?: number };
+  stop_timer: { timerId: string };
+  play_sound: { assetId: string; loop?: boolean };
+  show_modal: { title: string; text: string; buttons?: { label: string; action: string }[] };
+  assign_role: { roleId: string; playerId?: string };
+  give_item: { itemId: string; quantity: number };
+  remove_item: { itemId: string; quantity: number };
+  emit_event: { eventName: string; data?: Record<string, any> };
+  call_api: { url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: string };
+}
+
+// Иконки для типов событий триггеров
+export const TRIGGER_EVENT_ICONS: Record<TriggerEventType, string> = {
+  onSceneEnter: '🚪',
+  onSceneExit: '🚶',
+  onMissionStart: '🎯',
+  onMissionComplete: '✅',
+  onMissionFail: '❌',
+  onAnswerCorrect: '👍',
+  onAnswerWrong: '👎',
+  onTimerStart: '⏱️',
+  onTimerEnd: '⏰',
+  onItemGet: '📦',
+  onItemSpend: '💸',
+  onAchievementUnlock: '🏆',
+  onRoleAssigned: '👤',
+  onVariableChange: '📊',
+  onCustomEvent: '🔔',
+};
+
+// Лейблы для типов событий триггеров
+export const TRIGGER_EVENT_LABELS: Record<TriggerEventType, string> = {
+  onSceneEnter: 'Вход в сцену',
+  onSceneExit: 'Выход из сцены',
+  onMissionStart: 'Начало миссии',
+  onMissionComplete: 'Завершение миссии',
+  onMissionFail: 'Провал миссии',
+  onAnswerCorrect: 'Правильный ответ',
+  onAnswerWrong: 'Неправильный ответ',
+  onTimerStart: 'Таймер запущен',
+  onTimerEnd: 'Таймер истёк',
+  onItemGet: 'Получение предмета',
+  onItemSpend: 'Трата предмета',
+  onAchievementUnlock: 'Достижение',
+  onRoleAssigned: 'Назначение роли',
+  onVariableChange: 'Изменение переменной',
+  onCustomEvent: 'Пользовательское событие',
+};
+
+// Иконки для типов действий триггеров
+export const TRIGGER_ACTION_ICONS: Record<string, string> = {
+  set_variable: '📊',
+  add_score: '⭐',
+  teleport: '📍',
+  show_notification: '🔔',
+  start_timer: '⏱️',
+  stop_timer: '⏹️',
+  play_sound: '🔊',
+  show_modal: '🪟',
+  assign_role: '👤',
+  give_item: '🎁',
+  remove_item: '🗑️',
+  emit_event: '📡',
+  call_api: '🌐',
+};
+
+// Лейблы для типов действий триггеров
+export const TRIGGER_ACTION_LABELS: Record<string, string> = {
+  set_variable: 'Установить переменную',
+  add_score: 'Добавить очки',
+  teleport: 'Телепорт',
+  show_notification: 'Уведомление',
+  start_timer: 'Запустить таймер',
+  stop_timer: 'Остановить таймер',
+  play_sound: 'Воспроизвести звук',
+  show_modal: 'Показать модалку',
+  assign_role: 'Назначить роль',
+  give_item: 'Выдать предмет',
+  remove_item: 'Удалить предмет',
+  emit_event: 'Отправить событие',
+  call_api: 'API-запрос',
+};
+
 // ==================== Scheduler (spec 50.7) ====================
 export type ScheduleType = 'absolute' | 'relative' | 'periodic';
 
@@ -584,6 +745,24 @@ export interface Schedule {
   delay?: number;
   interval?: number;
   action: Action;
+}
+
+// ==================== Loop Config (spec 1.4) ====================
+export type LoopType = 'for' | 'while' | 'forEach';
+
+export interface LoopConfig {
+  type: LoopType;
+  // for: N раз
+  count?: number;
+  counterVariable?: string; // имя переменной-счётчика
+  // while: пока условие истинно
+  condition?: ConditionGroup;
+  // forEach: по массиву
+  collectionVariable?: string; // переменная-массив
+  itemVariable?: string; // переменная для текущего элемента
+  // Общие
+  maxIterations?: number; // защита от бесконечного цикла (по умолчанию 100)
+  onCompleteSceneId?: string; // сцена после завершения цикла
 }
 
 // ==================== Константы блоков ====================
@@ -606,12 +785,17 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   { type: 'slide', label: 'Таймер', icon: '⏱', description: 'Ограничение по времени', color: 'bg-red-400', category: 'Логика' },
   { type: 'custom', label: 'Ветвление', icon: '🔀', description: 'Ветвление сценария', color: 'bg-teal-500', category: 'Логика' },
   { type: 'custom', label: 'Условие', icon: '⚖️', description: 'Проверка условия', color: 'bg-amber-500', category: 'Логика' },
+  { type: 'loop', label: 'Цикл', icon: '🔄', description: 'Повторение действий N раз', color: 'bg-cyan-500', category: 'Логика' },
   // Инвентарь
   { type: 'custom', label: 'Получить предмет', icon: '🎒', description: 'Добавить предмет в инвентарь', color: 'bg-lime-500', category: 'Инвентарь' },
   { type: 'custom', label: 'Потратить предмет', icon: '📦', description: 'Удалить предмет из инвентаря', color: 'bg-orange-400', category: 'Инвентарь' },
   { type: 'custom', label: 'Проверка предмета', icon: '🔍', description: 'Проверить наличие предмета', color: 'bg-cyan-400', category: 'Инвентарь' },
   // Достижения
   { type: 'custom', label: 'Достижение', icon: '🏆', description: 'Выдать достижение', color: 'bg-yellow-400', category: 'Достижения' },
+  // Роли
+  { type: 'custom', label: 'Назначить роль', icon: '👤', description: 'Назначить игроку роль', color: 'bg-violet-500', category: 'Роли' },
+  { type: 'custom', label: 'Проверить роль', icon: '🔍', description: 'Проверить роль игрока', color: 'bg-violet-400', category: 'Роли' },
+  { type: 'custom', label: 'Если роль =', icon: '⚖️', description: 'Ветвление по роли', color: 'bg-violet-600', category: 'Роли' },
   // Персонажи
   { type: 'dialogue', label: 'NPC', icon: '🗣', description: 'Взаимодействие с персонажем', color: 'bg-cyan-500', category: 'Персонажи' },
   { type: 'dialogue', label: 'Диалог', icon: '💬', description: 'Ветка диалога с NPC', color: 'bg-teal-400', category: 'Персонажи' },
@@ -628,6 +812,7 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: 'Инвентарь', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Инвентарь') },
   { name: 'Достижения', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Достижения') },
   { name: 'Персонажи', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Персонажи') },
+  { name: 'Роли', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Роли') },
   { name: 'Экспериментальные', blocks: BLOCK_DEFINITIONS.filter(b => b.category === 'Экспериментальные') },
 ];
 

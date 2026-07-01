@@ -8,6 +8,7 @@ import {
   Edge,
   ValidationResult,
   ValidationError,
+  LoopConfig,
 } from '../editor-store/editor.types';
 
 export class ValidationEngine {
@@ -38,6 +39,9 @@ export class ValidationEngine {
 
     // 7. Проверка переменных
     this.checkVariables(scenes, errors);
+
+    // 8. Проверка конфигурации циклов
+    this.checkLoopConfigs(scenes, edges, errors, warnings);
 
     return {
       valid: errors.length === 0,
@@ -445,6 +449,103 @@ export class ValidationEngine {
         message: 'Условие должно иметь type и operator',
         severity: 'error',
       });
+    }
+  }
+
+  /**
+   * 8. Проверка конфигурации циклов
+   */
+  private checkLoopConfigs(
+    scenes: Scene[],
+    edges: Edge[],
+    errors: ValidationError[],
+    warnings: ValidationError[]
+  ): void {
+    const loopScenes = scenes.filter((s) => s.type === 'loop');
+
+    for (const scene of loopScenes) {
+      const loop = scene.metadata?.loop;
+      if (!loop) {
+        errors.push({
+          code: 'LOOP_NO_CONFIG',
+          sceneId: scene.id,
+          message: `Сцена цикла "${scene.title}" не имеет конфигурации цикла`,
+          severity: 'error',
+        });
+        continue;
+      }
+
+      // Проверка: for-цикл должен иметь count > 0
+      if (loop.type === 'for') {
+        if (!loop.count || loop.count <= 0) {
+          errors.push({
+            code: 'LOOP_FOR_NO_COUNT',
+            sceneId: scene.id,
+            message: `For-цикл "${scene.title}" должен иметь количество повторений > 0`,
+            severity: 'error',
+          });
+        }
+      }
+
+      // Проверка: while-цикл должен иметь условие
+      if (loop.type === 'while') {
+        if (!loop.condition) {
+          errors.push({
+            code: 'LOOP_WHILE_NO_CONDITION',
+            sceneId: scene.id,
+            message: `While-цикл "${scene.title}" должен иметь условие продолжения`,
+            severity: 'error',
+          });
+        }
+      }
+
+      // Проверка: forEach должен иметь collectionVariable
+      if (loop.type === 'forEach') {
+        if (!loop.collectionVariable) {
+          errors.push({
+            code: 'LOOP_FOREACH_NO_COLLECTION',
+            sceneId: scene.id,
+            message: `ForEach-цикл "${scene.title}" должен иметь переменную-массив`,
+            severity: 'error',
+          });
+        }
+      }
+
+      // Проверка: maxIterations не может быть > 1000
+      if (loop.maxIterations && loop.maxIterations > 1000) {
+        errors.push({
+          code: 'LOOP_MAX_ITERATIONS_EXCEEDED',
+          sceneId: scene.id,
+          message: `Максимум итераций цикла "${scene.title}" не может превышать 1000`,
+          severity: 'error',
+        });
+      }
+
+      // Предупреждение: если тело цикла не ведёт к выходу (потенциально бесконечный цикл)
+      const loopBodyEdges = edges.filter(
+        (e) => e.source === scene.id && e.sourceHandle?.includes('loop-body')
+      );
+      const loopExitEdges = edges.filter(
+        (e) => e.source === scene.id && e.sourceHandle?.includes('loop-exit')
+      );
+
+      if (loopBodyEdges.length === 0) {
+        warnings.push({
+          code: 'LOOP_NO_BODY',
+          sceneId: scene.id,
+          message: `Цикл "${scene.title}" не имеет соединения для тела цикла`,
+          severity: 'warning',
+        });
+      }
+
+      if (loopExitEdges.length === 0 && !loop.onCompleteSceneId) {
+        warnings.push({
+          code: 'LOOP_NO_EXIT',
+          sceneId: scene.id,
+          message: `Цикл "${scene.title}" не имеет выхода (ни соединения loop-exit, ни onCompleteSceneId)`,
+          severity: 'warning',
+        });
+      }
     }
   }
 }

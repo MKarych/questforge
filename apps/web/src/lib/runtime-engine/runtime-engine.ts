@@ -15,12 +15,16 @@ import {
   ConditionGroup,
   Reward,
   VariableDefinition,
-  Trigger,
+  TriggerDefinition,
+  TriggerAction,
   Schedule,
   Action,
   Inventory,
   InventoryItem,
   Achievement,
+  RoleDefinition,
+  RoleAssignment,
+  LoopConfig,
 } from '@/lib/editor-store/editor.types';
 
 // ==================== 2.6. GameSession (spec 50.2.6) ====================
@@ -117,6 +121,8 @@ export interface ExecutionContext {
   inventory: Inventory;
   score: number;
   timestamp: Date;
+  roles: RoleDefinition[];
+  roleAssignments: RoleAssignment[];
 }
 
 // ==================== 10. Session State Machine (spec 53) ====================
@@ -169,6 +175,23 @@ export class ConditionEngine {
 
     // SingleCondition
     const sc = condition as SingleCondition;
+
+    // Специальная обработка для type: 'role'
+    if (sc.type === 'role') {
+      const playerId = context.session.team.members[0]?.id;
+      if (!playerId) return false;
+      const playerRole = context.roleAssignments.find((r) => r.playerId === playerId);
+      return playerRole?.roleId === sc.right;
+    }
+
+    // Специальная обработка для type: 'inventory' — проверка наличия предмета
+    if (sc.type === 'inventory') {
+      if (sc.operator === 'has') {
+        return context.team.inventory.items.some((i) => i.id === sc.right);
+      }
+      return false;
+    }
+
     const leftValue = this.resolveValue(sc.left, context);
     const rightValue = this.resolveValue(sc.right, context);
 
@@ -306,6 +329,31 @@ export class RewardEngine {
         result.message = `+${reward.value} опыта`;
         break;
 
+      case 'role_assignment': {
+        const roleId = reward.value?.roleId || reward.value;
+        const playerId = reward.value?.playerId || context.session.team.members[0]?.id;
+        if (playerId && roleId) {
+          // Удаляем предыдущее назначение для этого игрока
+          const existingIdx = context.roleAssignments.findIndex(
+            (a) => a.playerId === playerId
+          );
+          if (existingIdx >= 0) {
+            context.roleAssignments.splice(existingIdx, 1);
+          }
+          context.roleAssignments.push({
+            playerId,
+            roleId,
+            assignedAt: Date.now(),
+          });
+          const roleName = context.roles.find((r) => r.id === roleId)?.name || roleId;
+          result.message = `Игроку назначена роль: ${roleName}`;
+        } else {
+          result.success = false;
+          result.message = 'Не удалось назначить роль: не указан игрок или роль';
+        }
+        break;
+      }
+
       default:
         result.success = false;
         result.message = `Неизвестный тип награды: ${reward.type}`;
@@ -382,6 +430,7 @@ export interface AppliedReward {
 
 export class TriggerSystem {
   private conditionEngine: ConditionEngine;
+  private cooldowns: Map<string, number> = new Map();
 
   constructor() {
     this.conditionEngine = new ConditionEngine();
@@ -389,27 +438,360 @@ export class TriggerSystem {
 
   /**
    * Проверка и выполнение триггеров для данного события.
+   * Принимает массив TriggerDefinition из редактора.
    */
-  evaluateTriggers(eventType: string, context: ExecutionContext): TriggerResult[] {
+  evaluateTriggers(
+    eventType: string,
+    context: ExecutionContext,
+    triggers: TriggerDefinition[] = []
+  ): TriggerResult[] {
     const results: TriggerResult[] = [];
-    const triggers: Trigger[] = [];
 
-    const matchingTriggers = triggers.filter((t) => t.event === eventType);
+    // Фильтруем триггеры по событию
+    const matchingTriggers = triggers.filter(
+      (t) => t.enabled && t.event === eventType
+    );
 
     for (const trigger of matchingTriggers) {
+      // Проверка cooldown
+      if (this.isOnCooldown(trigger)) continue;
+
+      // Проверка maxFires
+      if (trigger.maxFires > 0 && trigger.fireCount >= trigger.maxFires) continue;
+
+      // Проверка eventFilter
+      if (!this.matchesEventFilter(trigger, context)) continue;
+
+      // Проверка условий
       const conditionMet = this.conditionEngine.evaluate(trigger.conditions, context);
 
       if (conditionMet) {
+        // Выполняем действия триггера
+        const actionResults = this.fireTrigger(trigger, context);
+
         results.push({
           triggerId: trigger.id,
           event: trigger.event,
           fired: true,
-          actions: trigger.actions,
+          actions: actionResults,
         });
       }
     }
 
     return results;
+  }
+
+  /**
+   * Выполнение действий триггера.
+   */
+  fireTrigger(trigger: TriggerDefinition, context: ExecutionContext): TriggerActionResult[] {
+    const results: TriggerActionResult[] = [];
+
+    // Устанавливаем кулдаун
+    if (trigger.cooldown > 0) {
+      this.cooldowns.set(trigger.id, Date.now() + trigger.cooldown * 1000);
+    }
+
+    // Увеличиваем счётчик срабатываний
+    trigger.fireCount++;
+
+    // Выполняем каждое действие
+    for (const action of trigger.actions) {
+      const result = this.executeAction(action, context);
+      results.push(result);
+    }
+
+    return results;
+  }
+
+  /**
+   * Выполнение одного действия триггера.
+   */
+  private executeAction(action: TriggerAction, context: ExecutionContext): TriggerActionResult {
+    const config = action.config || {};
+
+    switch (action.type) {
+      case 'set_variable': {
+        const varName = config.variableName as string;
+        const value = config.value;
+        const operation = (config.operation as string) || 'set';
+
+        switch (operation) {
+          case 'add':
+            context.variables[varName] = (context.variables[varName] || 0) + Number(value);
+            break;
+          case 'subtract':
+            context.variables[varName] = (context.variables[varName] || 0) - Number(value);
+            break;
+          case 'set':
+          default:
+            context.variables[varName] = value;
+            break;
+        }
+
+        return {
+          type: action.type,
+          success: true,
+          message: `Переменная ${varName} = ${context.variables[varName]}`,
+        };
+      }
+
+      case 'add_score': {
+        const amount = Number(config.amount) || 0;
+        context.score += amount;
+        context.team.score += amount;
+        return {
+          type: action.type,
+          success: true,
+          message: `+${amount} очков`,
+        };
+      }
+
+      case 'teleport': {
+        const sceneId = config.sceneId as string;
+        if (sceneId) {
+          context.session.currentSceneId = sceneId;
+          return {
+            type: action.type,
+            success: true,
+            message: `Телепорт к сцене ${sceneId}`,
+          };
+        }
+        return {
+          type: action.type,
+          success: false,
+          message: 'Не указан ID сцены для телепорта',
+        };
+      }
+
+      case 'show_notification': {
+        const text = config.text as string;
+        return {
+          type: action.type,
+          success: true,
+          message: text || 'Уведомление',
+          payload: {
+            text,
+            icon: config.icon,
+            duration: config.duration,
+          },
+        };
+      }
+
+      case 'start_timer': {
+        const timerId = config.timerId as string;
+        return {
+          type: action.type,
+          success: true,
+          message: `Таймер ${timerId} запущен`,
+          payload: { timerId, duration: config.duration },
+        };
+      }
+
+      case 'stop_timer': {
+        const timerId = config.timerId as string;
+        return {
+          type: action.type,
+          success: true,
+          message: `Таймер ${timerId} остановлен`,
+          payload: { timerId },
+        };
+      }
+
+      case 'play_sound': {
+        const assetId = config.assetId as string;
+        return {
+          type: action.type,
+          success: true,
+          message: `Воспроизведение звука ${assetId}`,
+          payload: { assetId, loop: config.loop },
+        };
+      }
+
+      case 'show_modal': {
+        return {
+          type: action.type,
+          success: true,
+          message: config.title as string || 'Модальное окно',
+          payload: {
+            title: config.title,
+            text: config.text,
+            buttons: config.buttons,
+          },
+        };
+      }
+
+      case 'assign_role': {
+        const roleId = config.roleId as string;
+        const playerId = (config.playerId as string) || context.session.team.members[0]?.id;
+        if (playerId && roleId) {
+          const existingIdx = context.roleAssignments.findIndex(
+            (a) => a.playerId === playerId
+          );
+          if (existingIdx >= 0) {
+            context.roleAssignments.splice(existingIdx, 1);
+          }
+          context.roleAssignments.push({
+            playerId,
+            roleId,
+            assignedAt: Date.now(),
+          });
+          return {
+            type: action.type,
+            success: true,
+            message: `Роль ${roleId} назначена игроку ${playerId}`,
+          };
+        }
+        return {
+          type: action.type,
+          success: false,
+          message: 'Не указан ID роли или игрока',
+        };
+      }
+
+      case 'give_item': {
+        const itemId = config.itemId as string;
+        const quantity = Number(config.quantity) || 1;
+        const existing = context.team.inventory.items.find((i) => i.id === itemId);
+        if (existing) {
+          existing.quantity += quantity;
+        } else {
+          context.team.inventory.items.push({
+            id: itemId,
+            name: itemId,
+            description: '',
+            quantity,
+            icon: '📦',
+            type: 'quest',
+            effects: [],
+          });
+        }
+        return {
+          type: action.type,
+          success: true,
+          message: `+${quantity} x ${itemId}`,
+        };
+      }
+
+      case 'remove_item': {
+        const removeItemId = config.itemId as string;
+        const removeQuantity = Number(config.quantity) || 1;
+        const item = context.team.inventory.items.find((i) => i.id === removeItemId);
+        if (item) {
+          item.quantity -= removeQuantity;
+          if (item.quantity <= 0) {
+            context.team.inventory.items = context.team.inventory.items.filter(
+              (i) => i.id !== removeItemId
+            );
+          }
+          return {
+            type: action.type,
+            success: true,
+            message: `-${removeQuantity} x ${removeItemId}`,
+          };
+        }
+        return {
+          type: action.type,
+          success: false,
+          message: `Предмет ${removeItemId} не найден`,
+        };
+      }
+
+      case 'emit_event': {
+        const eventName = config.eventName as string;
+        return {
+          type: action.type,
+          success: true,
+          message: `Событие ${eventName} отправлено`,
+          payload: { eventName, data: config.data },
+        };
+      }
+
+      case 'call_api': {
+        const url = config.url as string;
+        const method = (config.method as string) || 'GET';
+        // API-запрос выполняется асинхронно, возвращаем информацию о запросе
+        return {
+          type: action.type,
+          success: true,
+          message: `API ${method} ${url}`,
+          payload: { url, method, body: config.body },
+        };
+      }
+
+      default:
+        return {
+          type: action.type,
+          success: false,
+          message: `Неизвестный тип действия: ${action.type}`,
+        };
+    }
+  }
+
+  /**
+   * Проверка eventFilter триггера.
+   */
+  private matchesEventFilter(trigger: TriggerDefinition, context: ExecutionContext): boolean {
+    const filter = trigger.eventFilter;
+    if (!filter) return true;
+
+    // Проверка sceneId
+    if (filter.sceneId && context.scene?.id !== filter.sceneId) {
+      return false;
+    }
+
+    // Проверка missionId
+    if (filter.missionId && context.mission?.id !== filter.missionId) {
+      return false;
+    }
+
+    // Проверка itemId (в инвентаре)
+    if (filter.itemId) {
+      const hasItem = context.team.inventory.items.some((i) => i.id === filter.itemId);
+      if (!hasItem) return false;
+    }
+
+    // Проверка roleId
+    if (filter.roleId) {
+      const playerId = context.session.team.members[0]?.id;
+      if (playerId) {
+        const hasRole = context.roleAssignments.some(
+          (a) => a.playerId === playerId && a.roleId === filter.roleId
+        );
+        if (!hasRole) return false;
+      }
+    }
+
+    // Проверка variableName
+    if (filter.variableName && !(filter.variableName in context.variables)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Проверка, находится ли триггер на кулдауне.
+   */
+  private isOnCooldown(trigger: TriggerDefinition): boolean {
+    if (trigger.cooldown <= 0) return false;
+    const cooldownUntil = this.cooldowns.get(trigger.id);
+    if (!cooldownUntil) return false;
+    return Date.now() < cooldownUntil;
+  }
+
+  /**
+   * Сброс кулдауна для триггера.
+   */
+  resetCooldown(triggerId: string): void {
+    this.cooldowns.delete(triggerId);
+  }
+
+  /**
+   * Сброс всех кулдаунов.
+   */
+  resetAllCooldowns(): void {
+    this.cooldowns.clear();
   }
 }
 
@@ -417,7 +799,14 @@ export interface TriggerResult {
   triggerId: string;
   event: string;
   fired: boolean;
-  actions: Action[];
+  actions: TriggerActionResult[];
+}
+
+export interface TriggerActionResult {
+  type: string;
+  success: boolean;
+  message: string;
+  payload?: any;
 }
 
 // ==================== 7. Scheduler (spec 50.7) ====================
@@ -801,6 +1190,112 @@ export class ExecutionEngine {
     return null;
   }
 
+  // ==================== Loop Execution (spec 1.4) ====================
+
+  /**
+   * Выполнение цикла.
+   * Возвращает количество выполненных итераций.
+   */
+  executeLoop(session: GameSession, loopConfig: LoopConfig): number {
+    let iterations = 0;
+    const maxIter = loopConfig.maxIterations || 100;
+    const currentScene = session.scenario.scenes.find(
+      (s) => s.id === session.currentSceneId
+    );
+
+    if (!currentScene) return 0;
+
+    const context = this.createContext(session, currentScene);
+
+    switch (loopConfig.type) {
+      case 'for': {
+        const count = loopConfig.count || 0;
+        for (let i = 0; i < count && iterations < maxIter; i++) {
+          if (loopConfig.counterVariable) {
+            session.variables[loopConfig.counterVariable] = i;
+          }
+          // Выполнить тело цикла — переход к сцене тела
+          this.executeLoopBody(session, currentScene);
+          iterations++;
+        }
+        break;
+      }
+
+      case 'while': {
+        if (!loopConfig.condition) break;
+        while (
+          this.conditionEngine.evaluate(loopConfig.condition, context) &&
+          iterations < maxIter
+        ) {
+          // Выполнить тело цикла
+          this.executeLoopBody(session, currentScene);
+          iterations++;
+        }
+        break;
+      }
+
+      case 'forEach': {
+        const collection = session.variables[loopConfig.collectionVariable || ''] || [];
+        if (!Array.isArray(collection)) break;
+
+        for (const item of collection) {
+          if (iterations >= maxIter) break;
+          if (loopConfig.itemVariable) {
+            session.variables[loopConfig.itemVariable] = item;
+          }
+          // Выполнить тело цикла
+          this.executeLoopBody(session, currentScene);
+          iterations++;
+        }
+        break;
+      }
+    }
+
+    this.auditLogger.log(session, 'transition', {
+      type: 'loop.complete',
+      loopType: loopConfig.type,
+      iterations,
+    });
+
+    // Переход к сцене после завершения цикла
+    if (loopConfig.onCompleteSceneId) {
+      this.transitionToScene(session, loopConfig.onCompleteSceneId);
+    }
+
+    return iterations;
+  }
+
+  /**
+   * Выполнение тела цикла — запуск миссий текущей сцены и проверка триггеров.
+   */
+  private executeLoopBody(session: GameSession, scene: Scene): void {
+    const context = this.createContext(session, scene);
+
+    // Запуск триггеров входа в сцену (для каждой итерации)
+    this.triggerSystem.evaluateTriggers('onSceneEnter', context);
+
+    // Выполнение миссий сцены (если есть)
+    for (const mission of scene.missions) {
+      const missionContext = this.createContext(session, scene, mission);
+
+      // Проверка условий миссии
+      const allConditionsMet = mission.conditions.every((c) =>
+        this.conditionEngine.evaluate(c, missionContext)
+      );
+
+      if (allConditionsMet) {
+        // Применение наград за миссию
+        this.rewardEngine.applyRewards(mission.rewards, missionContext);
+
+        // Обновление состояния сессии
+        session.score = missionContext.team.score;
+        session.variables = missionContext.variables;
+      }
+    }
+
+    session.version++;
+  }
+
   // ==================== Mission Execution ====================
 
   /**
@@ -1033,6 +1528,8 @@ export class ExecutionEngine {
       inventory: { ...session.inventory, items: [...session.inventory.items] },
       score: session.score,
       timestamp: new Date(),
+      roles: session.scenario.metadata?.settings?.roles || [],
+      roleAssignments: (session as any).roleAssignments || [],
     };
   }
 

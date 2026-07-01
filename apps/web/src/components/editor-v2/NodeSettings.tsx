@@ -1,7 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Scene, Mission, MissionType, BLOCK_DEFINITIONS } from '@/lib/editor-store/editor.types';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Scene,
+  Mission,
+  MissionType,
+  Condition,
+  ConditionGroup,
+  SingleCondition,
+  LoopConfig,
+  LoopType,
+  BLOCK_DEFINITIONS,
+} from '@/lib/editor-store/editor.types';
+import { useEditorStore } from '@/lib/editor-store/editor.store';
+import ConditionBuilder from './ConditionBuilder';
 
 interface NodeSettingsProps {
   node: Scene | null;
@@ -181,6 +193,14 @@ export default function NodeSettings({
           />
         </div>
 
+        {/* Required Role */}
+        <RoleSelectField
+          label="👤 Требуемая роль"
+          value={node.metadata?.requiredRole || ''}
+          onChange={(val) => handleMetadataChange('requiredRole', val || undefined)}
+          placeholder="Нет ограничения по роли"
+        />
+
         {/* Missions */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -249,6 +269,27 @@ export default function NodeSettings({
             )}
           </div>
         </div>
+
+        {/* Conditions Section — для блоков "Ветвление" и "Условие" */}
+        {(node.title === 'Ветвление' || node.title === 'Условие') && (
+          <div className="pt-2 border-t border-border">
+            <ConditionSection
+              nodeId={node.id}
+              conditions={node.metadata?.conditions || null}
+              onUpdate={(conditions) => handleMetadataChange('conditions', conditions)}
+            />
+          </div>
+        )}
+
+        {/* Loop Settings — для блоков "Цикл" */}
+        {node.type === 'loop' && (
+          <div className="pt-2 border-t border-border">
+            <LoopSettingsSection
+              loopConfig={node.metadata?.loop || null}
+              onUpdate={(loop) => handleMetadataChange('loop', loop)}
+            />
+          </div>
+        )}
 
         {/* Delete */}
         {node.title !== 'Старт' && node.title !== 'Финиш' && (
@@ -798,4 +839,222 @@ function renderMissionConfig(
     default:
       return commonFields;
   }
+}
+
+// ==================== Role Select Field ====================
+function RoleSelectField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const roles = useEditorStore((s) => s.roles);
+
+  return (
+    <div>
+      <label className="label text-sm">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input-field text-sm"
+      >
+        <option value="">{placeholder || 'Нет'}</option>
+        {roles.map((role) => (
+          <option key={role.id} value={role.id}>
+            {role.icon} {role.name} ({role.team === 'red' ? '🔴' : role.team === 'blue' ? '🔵' : '⚪'})
+          </option>
+        ))}
+      </select>
+      {roles.length === 0 && (
+        <p className="text-[10px] text-text-secondary mt-1">
+          Роли не настроены. Добавьте их в 👤 Роли на панели инструментов.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ==================== LoopSettingsSection Component ====================
+function LoopSettingsSection({
+  loopConfig,
+  onUpdate,
+}: {
+  loopConfig: LoopConfig | null;
+  onUpdate: (config: LoopConfig | null) => void;
+}) {
+  const config = loopConfig || { type: 'for' as LoopType, maxIterations: 100 };
+
+  const update = (partial: Partial<LoopConfig>) => {
+    onUpdate({ ...config, ...partial });
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="label text-sm">🔄 Настройки цикла</label>
+
+      {/* Тип цикла */}
+      <div>
+        <label className="text-xs text-text-secondary">Тип цикла</label>
+        <select
+          value={config.type}
+          onChange={(e) => update({ type: e.target.value as LoopType })}
+          className="input-field text-sm"
+        >
+          <option value="for">for — N раз</option>
+          <option value="while">while — пока условие истинно</option>
+          <option value="forEach">forEach — по массиву</option>
+        </select>
+      </div>
+
+      {/* for: количество повторений */}
+      {config.type === 'for' && (
+        <>
+          <div>
+            <label className="text-xs text-text-secondary">Количество повторений</label>
+            <input
+              type="number"
+              value={config.count ?? 1}
+              onChange={(e) => update({ count: Math.max(1, parseInt(e.target.value) || 1) })}
+              className="input-field text-sm"
+              min={1}
+              max={1000}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">Имя переменной-счётчика</label>
+            <input
+              type="text"
+              value={config.counterVariable || ''}
+              onChange={(e) => update({ counterVariable: e.target.value || undefined })}
+              className="input-field text-sm"
+              placeholder="i, counter, index..."
+            />
+          </div>
+        </>
+      )}
+
+      {/* while: условие */}
+      {config.type === 'while' && (
+        <div>
+          <label className="text-xs text-text-secondary">Условие продолжения цикла</label>
+          <div className="p-2 rounded bg-background-modifier-hover/30 border border-border">
+            <ConditionBuilder
+              value={(config.condition as Condition) || null}
+              onChange={(condition) => update({ condition: (condition as ConditionGroup) || undefined })}
+              title="Условие while"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* forEach: коллекция и элемент */}
+      {config.type === 'forEach' && (
+        <>
+          <div>
+            <label className="text-xs text-text-secondary">Переменная-массив</label>
+            <input
+              type="text"
+              value={config.collectionVariable || ''}
+              onChange={(e) => update({ collectionVariable: e.target.value || undefined })}
+              className="input-field text-sm"
+              placeholder="items, players, scores..."
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary">Переменная для текущего элемента</label>
+            <input
+              type="text"
+              value={config.itemVariable || ''}
+              onChange={(e) => update({ itemVariable: e.target.value || undefined })}
+              className="input-field text-sm"
+              placeholder="item, player, score..."
+            />
+          </div>
+        </>
+      )}
+
+      {/* Общие настройки */}
+      <div>
+        <label className="text-xs text-text-secondary">
+          Максимум итераций (защита от бесконечного цикла)
+        </label>
+        <input
+          type="number"
+          value={config.maxIterations ?? 100}
+          onChange={(e) => update({ maxIterations: Math.max(1, Math.min(1000, parseInt(e.target.value) || 100)) })}
+          className="input-field text-sm"
+          min={1}
+          max={1000}
+        />
+        <p className="text-[10px] text-text-secondary mt-0.5">
+          По умолчанию: 100. Максимум: 1000.
+        </p>
+      </div>
+
+      <div>
+        <label className="text-xs text-text-secondary">Сцена после завершения цикла (ID)</label>
+        <input
+          type="text"
+          value={config.onCompleteSceneId || ''}
+          onChange={(e) => update({ onCompleteSceneId: e.target.value || undefined })}
+          className="input-field text-sm"
+          placeholder="scene-id"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ==================== ConditionSection Component ====================
+function ConditionSection({
+  nodeId,
+  conditions,
+  onUpdate,
+}: {
+  nodeId: string;
+  conditions: Condition | null;
+  onUpdate: (conditions: Condition | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="label text-sm">⚡ Условия</label>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+        >
+          {isOpen ? 'Скрыть' : conditions ? '✏️ Редактировать' : '⚡ Добавить условие'}
+        </button>
+      </div>
+
+      {conditions && !isOpen && (
+        <div className="p-2 rounded bg-background-modifier-hover/30 border border-border">
+          <ConditionBuilder
+            value={conditions}
+            onChange={onUpdate}
+            mode="compact"
+          />
+        </div>
+      )}
+
+      {isOpen && (
+        <div className="p-2 rounded-lg bg-background-modifier-hover/30 border border-border">
+          <ConditionBuilder
+            value={conditions}
+            onChange={onUpdate}
+            title="Редактор условий"
+            showApply
+            onApply={() => setIsOpen(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
