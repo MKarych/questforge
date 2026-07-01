@@ -221,7 +221,6 @@ export default function OrganizerRunningPage() {
               ) : (
                 <div className="space-y-4">
                   {progress.map((p) => {
-                    const teamInfo = teams.find((t) => t.teamId === p.teamId);
                     const progressPercent = p.currentNodeIndex > 0
                       ? Math.min(100, Math.round((p.currentNodeIndex / 10) * 100))
                       : 0;

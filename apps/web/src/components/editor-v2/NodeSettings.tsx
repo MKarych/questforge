@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Scene,
   Mission,
   MissionType,
   Condition,
   ConditionGroup,
-  SingleCondition,
   LoopConfig,
   LoopType,
   SubScenarioConfig,
@@ -277,8 +276,7 @@ export default function NodeSettings({
         {(node.title === 'Ветвление' || node.title === 'Условие') && (
           <div className="pt-2 border-t border-border">
             <ConditionSection
-              nodeId={node.id}
-              conditions={node.metadata?.conditions || null}
+              conditions={(node.metadata?.conditions?.[0]) || null}
               onUpdate={(conditions) => handleMetadataChange('conditions', conditions)}
             />
           </div>
@@ -1036,11 +1034,9 @@ function LoopSettingsSection({
 
 // ==================== ConditionSection Component ====================
 function ConditionSection({
-  nodeId,
   conditions,
   onUpdate,
 }: {
-  nodeId: string;
   conditions: Condition | null;
   onUpdate: (conditions: Condition | null) => void;
 }) {

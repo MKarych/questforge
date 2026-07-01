@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
 import {
   ParallelScenarioConfig,
   SyncPoint,
-  ConditionGroup,
 } from '@/lib/editor-store/editor.types';
 
 // ==================== Types ====================
@@ -191,12 +190,9 @@ function SyncPointEditor({ point, parallelScenarios, onChange, onDelete }: SyncP
 interface ParallelScenarioFormProps {
   config: ParallelScenarioConfig;
   onChange: (config: ParallelScenarioConfig) => void;
-  onClose: () => void;
 }
 
-function ParallelScenarioForm({ config, onChange, onClose }: ParallelScenarioFormProps) {
-  const storeScenarios = useEditorStore((s) => s.scenes);
-
+function ParallelScenarioForm({ config, onChange }: ParallelScenarioFormProps) {
   const handleAddSyncPoint = useCallback(() => {
     onChange({
       ...config,
@@ -562,7 +558,6 @@ export default function ParallelScenarioManager({ onClose }: ParallelScenarioMan
             <ParallelScenarioForm
               config={editingConfig}
               onChange={setEditingConfig}
-              onClose={() => setEditingConfig(null)}
             />
           </div>
         ) : activeTab === 'scenarios' ? (

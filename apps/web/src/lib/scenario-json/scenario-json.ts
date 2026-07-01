@@ -364,6 +364,7 @@ export function deserializeScenario(json: ScenarioDefinition): DeserializedScena
           hintLimit: 3,
           maxAttempts: 3,
           variables: [],
+          roles: [],
         },
       },
       status: 'draft',

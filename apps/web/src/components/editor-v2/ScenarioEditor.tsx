@@ -25,7 +25,6 @@ import {
   BlockDefinition,
   BLOCK_DEFINITIONS,
   MissionType,
-  Scene,
   Condition,
 } from '@/lib/editor-store/editor.types';
 import BlockPalette from './BlockPalette';
@@ -81,7 +80,6 @@ const CustomEdge = ({
 
   const { setEdges } = useReactFlow();
   const [showConditionEditor, setShowConditionEditor] = useState(false);
-  const storeEdges = useEditorStore((s) => s.edges);
   const setEdgesInStore = useEditorStore((s) => s.setEdges);
 
   const hasCondition = data?.condition != null;
@@ -1233,11 +1231,11 @@ function ScenarioEditorInner({
       {/* Trigger Editor Modal */}
       {showTriggerEditor && (
         <TriggerEditor onClose={() => setShowTriggerEditor(false)} />
+      )}
 
       {/* Parallel Scenario Manager Modal */}
       {showParallelManager && (
         <ParallelScenarioManager onClose={() => setShowParallelManager(false)} />
-      )}
       )}
     </div>
   );

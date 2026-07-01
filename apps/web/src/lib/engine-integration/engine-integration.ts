@@ -89,7 +89,7 @@ export function scenarioToEngine(
         role: 'captain',
       },
     ],
-    inventory: { items: [], capacity: 100 },
+    inventory: { items: [], capacity: 100, maxWeight: 50, gold: 0 },
     variables: {},
     score: 0,
     reputation: 0,
@@ -493,6 +493,7 @@ export function createTestScenario(): Scenario {
         hintLimit: 3,
         maxAttempts: 3,
         variables: [],
+        roles: [],
       },
       tags: ['test', 'integration'],
       authorId: 'author-1',
@@ -733,9 +734,16 @@ export function runFullIntegrationTest(): IntegrationTestReport {
       name: 'Магический артефакт',
       description: 'Древний артефакт',
       type: 'quest' as ItemType,
+      rarity: 'common' as any,
       quantity: 1,
       icon: '🔮',
       effects: [],
+      stackable: false,
+      maxStack: 1,
+      useable: false,
+      usableInScenario: true,
+      tradeable: false,
+      weight: 0.1,
     });
     const r9 = executeTestMission(bridge.engine, session, 'mission-collect', '');
     check('Collect: success', true, r9.success);

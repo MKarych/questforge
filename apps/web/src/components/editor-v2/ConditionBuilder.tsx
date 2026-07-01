@@ -297,7 +297,7 @@ function AutocompleteInput({
               <div className="px-2 py-1 text-[10px] font-semibold text-text-secondary uppercase tracking-wider bg-background-modifier-hover/50">
                 {group}
               </div>
-              {items.map((suggestion, idx) => {
+              {items.map((suggestion) => {
                 const globalIdx = filteredSuggestions.indexOf(suggestion);
                 return (
                   <button

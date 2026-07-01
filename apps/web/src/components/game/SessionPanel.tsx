@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getCurrentNode, requestHint, getInventory, addInventoryItem, removeInventoryItem, getResources } from '@/lib/api/client';
+import { getCurrentNode, requestHint, getInventory, getResources } from '@/lib/api/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface SessionPanelProps {

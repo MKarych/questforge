@@ -112,9 +112,16 @@ export function createPluginContext(
           name: item.name,
           description: item.description,
           type: 'quest' as ItemType,
+          rarity: 'common' as any,
           quantity: item.quantity,
           icon: '📦',
           effects: [],
+          stackable: false,
+          maxStack: 1,
+          useable: false,
+          usableInScenario: true,
+          tradeable: false,
+          weight: 0.1,
         });
       }
     },

@@ -34,7 +34,7 @@ export default function PlayLobbyPage() {
 
   const [game, setGame] = useState<GameDetails | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
-  const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
+  const [, setMyTeams] = useState<MyTeam[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<MyTeam | null>(null);
   const [teams, setTeams] = useState<TeamStatus[]>([]);
   const [timer, setTimer] = useState<TimerInfo | null>(null);

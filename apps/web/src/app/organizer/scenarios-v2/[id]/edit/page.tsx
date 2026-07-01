@@ -84,6 +84,7 @@ export default function EditScenarioV2Page() {
           hintLimit: 3,
           maxAttempts: 3,
           variables: [],
+          roles: [],
         };
 
         let restoredVariables: VariableDefinition[] = [];

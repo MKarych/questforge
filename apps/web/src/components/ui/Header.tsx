@@ -291,7 +291,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
                   <AdminNotificationBadge
-                    renderButton={(totalUnread) => (
+                    renderButton={(_totalUnread) => (
                       <DropdownNav
                         label="Администрирование"
                         items={adminDropdownItems}

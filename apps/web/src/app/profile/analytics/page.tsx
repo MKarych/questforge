@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -57,7 +55,7 @@ export default function AnalyticsPage() {
         ]);
         setSummary(summaryRes.data);
         setAnalytics(analyticsRes.data?.items || []);
-        setEarnings(earningsRes.data?.items || []);
+        setEarnings(earningsRes.data || []);
       } catch {
         setError('Ошибка загрузки аналитики');
       } finally {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
@@ -17,7 +16,6 @@ import {
 } from '@/lib/api/client';
 
 export default function EditListingPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
   const [listing, setListing] = useState<MarketplaceListingDto | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);

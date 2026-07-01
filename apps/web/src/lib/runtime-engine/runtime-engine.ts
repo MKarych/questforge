@@ -37,7 +37,6 @@ import {
   ItemUseTarget,
   GamePhase,
   GamePhaseConfig,
-  PhaseTransition,
   GameStateMachine,
   GameStateType,
 } from '@/lib/editor-store/editor.types';
@@ -2159,7 +2158,7 @@ export class MultiScenarioOrchestrator {
   // ==================== Private Helpers ====================
 
   private startParallelInstance(
-    state: MultiScenarioState,
+    _state: MultiScenarioState,
     instance: ParallelScenarioInstance,
     config: ParallelScenarioConfig
   ): void {
@@ -2870,7 +2869,7 @@ export class TradeSystem {
 
   cleanupExpired(): void {
     const now = Date.now();
-    for (const [id, offer] of this.offers) {
+    for (const [_id, offer] of this.offers) {
       if (offer.expiresAt && offer.expiresAt < now) offer.status = 'expired';
     }
   }

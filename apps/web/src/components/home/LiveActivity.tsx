@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiResponse } from '@/lib/api/client';
 import { io, Socket } from 'socket.io-client';
 
 interface ActivityEvent {
@@ -55,10 +55,8 @@ function ActivityContent({ enabled }: { enabled: boolean }) {
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<{ data: ActivityEvent[] }>('/activity/live?limit=10');
-      // TransformInterceptor оборачивает ответ в { success, data, meta },
-      // поэтому response.data — это { data: ActivityEvent[] }
-      const items = response?.data?.data;
+      const response = await apiClient.get<ApiResponse<ActivityEvent[]>>('/activity/live?limit=10');
+      const items = response?.data;
       setActivities(Array.isArray(items) ? items : []);
     } catch {
       // Тихая ошибка — блок не критичен

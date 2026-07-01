@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -28,12 +26,13 @@ export default function FavoritesPage() {
     setError(null);
     try {
       const res = await getFavorites('me');
-      const data = res.data || {};
-      const items: FavoriteItem[] = [
-        ...(data.games || []).map((id: string) => ({ id, category: 'games', itemId: id, createdAt: '' })),
-        ...(data.scenarios || []).map((id: string) => ({ id, category: 'scenarios', itemId: id, createdAt: '' })),
-        ...(data.authors || []).map((id: string) => ({ id, category: 'authors', itemId: id, createdAt: '' })),
-      ];
+      const items: FavoriteItem[] = (res.data || []).map((item: any) => ({
+        id: item.id,
+        category: item.category || 'games',
+        itemId: item.id,
+        createdAt: item.createdAt || '',
+        item: item,
+      }));
       setFavorites(items);
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки избранного');

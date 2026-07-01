@@ -12,7 +12,6 @@ import {
   removeFromCart,
   clearCart,
   checkoutCart,
-  getCartCount,
   type MarketplaceListingDto,
 } from '@/lib/api/client';
 

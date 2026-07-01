@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { askQuestion, getQuestions, sendChatMessage, getChatMessages, sendOrganizerMessage, getOrganizerMessages } from '@/lib/api/client';
+import { askQuestion, getQuestions, sendChatMessage, getChatMessages, getOrganizerMessages } from '@/lib/api/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface GameChatProps {

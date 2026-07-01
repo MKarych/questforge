@@ -7,11 +7,8 @@ import {
   TriggerDefinition,
   TriggerAction,
   TriggerEventType,
-  TriggerActionConfig,
   TRIGGER_EVENT_ICONS,
   TRIGGER_EVENT_LABELS,
-  TRIGGER_ACTION_ICONS,
-  TRIGGER_ACTION_LABELS,
   Condition,
   ConditionGroup,
 } from '@/lib/editor-store/editor.types';
@@ -280,13 +277,9 @@ function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) {
 interface TriggerFormProps {
   trigger: TriggerDefinition;
   onChange: (trigger: TriggerDefinition) => void;
-  onClose: () => void;
 }
 
-function TriggerForm({ trigger, onChange, onClose }: TriggerFormProps) {
-  const scenes = useEditorStore((s) => s.scenes);
-  const storeVariables = useEditorStore((s) => s.variables);
-
+function TriggerForm({ trigger, onChange }: TriggerFormProps) {
   const eventFilterFields = getEventFilterFields(trigger.event);
 
   const handleAddAction = useCallback(() => {
@@ -586,7 +579,6 @@ export default function TriggerEditor({ onClose }: TriggerEditorProps) {
             <TriggerForm
               trigger={editingTrigger}
               onChange={setEditingTrigger}
-              onClose={() => setEditingTrigger(null)}
             />
           </div>
         ) : (

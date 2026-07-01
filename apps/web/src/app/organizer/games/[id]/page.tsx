@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  getGame, publishGame, removeGame, updateGame,
+  getGame, publishGame, removeGame,
   openRegistration, closeRegistration, moveToLobby,
   startGame, finishGame, cancelGame,
   getGameRegistrations, type GameDetails,
@@ -140,7 +140,7 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [game, loadTeams, loadTimer]);
 
-  const handleAction = async (action: string, actionFn: () => Promise<any>, successMessage?: string) => {
+  const handleAction = async (action: string, actionFn: () => Promise<any>) => {
     if (!game) return;
     setActionLoading(action);
     setError(null);

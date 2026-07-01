@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -56,13 +54,13 @@ export default function ActivityPage() {
     setError(null);
     try {
       const res = await getActivityFeed('me', limit, pageNum * limit);
-      const data = res.data?.items || [];
+      const data = res.data?.data || [];
       if (pageNum === 0) {
         setActivities(data);
       } else {
         setActivities((prev) => [...prev, ...data]);
       }
-      setTotal(res.data?.total || data.length);
+      setTotal(res.data?.meta?.total || data.length);
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки активности');
     } finally {

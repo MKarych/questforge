@@ -8,7 +8,6 @@ import {
   Edge,
   ValidationResult,
   ValidationError,
-  LoopConfig,
 } from '../editor-store/editor.types';
 
 export class ValidationEngine {

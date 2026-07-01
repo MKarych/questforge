@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export default function NotFoundPage() {
   const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     // Инициализация темы из localStorage
