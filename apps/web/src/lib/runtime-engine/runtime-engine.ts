@@ -30,6 +30,11 @@ import {
   MultiScenarioState,
   ParallelScenarioInstance,
   SubScenarioConfig,
+  CraftRecipe,
+  TradeOffer,
+  ItemUseConfig,
+  ItemUseAction,
+  ItemUseTarget,
 } from '@/lib/editor-store/editor.types';
 
 // ==================== 2.6. GameSession (spec 50.2.6) ====================
@@ -373,8 +378,15 @@ export class RewardEngine {
       name: itemData?.name || itemData?.id || 'Предмет',
       description: itemData?.description || '',
       quantity: itemData?.quantity || 1,
-      icon: itemData?.icon,
+      icon: itemData?.icon || '📦',
       type: itemData?.type || 'quest',
+      rarity: itemData?.rarity || 'common',
+      stackable: itemData?.stackable ?? true,
+      maxStack: itemData?.maxStack ?? 99,
+      useable: itemData?.useable ?? false,
+      usableInScenario: itemData?.usableInScenario ?? false,
+      tradeable: itemData?.tradeable ?? true,
+      weight: itemData?.weight ?? 0,
       effects: itemData?.effects || [],
     };
 
@@ -677,6 +689,13 @@ export class TriggerSystem {
             quantity,
             icon: '📦',
             type: 'quest',
+            rarity: 'common',
+            stackable: true,
+            maxStack: 99,
+            useable: false,
+            usableInScenario: false,
+            tradeable: true,
+            weight: 0,
             effects: [],
           });
         }
@@ -959,7 +978,7 @@ export class ExecutionEngine {
       team,
       currentSceneId: scenario.startSceneId || scenario.scenes[0]?.id || '',
       variables: this.initializeVariables(scenario.variables),
-      inventory: { items: [], capacity: 100 },
+      inventory: { items: [], capacity: 100, maxWeight: 1000, gold: 0 },
       score: 0,
       achievements: [],
       status: 'created',
@@ -2653,23 +2672,269 @@ export class MultiplayerEngine {
         this.votingSessions.delete(id);
       }
     }
+  }
+}
 
-    for (const [id, session] of this.auctionSessions) {
-      if (session.status === 'completed' && now - session.startedAt > timeout) {
-        this.auctionSessions.delete(id);
+// ==================== Crafting System (spec 3.2) ====================
+export interface CraftResult {
+  success: boolean;
+  recipeId: string;
+  itemsGained: { itemId: string; quantity: number }[];
+  itemsLost: { itemId: string; quantity: number }[];
+  message: string;
+}
+
+export class CraftingSystem {
+  private recipes: Map<string, CraftRecipe> = new Map();
+  private craftCooldowns: Map<string, number> = new Map();
+  private craftCounts: Map<string, number> = new Map();
+
+  registerRecipe(recipe: CraftRecipe): void {
+    this.recipes.set(recipe.id, recipe);
+  }
+
+  registerRecipes(recipes: CraftRecipe[]): void {
+    for (const r of recipes) this.recipes.set(r.id, r);
+  }
+
+  getRecipe(recipeId: string): CraftRecipe | undefined {
+    return this.recipes.get(recipeId);
+  }
+
+  getAllRecipes(): CraftRecipe[] {
+    return Array.from(this.recipes.values());
+  }
+
+  canCraft(recipeId: string, context: ExecutionContext): { allowed: boolean; reason?: string } {
+    const recipe = this.recipes.get(recipeId);
+    if (!recipe) return { allowed: false, reason: 'Рецепт не найден' };
+    const teamId = context.session.team.id;
+    const cooldownKey = `${teamId}:${recipeId}`;
+    const lastCraft = this.craftCooldowns.get(cooldownKey) || 0;
+    if (Date.now() - lastCraft < recipe.cooldown) {
+      const remaining = Math.ceil((recipe.cooldown - (Date.now() - lastCraft)) / 1000);
+      return { allowed: false, reason: `Крафт будет доступен через ${remaining}с` };
+    }
+    if (recipe.maxCrafts) {
+      const count = this.craftCounts.get(cooldownKey) || 0;
+      if (count >= recipe.maxCrafts) return { allowed: false, reason: 'Лимит крафта исчерпан' };
+    }
+    if (recipe.requiredLevel && (context.variables?.level || 0) < recipe.requiredLevel) {
+      return { allowed: false, reason: `Требуется уровень ${recipe.requiredLevel}` };
+    }
+    if (recipe.requiredRole) {
+      const hasRole = context.roleAssignments?.some((a) => a.roleId === recipe.requiredRole);
+      if (!hasRole) return { allowed: false, reason: `Требуется роль ${recipe.requiredRole}` };
+    }
+    if (recipe.requiredAchievement) {
+      const hasAchievement = context.team.achievements?.some((a) => a.id === recipe.requiredAchievement);
+      if (!hasAchievement) return { allowed: false, reason: 'Требуется достижение' };
+    }
+    for (const ing of recipe.ingredients) {
+      if (!ing.consume) continue;
+      const item = context.team.inventory.items.find((i) => i.id === ing.itemId);
+      if (!item || item.quantity < ing.quantity) {
+        return { allowed: false, reason: `Недостаточно ${ing.itemName} (нужно ${ing.quantity})` };
       }
     }
+    return { allowed: true };
+  }
 
-    for (const [id, session] of this.choiceSessions) {
-      if (session.status === 'completed' && now - session.startedAt > timeout) {
-        this.choiceSessions.delete(id);
+  craft(recipeId: string, context: ExecutionContext): CraftResult {
+    const recipe = this.recipes.get(recipeId);
+    if (!recipe) return { success: false, recipeId, itemsGained: [], itemsLost: [], message: 'Рецепт не найден' };
+    const check = this.canCraft(recipeId, context);
+    if (!check.allowed) return { success: false, recipeId, itemsGained: [], itemsLost: [], message: check.reason || 'Крафт невозможен' };
+    const teamId = context.session.team.id;
+    const cooldownKey = `${teamId}:${recipeId}`;
+    const itemsLost: { itemId: string; quantity: number }[] = [];
+    for (const ing of recipe.ingredients) {
+      if (!ing.consume) continue;
+      const item = context.team.inventory.items.find((i) => i.id === ing.itemId);
+      if (item) {
+        const removed = Math.min(ing.quantity, item.quantity);
+        item.quantity -= removed;
+        itemsLost.push({ itemId: ing.itemId, quantity: removed });
+        if (item.quantity <= 0) context.team.inventory.items = context.team.inventory.items.filter((i) => i.id !== ing.itemId);
       }
     }
+    const isSuccess = Math.random() < recipe.successRate;
+    const itemsGained: { itemId: string; quantity: number }[] = [];
+    const targetResults = isSuccess ? recipe.results : (recipe.failureResults || []);
+    for (const result of targetResults) {
+      const existing = context.team.inventory.items.find((i) => i.id === result.itemId);
+      if (existing) { existing.quantity += result.quantity; }
+      else {
+        context.team.inventory.items.push({
+          id: result.itemId, name: result.itemName, description: '',
+          quantity: result.quantity, icon: isSuccess ? '📦' : '💥', type: 'material',
+          rarity: 'common', stackable: true, maxStack: 99,
+          useable: false, usableInScenario: false, tradeable: true, weight: 0, effects: [],
+        });
+      }
+      itemsGained.push({ itemId: result.itemId, quantity: result.quantity });
+    }
+    this.craftCooldowns.set(cooldownKey, Date.now());
+    this.craftCounts.set(cooldownKey, (this.craftCounts.get(cooldownKey) || 0) + 1);
+    return {
+      success: isSuccess, recipeId, itemsGained, itemsLost,
+      message: isSuccess ? `Крафт успешен!` : 'Крафт не удался',
+    };
+  }
 
-    for (const [id, session] of this.challengeSessions) {
-      if (session.status === 'completed' && now - session.startedAt > timeout) {
-        this.challengeSessions.delete(id);
+  getAvailableRecipes(context: ExecutionContext): CraftRecipe[] {
+    return Array.from(this.recipes.values()).filter((r) => this.canCraft(r.id, context).allowed);
+  }
+}
+
+// ==================== Trade System (spec 3.2) ====================
+export interface TradeResult {
+  success: boolean;
+  offerId: string;
+  message: string;
+}
+
+export class TradeSystem {
+  private offers: Map<string, TradeOffer> = new Map();
+
+  createOffer(offer: Omit<TradeOffer, 'id' | 'createdAt' | 'status'>): TradeOffer {
+    const newOffer: TradeOffer = { ...offer, id: `trade-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, status: 'open', createdAt: Date.now() };
+    this.offers.set(newOffer.id, newOffer);
+    return newOffer;
+  }
+
+  getOffer(offerId: string): TradeOffer | undefined { return this.offers.get(offerId); }
+
+  getOpenOffers(teamId?: string): TradeOffer[] {
+    return Array.from(this.offers.values()).filter((o) => o.status === 'open' && (!teamId || o.toTeamId === undefined || o.toTeamId === teamId));
+  }
+
+  getOffersByTeam(teamId: string): TradeOffer[] {
+    return Array.from(this.offers.values()).filter((o) => o.fromTeamId === teamId);
+  }
+
+  acceptOffer(offerId: string, context: ExecutionContext): TradeResult {
+    const offer = this.offers.get(offerId);
+    if (!offer) return { success: false, offerId, message: 'Предложение не найдено' };
+    if (offer.status !== 'open') return { success: false, offerId, message: 'Предложение уже закрыто' };
+    if (offer.toTeamId && offer.toTeamId !== context.session.team.id) return { success: false, offerId, message: 'Это предложение не для вашей команды' };
+    const team = context.session.team;
+    for (const offered of offer.offeredItems) {
+      const item = team.inventory.items.find((i) => i.id === offered.itemId);
+      if (!item || item.quantity < offered.quantity) return { success: false, offerId, message: `Недостаточно ${offered.itemId}` };
+    }
+    for (const requested of offer.requestedItems) {
+      const item = team.inventory.items.find((i) => i.id === requested.itemId);
+      if (!item || item.quantity < requested.quantity) return { success: false, offerId, message: `Недостаточно ${requested.itemId}` };
+    }
+    if (offer.requestedGold && (team.inventory.gold || 0) < offer.requestedGold) return { success: false, offerId, message: 'Недостаточно золота' };
+    for (const offered of offer.offeredItems) {
+      const item = team.inventory.items.find((i) => i.id === offered.itemId);
+      if (item) {
+        item.quantity -= offered.quantity;
+        if (item.quantity <= 0) team.inventory.items = team.inventory.items.filter((i) => i.id !== offered.itemId);
       }
     }
+    for (const requested of offer.requestedItems) {
+      const item = team.inventory.items.find((i) => i.id === requested.itemId);
+      if (item) {
+        item.quantity -= requested.quantity;
+        if (item.quantity <= 0) team.inventory.items = team.inventory.items.filter((i) => i.id !== requested.itemId);
+      }
+    }
+    if (offer.requestedGold) team.inventory.gold = (team.inventory.gold || 0) - offer.requestedGold;
+    if (offer.offeredGold) team.inventory.gold = (team.inventory.gold || 0) + offer.offeredGold;
+    offer.status = 'accepted';
+    return { success: true, offerId, message: 'Обмен успешно выполнен' };
+  }
+
+  declineOffer(offerId: string): TradeResult {
+    const offer = this.offers.get(offerId);
+    if (!offer) return { success: false, offerId, message: 'Предложение не найдено' };
+    offer.status = 'declined';
+    return { success: true, offerId, message: 'Предложение отклонено' };
+  }
+
+  cancelOffer(offerId: string, teamId: string): TradeResult {
+    const offer = this.offers.get(offerId);
+    if (!offer) return { success: false, offerId, message: 'Предложение не найдено' };
+    if (offer.fromTeamId !== teamId) return { success: false, offerId, message: 'Не ваше предложение' };
+    offer.status = 'cancelled';
+    return { success: true, offerId, message: 'Предложение отменено' };
+  }
+
+  cleanupExpired(): void {
+    const now = Date.now();
+    for (const [id, offer] of this.offers) {
+      if (offer.expiresAt && offer.expiresAt < now) offer.status = 'expired';
+    }
+  }
+}
+
+// ==================== Item Use System (spec 3.2) ====================
+export interface ItemUseResult {
+  success: boolean;
+  itemId: string;
+  actions: ItemUseAction[];
+  message: string;
+}
+
+export class ItemUseSystem {
+  private itemUseConfigs: Map<string, ItemUseConfig> = new Map();
+  private useCooldowns: Map<string, number> = new Map();
+
+  registerItemUse(config: ItemUseConfig): void { this.itemUseConfigs.set(config.itemId, config); }
+  registerItemUses(configs: ItemUseConfig[]): void { for (const c of configs) this.itemUseConfigs.set(c.itemId, c); }
+  getItemUseConfig(itemId: string): ItemUseConfig | undefined { return this.itemUseConfigs.get(itemId); }
+
+  canUse(itemId: string, context: ExecutionContext): { allowed: boolean; reason?: string } {
+    const config = this.itemUseConfigs.get(itemId);
+    if (!config) return { allowed: false, reason: 'Конфигурация не найдена' };
+    const item = context.team.inventory.items.find((i) => i.id === itemId);
+    if (!item || item.quantity < config.quantity) return { allowed: false, reason: 'Предмет не найден' };
+    if (!item.useable) return { allowed: false, reason: 'Предмет нельзя использовать' };
+    const teamId = context.session.team.id;
+    const lastUse = this.useCooldowns.get(`${teamId}:${itemId}`) || 0;
+    if (Date.now() - lastUse < config.cooldown) return { allowed: false, reason: 'Предмет на перезарядке' };
+    if (config.allowedScenes?.length && context.session.currentSceneId && !config.allowedScenes.includes(context.session.currentSceneId)) {
+      return { allowed: false, reason: 'Нельзя использовать в этой сцене' };
+    }
+    return { allowed: true };
+  }
+
+  useItem(itemId: string, context: ExecutionContext, targetType?: ItemUseTarget): ItemUseResult {
+    const config = this.itemUseConfigs.get(itemId);
+    if (!config) return { success: false, itemId, actions: [], message: 'Конфигурация не найдена' };
+    const check = this.canUse(itemId, context);
+    if (!check.allowed) return { success: false, itemId, actions: [], message: check.reason || 'Использование невозможно' };
+    const item = context.team.inventory.items.find((i) => i.id === itemId);
+    if (!item) return { success: false, itemId, actions: [], message: 'Предмет не найден' };
+    if (config.consumeOnUse) {
+      item.quantity -= config.quantity;
+      if (item.quantity <= 0) context.team.inventory.items = context.team.inventory.items.filter((i) => i.id !== itemId);
+    }
+    const appliedActions: ItemUseAction[] = [];
+    for (const action of config.actions) {
+      const effectiveTarget = action.target || targetType || 'self';
+      appliedActions.push({ ...action, target: effectiveTarget });
+      switch (action.type) {
+        case 'heal': context.variables['health'] = (context.variables['health'] || 100) + Number(action.value); break;
+        case 'damage': context.variables['health'] = (context.variables['health'] || 100) - Number(action.value); break;
+        case 'buff': { const bn = typeof action.value === 'string' ? action.value : 'buff'; context.variables[`buff_${bn}`] = { active: true, value: action.value, duration: action.duration || 0, appliedAt: Date.now() }; break; }
+        case 'debuff': { const dn = typeof action.value === 'string' ? action.value : 'debuff'; context.variables[`debuff_${dn}`] = { active: true, value: action.value, duration: action.duration || 0, appliedAt: Date.now() }; break; }
+        case 'teleport': { const ts = typeof action.value === 'string' ? action.value : undefined; if (ts) context.variables['_teleportTo'] = ts; break; }
+        case 'reveal_map': context.variables['_mapRevealed'] = true; break;
+        case 'custom': context.variables[`_item_${itemId}_custom`] = action.value; break;
+      }
+    }
+    this.useCooldowns.set(`${context.session.team.id}:${itemId}`, Date.now());
+    return { success: true, itemId, actions: appliedActions, message: config.successMessage || `Предмет ${item.name} использован` };
+  }
+
+  getUsableItems(context: ExecutionContext): InventoryItem[] {
+    return context.team.inventory.items.filter((item) => {
+      const config = this.itemUseConfigs.get(item.id);
+      return config && this.canUse(item.id, context).allowed;
+    });
   }
 }

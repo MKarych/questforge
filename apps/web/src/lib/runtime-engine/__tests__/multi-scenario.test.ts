@@ -66,7 +66,7 @@ function createMockTeam(overrides: Partial<Team> = {}): Team {
     name: 'Команда 1',
     captainId: 'player-1',
     members: [player],
-    inventory: { items: [], capacity: 100 },
+    inventory: { items: [], capacity: 100, maxWeight: 1000, gold: 0 },
     variables: { teamName: 'Команда 1' },
     score: 0,
     reputation: 0,

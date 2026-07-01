@@ -31,7 +31,7 @@ function createTeam(id: string, name: string, members: Player[]): Team {
     name,
     captainId: members[0]?.id || '',
     members,
-    inventory: { items: [], capacity: 100 },
+    inventory: { items: [], capacity: 100, maxWeight: 1000, gold: 0 },
     variables: {},
     score: 0,
     reputation: 0,

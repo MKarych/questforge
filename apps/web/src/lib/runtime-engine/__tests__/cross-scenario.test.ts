@@ -27,7 +27,7 @@ function createMockTeam(): Team {
       { id: 'player-1', name: 'Alice', role: 'captain' },
       { id: 'player-2', name: 'Bob', role: 'member' },
     ],
-    inventory: { items: [], capacity: 100 },
+    inventory: { items: [], capacity: 100, maxWeight: 1000, gold: 0 },
     variables: {},
     score: 0,
     reputation: 0,

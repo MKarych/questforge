@@ -406,26 +406,120 @@ export interface Hint {
 }
 
 // ==================== Inventory (spec 49.12) ====================
-export type ItemType = 'key' | 'consumable' | 'currency' | 'quest' | 'weapon' | 'armor';
+export type ItemType = 'key' | 'consumable' | 'currency' | 'quest' | 'weapon' | 'armor' | 'material' | 'special';
+
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export type ItemUseTarget = 'self' | 'player' | 'team' | 'scene';
 
 export interface InventoryItem {
   id: string;
   name: string;
   description: string;
   type: ItemType;
+  rarity: ItemRarity;
   quantity: number;
   icon: string;
   effects: ItemEffect[];
+  stackable: boolean;
+  maxStack: number;
+  useable: boolean;
+  usableInScenario: boolean;
+  tradeable: boolean;
+  weight: number;
+  metadata?: Record<string, any>;
 }
 
 export interface ItemEffect {
   type: string;
   value: any;
+  target?: ItemUseTarget;
+  duration?: number; // ms, 0 = instant
+  condition?: Condition;
 }
 
 export interface Inventory {
   items: InventoryItem[];
   capacity: number;
+  maxWeight: number;
+  gold: number;
+}
+
+// ==================== Craft System (spec 3.2) ====================
+export interface CraftIngredient {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  consume: boolean; // true = предмет тратится, false = нужен в инвентаре но не тратится
+}
+
+export interface CraftResult {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+}
+
+export interface CraftRecipe {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  ingredients: CraftIngredient[];
+  results: CraftResult[];
+  craftTime: number; // ms, 0 = instant
+  requiredLevel?: number;
+  requiredRole?: string;
+  requiredAchievement?: string;
+  requiredScenarioVariable?: { name: string; value: any };
+  cooldown: number; // ms per player/team
+  maxCrafts?: number; // max times this recipe can be crafted
+  successRate: number; // 0-1, 1 = always
+  failureResults?: CraftResult[]; // what you get on failure
+}
+
+// ==================== Trade System (spec 3.2) ====================
+export interface TradeOfferItem {
+  itemId: string;
+  quantity: number;
+}
+
+export interface TradeOffer {
+  id: string;
+  fromTeamId: string;
+  toTeamId?: string; // undefined = public offer
+  offeredItems: TradeOfferItem[];
+  requestedItems: TradeOfferItem[];
+  requestedGold?: number;
+  offeredGold?: number;
+  expiresAt?: number; // timestamp
+  status: 'open' | 'accepted' | 'declined' | 'cancelled' | 'expired';
+  createdAt: number;
+}
+
+// ==================== Item Use System (spec 3.2) ====================
+export type ItemUseActionType = 'heal' | 'damage' | 'buff' | 'debuff' | 'teleport' | 'reveal_map' | 'custom';
+
+export interface ItemUseAction {
+  type: ItemUseActionType;
+  value: any;
+  target: ItemUseTarget;
+  duration?: number;
+  description: string;
+}
+
+export interface ItemUseConfig {
+  itemId: string;
+  actions: ItemUseAction[];
+  consumeOnUse: boolean;
+  quantity: number;
+  cooldown: number; // ms
+  requireConfirmation: boolean;
+  requireTargetSelection: boolean;
+  allowedTargetRoles?: string[];
+  allowedScenes?: string[];
+  failMessage?: string;
+  successMessage?: string;
 }
 
 // ==================== Achievement (spec 49.14) ====================
@@ -632,6 +726,7 @@ export type TriggerEventType =
   | 'onAnswerCorrect' | 'onAnswerWrong'
   | 'onTimerStart' | 'onTimerEnd'
   | 'onItemGet' | 'onItemSpend'
+  | 'onItemCraft' | 'onItemUse' | 'onItemTrade'
   | 'onAchievementUnlock'
   | 'onRoleAssigned'
   | 'onVariableChange'
@@ -643,6 +738,7 @@ export interface TriggerAction {
   type: 'set_variable' | 'add_score' | 'teleport' | 'show_notification'
       | 'start_timer' | 'stop_timer' | 'play_sound' | 'show_modal'
       | 'assign_role' | 'give_item' | 'remove_item'
+      | 'craft_item' | 'use_item' | 'trade_item'
       | 'emit_event' | 'call_api';
   config: Record<string, any>;
 }
@@ -681,6 +777,9 @@ export interface TriggerActionConfig {
   assign_role: { roleId: string; playerId?: string };
   give_item: { itemId: string; quantity: number };
   remove_item: { itemId: string; quantity: number };
+  craft_item: { recipeId: string; quantity?: number };
+  use_item: { itemId: string; quantity?: number; targetId?: string; targetType?: 'self' | 'player' | 'team' };
+  trade_item: { offerId: string; action: 'accept' | 'decline' | 'cancel' };
   emit_event: { eventName: string; data?: Record<string, any> };
   call_api: { url: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: string };
 }
@@ -698,6 +797,9 @@ export const TRIGGER_EVENT_ICONS: Record<TriggerEventType, string> = {
   onTimerEnd: '⏰',
   onItemGet: '📦',
   onItemSpend: '💸',
+  onItemCraft: '🔨',
+  onItemUse: '⚡',
+  onItemTrade: '🤝',
   onAchievementUnlock: '🏆',
   onRoleAssigned: '👤',
   onVariableChange: '📊',
@@ -717,6 +819,9 @@ export const TRIGGER_EVENT_LABELS: Record<TriggerEventType, string> = {
   onTimerEnd: 'Таймер истёк',
   onItemGet: 'Получение предмета',
   onItemSpend: 'Трата предмета',
+  onItemCraft: 'Крафт предмета',
+  onItemUse: 'Использование предмета',
+  onItemTrade: 'Обмен предмета',
   onAchievementUnlock: 'Достижение',
   onRoleAssigned: 'Назначение роли',
   onVariableChange: 'Изменение переменной',
@@ -736,6 +841,9 @@ export const TRIGGER_ACTION_ICONS: Record<string, string> = {
   assign_role: '👤',
   give_item: '🎁',
   remove_item: '🗑️',
+  craft_item: '🔨',
+  use_item: '⚡',
+  trade_item: '🤝',
   emit_event: '📡',
   call_api: '🌐',
 };
@@ -753,6 +861,9 @@ export const TRIGGER_ACTION_LABELS: Record<string, string> = {
   assign_role: 'Назначить роль',
   give_item: 'Выдать предмет',
   remove_item: 'Удалить предмет',
+  craft_item: 'Скрафтить предмет',
+  use_item: 'Использовать предмет',
+  trade_item: 'Обменять предмет',
   emit_event: 'Отправить событие',
   call_api: 'API-запрос',
 };
