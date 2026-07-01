@@ -35,6 +35,11 @@ import {
   ItemUseConfig,
   ItemUseAction,
   ItemUseTarget,
+  GamePhase,
+  GamePhaseConfig,
+  PhaseTransition,
+  GameStateMachine,
+  GameStateType,
 } from '@/lib/editor-store/editor.types';
 
 // ==================== 2.6. GameSession (spec 50.2.6) ====================
@@ -2936,5 +2941,333 @@ export class ItemUseSystem {
       const config = this.itemUseConfigs.get(item.id);
       return config && this.canUse(item.id, context).allowed;
     });
+  }
+}
+
+// ==================== Game Phase Manager (spec 3.3) ====================
+export interface PhaseChangeResult {
+  success: boolean;
+  fromPhaseId: string | null;
+  toPhaseId: string;
+  phase: GamePhase;
+  roundChanged: boolean;
+  newRound: number;
+  message: string;
+}
+
+export class GamePhaseManager {
+  private conditionEngine: ConditionEngine;
+  private config: GamePhaseConfig | null = null;
+  private currentPhaseId: string | null = null;
+  private currentRound: number = 1;
+  private state: GameStateType = 'menu';
+  private previousState: GameStateType | null = null;
+  private phaseStartTime: number = 0;
+  private roundStartTime: number = 0;
+  private timers: Map<string, NodeJS.Timeout> = new Map();
+
+  constructor() {
+    this.conditionEngine = new ConditionEngine();
+  }
+
+  /**
+   * Инициализация конфигурации фаз.
+   */
+  init(config: GamePhaseConfig): void {
+    this.config = config;
+    this.currentRound = 1;
+    this.currentPhaseId = config.startPhaseId;
+    this.state = 'playing';
+    this.phaseStartTime = Date.now();
+    this.roundStartTime = Date.now();
+
+    // Запускаем таймер для стартовой фазы, если есть длительность
+    const startPhase = this.getCurrentPhase();
+    if (startPhase && startPhase.duration > 0) {
+      this.startPhaseTimer(startPhase.id, startPhase.duration);
+    }
+  }
+
+  /**
+   * Получить текущую фазу.
+   */
+  getCurrentPhase(): GamePhase | null {
+    if (!this.config || !this.currentPhaseId) return null;
+    return this.config.phases.find((p) => p.id === this.currentPhaseId) || null;
+  }
+
+  /**
+   * Получить текущее состояние игры.
+   */
+  getState(): GameStateMachine {
+    return {
+      currentState: this.state,
+      previousState: this.previousState,
+      phaseConfig: this.config!,
+      phaseStartTime: this.phaseStartTime,
+      roundStartTime: this.roundStartTime,
+      elapsed: Date.now() - this.phaseStartTime,
+    };
+  }
+
+  /**
+   * Переход к следующей фазе.
+   */
+  transitionToPhase(phaseId: string, context?: ExecutionContext): PhaseChangeResult {
+    if (!this.config) {
+      return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: phaseId, phase: null as any, roundChanged: false, newRound: this.currentRound, message: 'Фазы не настроены' };
+    }
+
+    const targetPhase = this.config.phases.find((p) => p.id === phaseId);
+    if (!targetPhase) {
+      return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: phaseId, phase: null as any, roundChanged: false, newRound: this.currentRound, message: `Фаза ${phaseId} не найдена` };
+    }
+
+    const fromPhaseId = this.currentPhaseId;
+    const fromPhase = fromPhaseId ? this.config.phases.find((p) => p.id === fromPhaseId) : null;
+
+    // Выполняем onPhaseEnd для текущей фазы
+    if (fromPhase && context) {
+      for (const trigger of fromPhase.onPhaseEnd) {
+        this.conditionEngine.evaluate(trigger.conditions, context);
+      }
+    }
+
+    this.previousState = this.state;
+    this.currentPhaseId = phaseId;
+    this.phaseStartTime = Date.now();
+    this.state = 'phase_transition';
+
+    // Выполняем onPhaseStart для новой фазы
+    if (context) {
+      for (const trigger of targetPhase.onPhaseStart) {
+        this.conditionEngine.evaluate(trigger.conditions, context);
+      }
+    }
+
+    this.state = 'playing';
+
+    // Запускаем таймер фазы, если есть длительность
+    if (targetPhase.duration > 0) {
+      this.startPhaseTimer(targetPhase.id, targetPhase.duration, context);
+    }
+
+    return {
+      success: true,
+      fromPhaseId,
+      toPhaseId: phaseId,
+      phase: targetPhase,
+      roundChanged: false,
+      newRound: this.currentRound,
+      message: `Переход к фазе "${targetPhase.name}"`,
+    };
+  }
+
+  /**
+   * Переход к следующей фазе по порядку.
+   */
+  nextPhase(context?: ExecutionContext): PhaseChangeResult {
+    if (!this.config || !this.currentPhaseId) {
+      return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: '', phase: null as any, roundChanged: false, newRound: this.currentRound, message: 'Нет текущей фазы' };
+    }
+
+    const currentPhase = this.config.phases.find((p) => p.id === this.currentPhaseId);
+    if (!currentPhase) {
+      return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: '', phase: null as any, roundChanged: false, newRound: this.currentRound, message: 'Текущая фаза не найдена' };
+    }
+
+    // Если есть nextPhaseId — переходим к ней
+    if (currentPhase.nextPhaseId) {
+      return this.transitionToPhase(currentPhase.nextPhaseId, context);
+    }
+
+    // Если это последняя фаза и включены раунды
+    if (this.config.roundSystem && this.config.roundEndCondition) {
+      return this.nextRound(context);
+    }
+
+    return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: '', phase: currentPhase, roundChanged: false, newRound: this.currentRound, message: 'Нет следующей фазы' };
+  }
+
+  /**
+   * Переход к следующему раунду.
+   */
+  nextRound(context?: ExecutionContext): PhaseChangeResult {
+    if (!this.config) {
+      return { success: false, fromPhaseId: this.currentPhaseId, toPhaseId: '', phase: null as any, roundChanged: false, newRound: this.currentRound, message: 'Фазы не настроены' };
+    }
+
+    if (this.currentRound >= this.config.maxRounds) {
+      // Игра завершена
+      this.state = 'finished';
+      return { success: true, fromPhaseId: this.currentPhaseId, toPhaseId: this.currentPhaseId || '', phase: this.getCurrentPhase()!, roundChanged: true, newRound: this.currentRound, message: 'Игра завершена! Все раунды пройдены.' };
+    }
+
+    this.currentRound++;
+    this.roundStartTime = Date.now();
+
+    // Возвращаемся к стартовой фазе раунда
+    const startPhaseId = this.config.roundStartPhase || this.config.startPhaseId;
+    const result = this.transitionToPhase(startPhaseId, context);
+    result.roundChanged = true;
+    result.newRound = this.currentRound;
+    result.message = `Раунд ${this.currentRound}`;
+
+    // Выполняем onRoundStart
+    if (context) {
+      const currentPhase = this.getCurrentPhase();
+      if (currentPhase) {
+        for (const trigger of currentPhase.onRoundStart || []) {
+          this.conditionEngine.evaluate(trigger.conditions, context);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Проверка условий перехода между фазами.
+   */
+  checkTransitions(context: ExecutionContext): PhaseChangeResult | null {
+    if (!this.config || !this.currentPhaseId) return null;
+
+    for (const transition of this.config.transitions) {
+      if (transition.fromPhaseId !== this.currentPhaseId) continue;
+
+      const conditionMet = this.conditionEngine.evaluate(transition.condition, context);
+      if (conditionMet) {
+        if (transition.autoTransition) {
+          if (transition.delay > 0) {
+            // Запланированный переход с регистрацией таймера
+            const timerKey = `transition-${transition.id}`;
+            const timer = setTimeout(() => {
+              this.timers.delete(timerKey);
+              this.transitionToPhase(transition.toPhaseId, context);
+            }, transition.delay * 1000);
+            this.timers.set(timerKey, timer);
+            return null;
+          }
+          return this.transitionToPhase(transition.toPhaseId, context);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Проверка, является ли текущая фаза "ночью".
+   */
+  isNight(): boolean {
+    const phase = this.getCurrentPhase();
+    return phase?.type === 'night' || phase?.lighting === 'night' || phase?.lighting === 'dark';
+  }
+
+  /**
+   * Проверка, является ли текущая фаза "днём".
+   */
+  isDay(): boolean {
+    const phase = this.getCurrentPhase();
+    return phase?.type === 'day' || phase?.lighting === 'day' || phase?.type === 'free';
+  }
+
+  /**
+   * Проверка, разрешено ли действие в текущей фазе.
+   */
+  isActionAllowed(actionType: string): boolean {
+    const phase = this.getCurrentPhase();
+    if (!phase) return true;
+    if (phase.allowedActions.length === 0) return true; // Всё разрешено
+    return phase.allowedActions.includes(actionType);
+  }
+
+  /**
+   * Проверка, доступна ли сцена в текущей фазе.
+   */
+  isSceneAllowed(sceneId: string): boolean {
+    const phase = this.getCurrentPhase();
+    if (!phase) return true;
+    if (phase.allowedScenes.length === 0) return true;
+    return phase.allowedScenes.includes(sceneId);
+  }
+
+  /**
+   * Получить модификатор для текущей фазы.
+   */
+  getModifier(key: string, defaultValue: any = null): any {
+    const phase = this.getCurrentPhase();
+    if (!phase || !phase.globalModifiers) return defaultValue;
+    return phase.globalModifiers[key] !== undefined ? phase.globalModifiers[key] : defaultValue;
+  }
+
+  /**
+   * Получить номер текущего раунда.
+   */
+  getRound(): number {
+    return this.currentRound;
+  }
+
+  /**
+   * Получить оставшееся время фазы (в секундах).
+   */
+  getPhaseRemainingTime(): number {
+    const phase = this.getCurrentPhase();
+    if (!phase || phase.duration <= 0) return -1; // Без ограничения
+    const elapsed = (Date.now() - this.phaseStartTime) / 1000;
+    return Math.max(0, phase.duration - elapsed);
+  }
+
+  /**
+   * Получить оставшееся время раунда (в секундах).
+   */
+  getRoundRemainingTime(): number {
+    if (!this.config || !this.config.globalTimeLimit) return -1;
+    const elapsed = (Date.now() - this.roundStartTime) / 1000;
+    return Math.max(0, this.config.globalTimeLimit - elapsed);
+  }
+
+  /**
+   * Завершить игру.
+   */
+  endGame(context?: ExecutionContext): void {
+    this.state = 'finished';
+    if (context && this.config) {
+      for (const trigger of this.config.onGameEnd) {
+        this.conditionEngine.evaluate(trigger.conditions, context);
+      }
+    }
+    this.clearAllTimers();
+  }
+
+  /**
+   * Сбросить всё состояние.
+   */
+  reset(): void {
+    this.clearAllTimers();
+    this.config = null;
+    this.currentPhaseId = null;
+    this.currentRound = 1;
+    this.state = 'menu';
+    this.previousState = null;
+    this.phaseStartTime = 0;
+    this.roundStartTime = 0;
+  }
+
+  private startPhaseTimer(phaseId: string, duration: number, context?: ExecutionContext): void {
+    const timerKey = `phase-${phaseId}`;
+    const timer = setTimeout(() => {
+      if (this.currentPhaseId === phaseId) {
+        this.nextPhase(context);
+      }
+    }, duration * 1000);
+    this.timers.set(timerKey, timer);
+  }
+
+  private clearAllTimers(): void {
+    for (const [, timer] of this.timers) {
+      clearTimeout(timer);
+    }
+    this.timers.clear();
   }
 }

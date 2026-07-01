@@ -1066,3 +1066,73 @@ export interface CrossScenarioCommunication {
     readableBy: string[]; // scenario IDs, [] = все
   }[];
 }
+
+// ==================== Game Phase System (spec 3.3) ====================
+export type GamePhaseType = 'day' | 'night' | 'round' | 'free' | 'custom';
+
+export interface GamePhase {
+  id: string;
+  name: string;
+  type: GamePhaseType;
+  description: string;
+  duration: number; // seconds, 0 = unlimited
+  order: number;
+  // Day/Night specific
+  dayNightCycle: boolean;
+  nextPhaseId: string | null; // ID следующей фазы (null = последняя)
+  // Round specific
+  roundNumber?: number;
+  maxRounds?: number;
+  // Phase rules
+  allowedActions: string[]; // какие действия разрешены в этой фазе
+  allowedScenes: string[]; // какие сцены доступны
+  allowedMissions: string[]; // какие миссии доступны
+  globalModifiers: Record<string, any>; // модификаторы для фазы (например, скорость, видимость)
+  // Triggers
+  onPhaseStart: TriggerDefinition[];
+  onPhaseEnd: TriggerDefinition[];
+  onRoundStart?: TriggerDefinition[];
+  onRoundEnd?: TriggerDefinition[];
+  // Visual
+  icon: string;
+  color: string;
+  ambientSound?: string;
+  lighting?: 'day' | 'night' | 'dark' | 'custom';
+}
+
+export interface PhaseTransition {
+  id: string;
+  fromPhaseId: string;
+  toPhaseId: string;
+  condition: ConditionGroup;
+  autoTransition: boolean;
+  delay: number; // seconds
+}
+
+export interface GamePhaseConfig {
+  phases: GamePhase[];
+  transitions: PhaseTransition[];
+  startPhaseId: string;
+  cycleEnabled: boolean;
+  cycleOrder: 'sequential' | 'random' | 'conditional';
+  globalTimeLimit: number; // seconds, 0 = no limit
+  // Round system
+  roundSystem: boolean;
+  currentRound: number;
+  maxRounds: number;
+  roundStartPhase: string; // ID фазы, с которой начинается каждый раунд
+  roundEndCondition: ConditionGroup;
+  onGameEnd: TriggerDefinition[];
+}
+
+// ==================== Game State Machine (spec 3.3) ====================
+export type GameStateType = 'menu' | 'lobby' | 'playing' | 'paused' | 'phase_transition' | 'round_transition' | 'finished';
+
+export interface GameStateMachine {
+  currentState: GameStateType;
+  previousState: GameStateType | null;
+  phaseConfig: GamePhaseConfig;
+  phaseStartTime: number;
+  roundStartTime: number;
+  elapsed: number;
+}
