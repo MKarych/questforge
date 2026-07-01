@@ -202,7 +202,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const scenariosDropdownItems = [
     { label: 'Мои сценарии', href: '/organizer/scenarios' },
     { label: 'Создать сценарий', href: '/organizer/scenarios/create' },
-    { label: '📖 Инструкция', href: '/help/editor-guide' },
+    { label: 'Инструкция', href: '/help/editor-guide' },
   ];
 
   const showOrganizer = ['ORGANIZER', 'ADMIN'].includes(userRole as any);
