@@ -25,6 +25,10 @@ import {
   TriggerDefinition,
   TriggerAction,
   TriggerEventType,
+  ParallelScenarioConfig,
+  SyncPoint,
+  CrossScenarioCommunication,
+  CrossScenarioEvent,
 } from './editor.types';
 import { validationEngine } from '../editor-validation/validation-engine';
 import { autoSaveManager, AutoSaveData } from './autosave';
@@ -142,12 +146,28 @@ export interface EditorActions {
   getRolesByTeam: (team: string) => RoleDefinition[];
 
   // Trigger System
+
   addTrigger: (trigger: TriggerDefinition) => void;
   updateTrigger: (triggerId: string, data: Partial<TriggerDefinition>) => void;
   removeTrigger: (triggerId: string) => void;
   duplicateTrigger: (triggerId: string) => void;
   toggleTrigger: (triggerId: string) => void;
   resetTriggerFireCount: (triggerId: string) => void;
+
+  // Multi-Scenario (Parallel Scenarios)
+  addParallelScenario: (config: ParallelScenarioConfig) => void;
+  updateParallelScenario: (id: string, data: Partial<ParallelScenarioConfig>) => void;
+  removeParallelScenario: (id: string) => void;
+  addSyncPoint: (point: SyncPoint) => void;
+  updateSyncPoint: (id: string, data: Partial<SyncPoint>) => void;
+  removeSyncPoint: (id: string) => void;
+
+  // Cross-Scenario Communication
+  addGlobalVariable: (def: CrossScenarioCommunication['globalVariables'][0]) => void;
+  updateGlobalVariable: (name: string, data: Partial<CrossScenarioCommunication['globalVariables'][0]>) => void;
+  removeGlobalVariable: (name: string) => void;
+  addCrossScenarioEvent: (event: CrossScenarioEvent) => void;
+  removeCrossScenarioEvent: (id: string) => void;
 }
 
 // ==================== Initial State ====================
@@ -179,6 +199,16 @@ const createInitialState = (): EditorState => ({
   roleAssignments: [],
 
   // Trigger System
+
+  // Cross-Scenario Communication
+  crossScenarioComm: {
+    events: [],
+    globalVariables: [],
+  },
+
+  // Multi-Scenario (Parallel Scenarios)
+  parallelScenarios: [],
+  syncPoints: [],
   triggers: [],
 
   viewport: { x: 0, y: 0, zoom: 1 },
@@ -941,6 +971,106 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       triggers: state.triggers.map((t) =>
         t.id === triggerId ? { ...t, fireCount: 0 } : t
       ),
+      isDirty: true,
+    }));
+  },
+  // ==================== Multi-Scenario (Parallel Scenarios) ====================
+  addParallelScenario: (config) => {
+    set((state) => ({
+      parallelScenarios: [...state.parallelScenarios, config],
+      isDirty: true,
+    }));
+  },
+
+  updateParallelScenario: (id, data) => {
+    set((state) => ({
+      parallelScenarios: state.parallelScenarios.map((p) =>
+        p.id === id ? { ...p, ...data } : p
+      ),
+      isDirty: true,
+    }));
+  },
+
+  removeParallelScenario: (id) => {
+    set((state) => ({
+      parallelScenarios: state.parallelScenarios.filter((p) => p.id !== id),
+      syncPoints: state.syncPoints.filter((sp) => !sp.scenarios.includes(id)),
+      isDirty: true,
+    }));
+  },
+
+  addSyncPoint: (point) => {
+    set((state) => ({
+      syncPoints: [...state.syncPoints, point],
+      isDirty: true,
+    }));
+  },
+
+  updateSyncPoint: (id, data) => {
+    set((state) => ({
+      syncPoints: state.syncPoints.map((sp) =>
+        sp.id === id ? { ...sp, ...data } : sp
+      ),
+      isDirty: true,
+    }));
+  },
+
+  removeSyncPoint: (id) => {
+    set((state) => ({
+      syncPoints: state.syncPoints.filter((sp) => sp.id !== id),
+      isDirty: true,
+    }));
+  },
+
+  // ==================== Cross-Scenario Communication ====================
+  addGlobalVariable: (def) => {
+    set((state) => ({
+      crossScenarioComm: {
+        ...state.crossScenarioComm,
+        globalVariables: [...state.crossScenarioComm.globalVariables, def],
+      },
+      isDirty: true,
+    }));
+  },
+
+  updateGlobalVariable: (name, data) => {
+    set((state) => ({
+      crossScenarioComm: {
+        ...state.crossScenarioComm,
+        globalVariables: state.crossScenarioComm.globalVariables.map((gv) =>
+          gv.name === name ? { ...gv, ...data } : gv
+        ),
+      },
+      isDirty: true,
+    }));
+  },
+
+  removeGlobalVariable: (name) => {
+    set((state) => ({
+      crossScenarioComm: {
+        ...state.crossScenarioComm,
+        globalVariables: state.crossScenarioComm.globalVariables.filter((gv) => gv.name !== name),
+      },
+      isDirty: true,
+    }));
+  },
+
+  addCrossScenarioEvent: (event) => {
+    set((state) => ({
+      crossScenarioComm: {
+        ...state.crossScenarioComm,
+        events: [...state.crossScenarioComm.events, event],
+      },
+      isDirty: true,
+    }));
+  },
+
+  removeCrossScenarioEvent: (id) => {
+    set((state) => ({
+      crossScenarioComm: {
+        ...state.crossScenarioComm,
+        events: state.crossScenarioComm.events.filter((e) => e.id !== id),
+      },
       isDirty: true,
     }));
   },

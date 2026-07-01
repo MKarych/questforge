@@ -2,6 +2,19 @@
 // Editor v2 — Полная система типов по спецификациям 49, 50, 51
 // ============================================================
 
+// ==================== 1.5. Sub-Scenario Config (spec 2.3) ====================
+export interface SubScenarioConfig {
+  id: string;
+  scenarioId: string; // ссылка на другой сценарий
+  name: string;
+  description: string;
+  inputMapping: Record<string, string>; // переменная sub-scenario -> переменная родителя
+  outputMapping: Record<string, string>; // переменная sub-scenario -> переменная родителя
+  onComplete: 'continue_parent' | 'return_result' | 'emit_event';
+  onCompleteEventName?: string;
+  maxNestingLevel: number; // защита от рекурсии (по умолч. 3)
+}
+
 // ==================== 1. Core Runtime Primitives (spec 49.1.2) ====================
 
 // 1.2.1. Scene (Сцена)
@@ -22,6 +35,7 @@ export interface Scene {
     requiredRole?: string;
     conditions?: Condition[];
     loop?: LoopConfig;
+    subScenario?: SubScenarioConfig;
   };
 }
 
@@ -456,6 +470,13 @@ export interface EditorState {
   // Trigger System
   triggers: TriggerDefinition[];
 
+  // Cross-Scenario Communication
+  crossScenarioComm: CrossScenarioCommunication;
+
+  // Multi-Scenario (Parallel Scenarios)
+  parallelScenarios: ParallelScenarioConfig[];
+  syncPoints: SyncPoint[];
+
   // Canvas
   viewport: { x: number; y: number; zoom: number };
   selectedNodes: string[];
@@ -785,7 +806,10 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   { type: 'slide', label: 'Таймер', icon: '⏱', description: 'Ограничение по времени', color: 'bg-red-400', category: 'Логика' },
   { type: 'custom', label: 'Ветвление', icon: '🔀', description: 'Ветвление сценария', color: 'bg-teal-500', category: 'Логика' },
   { type: 'custom', label: 'Условие', icon: '⚖️', description: 'Проверка условия', color: 'bg-amber-500', category: 'Логика' },
+  { type: 'custom', label: 'Под-сценарий', icon: '📂', description: 'Запустить вложенный сценарий', color: 'bg-indigo-500', category: 'Логика' },
   { type: 'loop', label: 'Цикл', icon: '🔄', description: 'Повторение действий N раз', color: 'bg-cyan-500', category: 'Логика' },
+  { type: 'custom', label: 'Отправить событие', icon: '📡', description: 'Отправка события другим сценариям', color: 'bg-purple-500', category: 'Логика' },
+  { type: 'custom', label: 'Слушать событие', icon: '👂', description: 'Подписка на событие от другого сценария', color: 'bg-purple-400', category: 'Логика' },
   // Инвентарь
   { type: 'custom', label: 'Получить предмет', icon: '🎒', description: 'Добавить предмет в инвентарь', color: 'bg-lime-500', category: 'Инвентарь' },
   { type: 'custom', label: 'Потратить предмет', icon: '📦', description: 'Удалить предмет из инвентаря', color: 'bg-orange-400', category: 'Инвентарь' },
@@ -828,3 +852,67 @@ export const SYSTEM_VARIABLES: VariableDefinition[] = [
   { name: 'game.currentScene', type: 'string', defaultValue: '', scope: 'global' },
   { name: 'game.totalScenes', type: 'number', defaultValue: 0, scope: 'global' },
 ];
+// ==================== Multi-Scenario (Parallel Scenarios) ====================
+
+export interface ParallelScenarioConfig {
+  id: string;
+  scenarioId: string;
+  name: string;
+  startOn: 'game_start' | 'trigger' | 'condition';
+  triggerEvent?: string;
+  condition?: ConditionGroup;
+  syncPoints: SyncPoint[];
+  variables: {
+    local: string[];
+    shared: string[];
+  };
+}
+
+export interface SyncPoint {
+  id: string;
+  type: 'wait_all' | 'wait_any' | 'sequence';
+  scenarios: string[];
+  onComplete: {
+    action: 'continue_all' | 'continue_one' | 'stop_all' | 'emit_event';
+    eventData?: Record<string, any>;
+  };
+}
+
+export interface MultiScenarioState {
+  mainScenarioId: string;
+  parallelScenarios: ParallelScenarioInstance[];
+  globalVariables: Record<string, any>;
+  syncPoints: SyncPoint[];
+}
+
+export interface ParallelScenarioInstance {
+  id: string;
+  configId: string;
+  status: 'idle' | 'running' | 'paused' | 'finished' | 'failed';
+  currentSceneId: string | null;
+  variables: Record<string, any>;
+  score: number;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+
+// ==================== Cross-Scenario Communication (spec 2.2) ====================
+
+export interface CrossScenarioEvent {
+  id: string;
+  name: string;
+  description: string;
+  payloadSchema: Record<string, string>; // имя поля -> тип
+}
+
+export interface CrossScenarioCommunication {
+  events: CrossScenarioEvent[];
+  globalVariables: {
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+    defaultValue: any;
+    description: string;
+    writableBy: string[]; // scenario IDs, [] = все
+    readableBy: string[]; // scenario IDs, [] = все
+  }[];
+}

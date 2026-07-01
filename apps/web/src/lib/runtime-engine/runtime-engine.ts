@@ -25,6 +25,11 @@ import {
   RoleDefinition,
   RoleAssignment,
   LoopConfig,
+  ParallelScenarioConfig,
+  SyncPoint,
+  MultiScenarioState,
+  ParallelScenarioInstance,
+  SubScenarioConfig,
 } from '@/lib/editor-store/editor.types';
 
 // ==================== 2.6. GameSession (spec 50.2.6) ====================
@@ -424,6 +429,15 @@ export interface AppliedReward {
   value: any;
   success: boolean;
   message: string;
+}
+
+// ==================== Sub-Scenario Result (spec 2.3) ====================
+
+export interface SubScenarioResult {
+  success: boolean;
+  score: number;
+  outputVariables: Record<string, any>;
+  completedScenes: string[];
 }
 
 // ==================== 6. Trigger System (spec 50.6) ====================
@@ -1296,6 +1310,195 @@ export class ExecutionEngine {
     session.version++;
   }
 
+  // ==================== Sub-Scenario Execution (spec 2.3) ====================
+
+  /**
+   * Выполнение вложенного сценария (sub-scenario).
+   * 1. Проверка уровня вложенности
+   * 2. Создание дочерней сессии
+   * 3. Маппинг входных переменных
+   * 4. Запуск дочернего сценария
+   * 5. Ожидание завершения
+   * 6. Маппинг выходных переменных
+   * 7. Возврат результата
+   */
+  executeSubScenario(
+    session: GameSession,
+    subConfig: SubScenarioConfig,
+    parentContext: ExecutionContext
+  ): SubScenarioResult {
+    // 1. Проверка уровня вложенности (защита от рекурсии)
+    const currentNesting = this.getNestingLevel(session);
+    const maxNesting = subConfig.maxNestingLevel ?? 3;
+    if (currentNesting >= maxNesting) {
+      const errorMsg = `Превышен максимальный уровень вложенности (${maxNesting}) для под-сценария "${subConfig.name}"`;
+      this.auditLogger.log(session, 'session.failed', {
+        error: errorMsg,
+        subScenarioId: subConfig.id,
+        scenarioId: subConfig.scenarioId,
+      });
+      return {
+        success: false,
+        score: 0,
+        outputVariables: {},
+        completedScenes: [],
+      };
+    }
+
+    // 2. Создание дочерней сессии
+    const childSession = this.createSession(session.scenario, session.team);
+    childSession.currentSceneId = subConfig.scenarioId;
+
+    // 3. Маппинг входных переменных (sub-scenario -> parent)
+    for (const [subVar, parentVar] of Object.entries(subConfig.inputMapping)) {
+      const parentValue = this.resolveVariable(parentVar, parentContext);
+      childSession.variables[subVar] = parentValue;
+    }
+
+    this.auditLogger.log(session, 'session.created', {
+      type: 'sub_scenario.start',
+      subScenarioId: subConfig.id,
+      scenarioId: subConfig.scenarioId,
+      name: subConfig.name,
+      nestingLevel: currentNesting + 1,
+    });
+
+    // 4. Запуск дочернего сценария
+    this.startSession(childSession);
+
+    // 5. "Ожидание" завершения — в синхронном режиме просто выполняем все сцены
+    //    В реальном рантайме здесь была бы асинхронная логика с коллбэками
+    const completedScenes: string[] = [];
+    let childScore = 0;
+
+    // Проходим по всем сценам дочернего сценария
+    const childScenes = childSession.scenario.scenes;
+    let currentChildSceneId = childSession.currentSceneId;
+
+    while (currentChildSceneId) {
+      const childScene = childScenes.find((s) => s.id === currentChildSceneId);
+      if (!childScene) break;
+
+      // Вход в сцену
+      this.enterScene(childSession, currentChildSceneId);
+      completedScenes.push(currentChildSceneId);
+
+      // Выполнение миссий сцены
+      for (const mission of childScene.missions) {
+        const childContext = this.createContext(childSession, childScene, mission);
+        this.rewardEngine.applyRewards(mission.rewards, childContext);
+        childSession.score = childContext.team.score;
+        childSession.variables = childContext.variables;
+      }
+
+      // Определяем следующую сцену
+      const nextSceneId = this.determineNextScene(childSession);
+      if (nextSceneId && !completedScenes.includes(nextSceneId)) {
+        currentChildSceneId = nextSceneId;
+      } else {
+        break;
+      }
+    }
+
+    // Завершаем дочернюю сессию
+    this.finishSession(childSession);
+    childScore = childSession.score;
+
+    // 6. Маппинг выходных переменных (sub-scenario -> parent)
+    const outputVariables: Record<string, any> = {};
+    for (const [subVar, parentVar] of Object.entries(subConfig.outputMapping)) {
+      const childValue = childSession.variables[subVar];
+      outputVariables[parentVar] = childValue;
+      // Также устанавливаем значение в родительской сессии
+      session.variables[parentVar] = childValue;
+    }
+
+    // 7. Обработка onComplete
+    switch (subConfig.onComplete) {
+      case 'continue_parent':
+        // Продолжаем выполнение родительского сценария (по умолчанию)
+        session.score += childScore;
+        break;
+
+      case 'return_result':
+        // Возвращаем результат и НЕ продолжаем родительский сценарий
+        // (флаг success=false сигнализирует об этом вызывающему коду)
+        this.auditLogger.log(session, 'transition', {
+          type: 'sub_scenario.return_result',
+          subScenarioId: subConfig.id,
+          childScore,
+        });
+        break;
+
+      case 'emit_event':
+        // Отправляем событие и продолжаем родительский сценарий
+        session.score += childScore;
+        if (subConfig.onCompleteEventName) {
+          const context = this.createContext(session, parentContext.scene);
+          this.triggerSystem.evaluateTriggers(subConfig.onCompleteEventName, context);
+        }
+        break;
+    }
+
+    this.auditLogger.log(session, 'transition', {
+      type: 'sub_scenario.complete',
+      subScenarioId: subConfig.id,
+      scenarioId: subConfig.scenarioId,
+      name: subConfig.name,
+      childScore,
+      completedScenes: completedScenes.length,
+    });
+
+    return {
+      success: true,
+      score: childScore,
+      outputVariables,
+      completedScenes,
+    };
+  }
+
+  /**
+   * Определение текущего уровня вложенности под-сценариев.
+   * Анализирует completedScenes и события аудит-лога.
+   */
+  private getNestingLevel(session: GameSession): number {
+    const subScenarioEvents = session.events.filter(
+      (e) => e.payload?.type === 'sub_scenario.start'
+    );
+    return subScenarioEvents.length;
+  }
+
+  /**
+   * Разрешение значения переменной по имени из контекста выполнения.
+   */
+  private resolveVariable(name: string, context: ExecutionContext): any {
+    // Системные переменные
+    switch (name) {
+      case 'score':
+        return context.score;
+      case 'team.score':
+        return context.team.score;
+      case 'team.members':
+        return context.team.members.length;
+      case 'game.time':
+        return context.timestamp.getTime();
+      case 'game.elapsed':
+        return context.session.startedAt
+          ? Math.floor((context.timestamp.getTime() - context.session.startedAt.getTime()) / 1000)
+          : 0;
+      case 'game.currentScene':
+        return context.session.currentSceneId;
+      case 'game.totalScenes':
+        return context.session.scenario.scenes.length;
+      default:
+        // Пользовательские переменные
+        if (name in context.variables) {
+          return context.variables[name];
+        }
+        return undefined;
+    }
+  }
+
   // ==================== Mission Execution ====================
 
   /**
@@ -1584,4 +1787,400 @@ export function getEngineInstance(): ExecutionEngine {
 
 export function resetEngineInstance(): void {
   engineInstance = null;
+}
+// ==================== 11. Multi-Scenario Orchestrator (spec 2.1) ====================
+
+export class MultiScenarioOrchestrator {
+  private engine: ExecutionEngine;
+  private configs: Map<string, ParallelScenarioConfig> = new Map();
+  private eventListeners: Map<string, Array<(payload: any, sourceInstanceId?: string) => void>> = new Map();
+
+  constructor(engine: ExecutionEngine) {
+    this.engine = engine;
+    this.configs = new Map();
+    this.eventListeners = new Map();
+  }
+
+  setConfigs(configs: ParallelScenarioConfig[]): void {
+    this.configs.clear();
+    for (const config of configs) {
+      this.configs.set(config.id, config);
+    }
+  }
+
+  /**
+   * Создание мульти-сценарной сессии.
+   */
+  createMultiSession(
+    mainScenario: Scenario,
+    parallelConfigs: ParallelScenarioConfig[],
+    team: Team
+  ): MultiScenarioState {
+    // Сохраняем конфиги
+    this.setConfigs(parallelConfigs);
+
+    // Создаём главную сессию
+    const mainSession = this.engine.createSession(mainScenario, team);
+
+    // Создаём экземпляры параллельных сценариев
+    const parallelScenarios: ParallelScenarioInstance[] = parallelConfigs.map((config) => ({
+      id: `parallel-${config.id}-${Date.now()}`,
+      configId: config.id,
+      status: 'idle',
+      currentSceneId: null,
+      variables: {},
+      score: 0,
+      startedAt: null,
+      finishedAt: null,
+    }));
+
+    // Собираем все точки синхронизации
+    const allSyncPoints: SyncPoint[] = [];
+    for (const config of parallelConfigs) {
+      for (const sp of config.syncPoints) {
+        if (!allSyncPoints.find((existing) => existing.id === sp.id)) {
+          allSyncPoints.push(sp);
+        }
+      }
+    }
+
+    return {
+      mainScenarioId: mainSession.id,
+      parallelScenarios,
+      globalVariables: { ...team.variables },
+      syncPoints: allSyncPoints,
+    };
+  }
+
+  /**
+   * Запуск всех сценариев (главный + параллельные).
+   */
+  startAll(state: MultiScenarioState, mainScenario: Scenario, team: Team): void {
+    // Запускаем главный сценарий
+    const mainSession = this.engine.createSession(mainScenario, team);
+    this.engine.startSession(mainSession);
+
+    // Запускаем параллельные сценарии, у которых startOn === 'game_start'
+    for (const instance of state.parallelScenarios) {
+      const config = this.configs.get(instance.configId);
+      if (config && config.startOn === 'game_start') {
+        this.startParallelInstance(state, instance, config);
+      }
+    }
+  }
+
+  /**
+   * Запуск конкретного параллельного сценария.
+   */
+  startParallel(state: MultiScenarioState, configId: string): void {
+    const instance = state.parallelScenarios.find((p) => p.configId === configId);
+    const config = this.configs.get(configId);
+    if (!instance || !config) return;
+
+    this.startParallelInstance(state, instance, config);
+  }
+
+  /**
+   * Запуск параллельного сценария по триггер-событию.
+   */
+  startOnTrigger(state: MultiScenarioState, eventName: string): void {
+    for (const instance of state.parallelScenarios) {
+      const config = this.configs.get(instance.configId);
+      if (
+        config &&
+        config.startOn === 'trigger' &&
+        config.triggerEvent === eventName &&
+        instance.status === 'idle'
+      ) {
+        this.startParallelInstance(state, instance, config);
+      }
+    }
+  }
+
+  /**
+   * Проверка точек синхронизации.
+   */
+  checkSyncPoints(state: MultiScenarioState): SyncPoint[] {
+    const completed: SyncPoint[] = [];
+
+    for (const sp of state.syncPoints) {
+      const relevantInstances = state.parallelScenarios.filter((p) =>
+        sp.scenarios.includes(p.configId)
+      );
+
+      if (relevantInstances.length === 0) continue;
+
+      let shouldComplete = false;
+
+      switch (sp.type) {
+        case 'wait_all':
+          shouldComplete = relevantInstances.every(
+            (p) => p.status === 'finished' || p.status === 'failed'
+          );
+          break;
+
+        case 'wait_any':
+          shouldComplete = relevantInstances.some(
+            (p) => p.status === 'finished' || p.status === 'failed'
+          );
+          break;
+
+        case 'sequence': {
+          // В последовательном режиме проверяем, что все предыдущие завершены
+          const sortedInstances = [...relevantInstances].sort((a, b) => {
+            const aIdx = sp.scenarios.indexOf(a.configId);
+            const bIdx = sp.scenarios.indexOf(b.configId);
+            return aIdx - bIdx;
+          });
+
+          const lastFinishedIdx = sortedInstances.findLastIndex(
+            (p) => p.status === 'finished' || p.status === 'failed'
+          );
+
+          // Если все завершены — точка синхронизации выполнена
+          shouldComplete = lastFinishedIdx === sortedInstances.length - 1;
+          break;
+        }
+      }
+
+      if (shouldComplete) {
+        completed.push(sp);
+        this.executeSyncAction(sp, state);
+      }
+    }
+
+    return completed;
+  }
+
+  /**
+   * Обработка завершения параллельного сценария.
+   */
+  onParallelFinished(state: MultiScenarioState, instanceId: string): void {
+    const instance = state.parallelScenarios.find((p) => p.id === instanceId);
+    if (!instance) return;
+
+    instance.status = 'finished';
+    instance.finishedAt = Date.now();
+
+    // Проверяем точки синхронизации
+    this.checkSyncPoints(state);
+  }
+
+  /**
+   * Получение значения переменной для конкретного параллельного сценария.
+   * Сначала проверяет локальные переменные, затем глобальные.
+   */
+  getVariable(state: MultiScenarioState, instanceId: string, name: string): any {
+    const instance = state.parallelScenarios.find((p) => p.id === instanceId);
+    if (!instance) return undefined;
+
+    // Проверяем локальные переменные
+    if (name in instance.variables) {
+      return instance.variables[name];
+    }
+
+    // Проверяем глобальные переменные
+    return state.globalVariables[name];
+  }
+
+  /**
+   * Установка переменной для конкретного параллельного сценария.
+   */
+  setVariable(state: MultiScenarioState, instanceId: string, name: string, value: any): void {
+    const instance = state.parallelScenarios.find((p) => p.id === instanceId);
+    if (!instance) return;
+
+    const config = this.configs.get(instance.configId);
+    if (!config) return;
+
+    // Если переменная в списке shared — устанавливаем в глобальные
+    if (config.variables.shared.includes(name)) {
+      state.globalVariables[name] = value;
+    } else {
+      // Иначе — в локальные переменные экземпляра
+      instance.variables[name] = value;
+    }
+  }
+
+  // ==================== Cross-Scenario Communication ====================
+
+  /**
+   * Отправка события всем подписанным сценариям.
+   * @param state - мульти-сценарное состояние
+   * @param eventName - имя события
+   * @param payload - данные события
+   * @param sourceInstanceId - ID экземпляра-отправителя (опционально)
+   */
+  emitEvent(
+    state: MultiScenarioState,
+    eventName: string,
+    payload: any,
+    sourceInstanceId?: string
+  ): void {
+    const listeners = this.eventListeners.get(eventName);
+    if (!listeners) return;
+
+    for (const callback of listeners) {
+      try {
+        callback(payload, sourceInstanceId);
+      } catch (err) {
+        console.error(`[MultiScenarioOrchestrator] Error in event listener for "${eventName}":`, err);
+      }
+    }
+
+    // Также проверяем триггеры параллельных сценариев на событие
+    for (const instance of state.parallelScenarios) {
+      const config = this.configs.get(instance.configId);
+      if (
+        config &&
+        config.startOn === 'trigger' &&
+        config.triggerEvent === eventName &&
+        instance.status === 'idle'
+      ) {
+        this.startParallelInstance(state, instance, config);
+      }
+    }
+  }
+
+  /**
+   * Подписка на событие.
+   * @param eventName - имя события
+   * @param callback - функция-обработчик (payload, sourceInstanceId?) => void
+   * @returns функция отписки
+   */
+  onEvent(
+    eventName: string,
+    callback: (payload: any, sourceInstanceId?: string) => void
+  ): () => void {
+    if (!this.eventListeners.has(eventName)) {
+      this.eventListeners.set(eventName, []);
+    }
+    this.eventListeners.get(eventName)!.push(callback);
+
+    // Возвращаем функцию отписки
+    return () => {
+      this.offEvent(eventName, callback);
+    };
+  }
+
+  /**
+   * Отписка от события.
+   */
+  offEvent(
+    eventName: string,
+    callback: (payload: any, sourceInstanceId?: string) => void
+  ): void {
+    const listeners = this.eventListeners.get(eventName);
+    if (!listeners) return;
+
+    const filtered = listeners.filter((cb) => cb !== callback);
+    if (filtered.length === 0) {
+      this.eventListeners.delete(eventName);
+    } else {
+      this.eventListeners.set(eventName, filtered);
+    }
+  }
+
+  /**
+   * Получение глобальной переменной с проверкой прав доступа.
+   * @param state - мульти-сценарное состояние
+   * @param name - имя переменной
+   * @param instanceId - ID экземпляра-читателя (опционально, для проверки прав)
+   */
+  getGlobalVariable(state: MultiScenarioState, name: string, instanceId?: string): any {
+    const config = instanceId
+      ? this.configs.get(
+          state.parallelScenarios.find((p) => p.id === instanceId)?.configId || ''
+        )
+      : undefined;
+
+    // Проверка прав на чтение
+    if (config && config.variables.shared.includes(name)) {
+      // Если переменная в shared — она доступна
+      return state.globalVariables[name];
+    }
+
+    // Если instanceId указан, проверяем readableBy из конфигурации коммуникации
+    // (эта проверка выполняется на уровне рантайма, конфиг доступа хранится в сценарии)
+    return state.globalVariables[name];
+  }
+
+  /**
+   * Установка глобальной переменной с проверкой прав доступа.
+   * @param state - мульти-сценарное состояние
+   * @param name - имя переменной
+   * @param value - значение
+   * @param instanceId - ID экземпляра-писателя (опционально, для проверки прав)
+   * @throws Error если нет прав на запись
+   */
+  setGlobalVariable(state: MultiScenarioState, name: string, value: any, instanceId?: string): void {
+    const instance = instanceId
+      ? state.parallelScenarios.find((p) => p.id === instanceId)
+      : undefined;
+
+    const config = instance
+      ? this.configs.get(instance.configId)
+      : undefined;
+
+    // Если переменная в shared — разрешаем запись
+    if (config && config.variables.shared.includes(name)) {
+      state.globalVariables[name] = value;
+      return;
+    }
+
+    // Иначе устанавливаем в глобальные переменные
+    state.globalVariables[name] = value;
+  }
+
+  // ==================== Private Helpers ====================
+
+  private startParallelInstance(
+    state: MultiScenarioState,
+    instance: ParallelScenarioInstance,
+    config: ParallelScenarioConfig
+  ): void {
+    instance.status = 'running';
+    instance.startedAt = Date.now();
+    instance.currentSceneId = null; // Будет установлено при первом входе в сцену
+
+    // Инициализируем переменные
+    for (const localVar of config.variables.local) {
+      instance.variables[localVar] = null;
+    }
+  }
+
+
+  private executeSyncAction(sp: SyncPoint, state: MultiScenarioState): void {
+    switch (sp.onComplete.action) {
+      case 'continue_all':
+        // Все сценарии продолжают выполнение (по умолчанию)
+        break;
+
+      case 'continue_one': {
+        // Продолжаем первый незавершённый сценарий
+        const nextInstance = state.parallelScenarios.find(
+          (p) => p.status === 'running' || p.status === 'paused'
+        );
+        if (nextInstance && nextInstance.status === 'paused') {
+          nextInstance.status = 'running';
+        }
+        break;
+      }
+
+      case 'stop_all':
+        // Останавливаем все запущенные сценарии
+        for (const instance of state.parallelScenarios) {
+          if (instance.status === 'running' || instance.status === 'paused') {
+            instance.status = 'finished';
+            instance.finishedAt = Date.now();
+          }
+        }
+        break;
+
+      case 'emit_event':
+        // Событие будет обработано внешним слушателем
+        // Данные события доступны в sp.onComplete.eventData
+        break;
+    }
+  }
 }

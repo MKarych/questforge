@@ -42,6 +42,7 @@ import AuthorAchievements from './AuthorAchievements';
 import ToolbarSettingsModal from './ToolbarSettingsModal';
 import RoleManager from './RoleManager';
 import ConditionBuilder from './ConditionBuilder';
+import ParallelScenarioManager from "./ParallelScenarioManager";
 import TriggerEditor from './TriggerEditor';
 import { autoSaveManager } from '@/lib/editor-store/autosave';
 
@@ -300,6 +301,7 @@ function ScenarioEditorInner({
   const [showTemplatesOnStart, setShowTemplatesOnStart] = useState(true);
   const [showRoleManager, setShowRoleManager] = useState(false);
   const [showTriggerEditor, setShowTriggerEditor] = useState(false);
+  const [showParallelManager, setShowParallelManager] = useState(false);
 
   // Initialize store with initial data
   useEffect(() => {
@@ -778,6 +780,19 @@ function ScenarioEditorInner({
             title="Управление триггерами и событиями"
           >
             {tbContent('⚡', 'Триггеры')}
+
+          /* 📑 Параллельные */
+          <button onClick={() => setShowParallelManager(true)}
+            className={`${tbBtn()} ${showParallelManager ? "bg-primary/20" : ""} relative`}
+            title="Управление параллельными сценариями"
+          >
+            {tbContent('📑', 'Паралл')}
+            {store.parallelScenarios.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                {store.parallelScenarios.length}
+              </span>
+            )}
+          </button>
             {store.triggers.filter(t => t.enabled).length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-yellow-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
                 {store.triggers.filter(t => t.enabled).length}
@@ -1218,6 +1233,11 @@ function ScenarioEditorInner({
       {/* Trigger Editor Modal */}
       {showTriggerEditor && (
         <TriggerEditor onClose={() => setShowTriggerEditor(false)} />
+
+      {/* Parallel Scenario Manager Modal */}
+      {showParallelManager && (
+        <ParallelScenarioManager onClose={() => setShowParallelManager(false)} />
+      )}
       )}
     </div>
   );

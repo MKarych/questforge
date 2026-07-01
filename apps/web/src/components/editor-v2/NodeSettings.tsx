@@ -10,6 +10,7 @@ import {
   SingleCondition,
   LoopConfig,
   LoopType,
+  SubScenarioConfig,
   BLOCK_DEFINITIONS,
 } from '@/lib/editor-store/editor.types';
 import { useEditorStore } from '@/lib/editor-store/editor.store';
@@ -287,6 +288,16 @@ export default function NodeSettings({
             <LoopSettingsSection
               loopConfig={node.metadata?.loop || null}
               onUpdate={(loop) => handleMetadataChange('loop', loop)}
+            />
+          </div>
+        )}
+
+        {/* Sub-Scenario Settings — для блоков "Под-сценарий" */}
+        {node.title === 'Под-сценарий' && (
+          <div className="pt-2 border-t border-border">
+            <SubScenarioSettingsSection
+              subScenario={node.metadata?.subScenario || null}
+              onUpdate={(sub) => handleMetadataChange('subScenario', sub)}
             />
           </div>
         )}
@@ -1055,6 +1066,251 @@ function ConditionSection({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// ==================== SubScenarioSettingsSection Component ====================
+function SubScenarioSettingsSection({
+  subScenario,
+  onUpdate,
+}: {
+  subScenario: SubScenarioConfig | null;
+  onUpdate: (config: SubScenarioConfig | null) => void;
+}) {
+  const config = subScenario || {
+    id: `sub-${crypto.randomUUID?.() || Math.random().toString(36).slice(2, 10)}`,
+    scenarioId: '',
+    name: '',
+    description: '',
+    inputMapping: {},
+    outputMapping: {},
+    onComplete: 'continue_parent' as const,
+    maxNestingLevel: 3,
+  };
+
+  const update = (partial: Partial<SubScenarioConfig>) => {
+    onUpdate({ ...config, ...partial });
+  };
+
+  const [inputEntries, setInputEntries] = useState<[string, string][]>(
+    Object.entries(config.inputMapping)
+  );
+  const [outputEntries, setOutputEntries] = useState<[string, string][]>(
+    Object.entries(config.outputMapping)
+  );
+
+  // Синхронизация маппингов
+  useEffect(() => {
+    const inputMap: Record<string, string> = {};
+    for (const [subVar, parentVar] of inputEntries) {
+      if (subVar.trim()) inputMap[subVar.trim()] = parentVar;
+    }
+    update({ inputMapping: inputMap });
+  }, [inputEntries]);
+
+  useEffect(() => {
+    const outputMap: Record<string, string> = {};
+    for (const [subVar, parentVar] of outputEntries) {
+      if (subVar.trim()) outputMap[subVar.trim()] = parentVar;
+    }
+    update({ outputMapping: outputMap });
+  }, [outputEntries]);
+
+  return (
+    <div className="space-y-3">
+      <label className="label text-sm">📂 Настройки под-сценария</label>
+
+      {/* ID сценария */}
+      <div>
+        <label className="text-xs text-text-secondary">ID сценария</label>
+        <input
+          type="text"
+          value={config.scenarioId}
+          onChange={(e) => update({ scenarioId: e.target.value })}
+          className="input-field text-sm"
+          placeholder="scenario-id-123"
+        />
+        <p className="text-[10px] text-text-secondary mt-0.5">
+          ID сценария, который будет запущен как под-сценарий
+        </p>
+      </div>
+
+      {/* Название */}
+      <div>
+        <label className="text-xs text-text-secondary">Название</label>
+        <input
+          type="text"
+          value={config.name}
+          onChange={(e) => update({ name: e.target.value })}
+          className="input-field text-sm"
+          placeholder="Мини-игра, под-квест..."
+        />
+      </div>
+
+      {/* Описание */}
+      <div>
+        <label className="text-xs text-text-secondary">Описание</label>
+        <textarea
+          value={config.description}
+          onChange={(e) => update({ description: e.target.value })}
+          className="input-field text-sm min-h-[40px]"
+          placeholder="Описание под-сценария..."
+          rows={1}
+        />
+      </div>
+
+      {/* onComplete */}
+      <div>
+        <label className="text-xs text-text-secondary">По завершении</label>
+        <select
+          value={config.onComplete}
+          onChange={(e) => update({ onComplete: e.target.value as SubScenarioConfig['onComplete'] })}
+          className="input-field text-sm"
+        >
+          <option value="continue_parent">Продолжить родительский</option>
+          <option value="return_result">Вернуть результат</option>
+          <option value="emit_event">Отправить событие</option>
+        </select>
+      </div>
+
+      {/* onCompleteEventName (только для emit_event) */}
+      {config.onComplete === 'emit_event' && (
+        <div>
+          <label className="text-xs text-text-secondary">Имя события</label>
+          <input
+            type="text"
+            value={config.onCompleteEventName || ''}
+            onChange={(e) => update({ onCompleteEventName: e.target.value || undefined })}
+            className="input-field text-sm"
+            placeholder="sub_scenario_completed"
+          />
+        </div>
+      )}
+
+      {/* maxNestingLevel */}
+      <div>
+        <label className="text-xs text-text-secondary">
+          Макс. уровень вложенности (защита от рекурсии)
+        </label>
+        <input
+          type="number"
+          value={config.maxNestingLevel}
+          onChange={(e) => update({ maxNestingLevel: Math.max(1, Math.min(10, parseInt(e.target.value) || 3)) })}
+          className="input-field text-sm"
+          min={1}
+          max={10}
+        />
+        <p className="text-[10px] text-text-secondary mt-0.5">
+          По умолчанию: 3. Максимум: 10.
+        </p>
+      </div>
+
+      {/* Input Mapping */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-text-secondary">📥 Маппинг входных переменных</label>
+          <button
+            onClick={() => setInputEntries([...inputEntries, ['', '']])}
+            className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+          >
+            + Добавить
+          </button>
+        </div>
+        <div className="space-y-1">
+          {inputEntries.map((entry, idx) => (
+            <div key={idx} className="flex gap-1 items-center">
+              <input
+                type="text"
+                value={entry[0]}
+                onChange={(e) => {
+                  const newEntries = [...inputEntries];
+                  newEntries[idx] = [e.target.value, entry[1]];
+                  setInputEntries(newEntries);
+                }}
+                className="input-field text-xs flex-1"
+                placeholder="sub_var"
+              />
+              <span className="text-text-secondary text-xs">→</span>
+              <input
+                type="text"
+                value={entry[1]}
+                onChange={(e) => {
+                  const newEntries = [...inputEntries];
+                  newEntries[idx] = [entry[0], e.target.value];
+                  setInputEntries(newEntries);
+                }}
+                className="input-field text-xs flex-1"
+                placeholder="parent_var"
+              />
+              <button
+                onClick={() => setInputEntries(inputEntries.filter((_, i) => i !== idx))}
+                className="text-error hover:text-error/80 text-sm"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {inputEntries.length === 0 && (
+            <p className="text-[10px] text-text-secondary text-center py-1">
+              Нет маппинга входных переменных
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Output Mapping */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-text-secondary">📤 Маппинг выходных переменных</label>
+          <button
+            onClick={() => setOutputEntries([...outputEntries, ['', '']])}
+            className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+          >
+            + Добавить
+          </button>
+        </div>
+        <div className="space-y-1">
+          {outputEntries.map((entry, idx) => (
+            <div key={idx} className="flex gap-1 items-center">
+              <input
+                type="text"
+                value={entry[0]}
+                onChange={(e) => {
+                  const newEntries = [...outputEntries];
+                  newEntries[idx] = [e.target.value, entry[1]];
+                  setOutputEntries(newEntries);
+                }}
+                className="input-field text-xs flex-1"
+                placeholder="sub_var"
+              />
+              <span className="text-text-secondary text-xs">→</span>
+              <input
+                type="text"
+                value={entry[1]}
+                onChange={(e) => {
+                  const newEntries = [...outputEntries];
+                  newEntries[idx] = [entry[0], e.target.value];
+                  setOutputEntries(newEntries);
+                }}
+                className="input-field text-xs flex-1"
+                placeholder="parent_var"
+              />
+              <button
+                onClick={() => setOutputEntries(outputEntries.filter((_, i) => i !== idx))}
+                className="text-error hover:text-error/80 text-sm"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {outputEntries.length === 0 && (
+            <p className="text-[10px] text-text-secondary text-center py-1">
+              Нет маппинга выходных переменных
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
