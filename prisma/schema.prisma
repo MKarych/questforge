@@ -100,6 +100,7 @@ model User {
   authoredEarnings       AuthorEarning[]
   payouts                Payout[]
   marketplaceReviews     MarketplaceReview[]
+  listingQuestions       ListingQuestion[]
   promoCodesCreated      PromoCode[]
   captainTeams           Team[]                 @relation("TeamCaptain")
   teamMemberships        TeamMember[]
@@ -887,6 +888,7 @@ model MarketplaceListing {
   cartItems   CartItem[]
   reviews     MarketplaceReview[]
   analytics   MarketplaceAnalytics[]
+  questions   ListingQuestion[]
 
   @@index([authorId])
   @@index([status])
@@ -1178,6 +1180,29 @@ model MarketplaceReview {
   @@index([userId])
   @@index([status])
   @@map("marketplace_reviews")
+}
+
+// ============================================================
+// ListingQuestion — вопросы к продавцу
+// ============================================================
+
+model ListingQuestion {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  question    String   @db.Text
+  answer      String?  @db.Text
+  answeredAt  DateTime? @map("answered_at")
+  answeredBy  String?  @map("answered_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
+
+  @@index([listingId])
+  @@index([userId])
+  @@map("listing_questions")
 }
 
 // ============================================================

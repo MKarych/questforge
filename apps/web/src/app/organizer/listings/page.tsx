@@ -10,7 +10,6 @@ import {
   type MarketplaceListingDto,
 } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
-import StatusBadge from '@/components/ui/StatusBadge';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 

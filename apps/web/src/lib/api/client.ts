@@ -1989,6 +1989,49 @@ export const getMyAnalyticsSummary = () =>
   apiClient.get<ApiResponse<any>>('/marketplace/me/analytics/summary');
 
 // ============================================================
+// LISTING QUESTIONS
+// ============================================================
+
+export interface ListingQuestionDto {
+  id: string;
+  listingId: string;
+  userId: string;
+  question: string;
+  answer: string | null;
+  answeredAt: string | null;
+  answeredBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+  };
+  listing?: {
+    id: string;
+    title: string;
+  };
+}
+
+export const getListingQuestions = (listingId: string) =>
+  apiClient.get<ApiResponse<ListingQuestionDto[]>>(`/marketplace/${listingId}/questions`);
+
+export const askListingQuestion = (listingId: string, question: string) =>
+  apiClient.post<ApiResponse<ListingQuestionDto>>(`/marketplace/${listingId}/questions`, { question });
+
+export const answerListingQuestion = (questionId: string, answer: string) =>
+  apiClient.patch<ApiResponse<ListingQuestionDto>>(`/marketplace/questions/${questionId}/answer`, { answer });
+
+export const getSellerQuestions = () =>
+  apiClient.get<ApiResponse<ListingQuestionDto[]>>('/marketplace/seller/questions');
+
+export const getUnansweredQuestions = () =>
+  apiClient.get<ApiResponse<ListingQuestionDto[]>>('/marketplace/seller/questions/unanswered');
+
+export const getUnansweredQuestionsCount = () =>
+  apiClient.get<ApiResponse<{ count: number }>>('/marketplace/seller/questions/unanswered/count');
+
+// ============================================================
 // COMPLAINT / REPORT SYSTEM
 // ============================================================
 

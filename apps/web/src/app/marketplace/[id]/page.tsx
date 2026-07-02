@@ -336,6 +336,13 @@ export default function MarketplaceDetailPage() {
                   >
                     {isFavorite ? '♥ В избранном' : '♡ В избранное'}
                   </button>
+
+                  <Link
+                    href={`/marketplace/${id}/ask`}
+                    className="block w-full py-2.5 border border-border text-text-secondary rounded-xl hover:bg-surface-secondary transition-colors text-sm text-center"
+                  >
+                    ❓ Задать вопрос
+                  </Link>
                 </div>
               )}
 
