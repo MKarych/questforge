@@ -1989,6 +1989,37 @@ export const getMyAnalyticsSummary = () =>
   apiClient.get<ApiResponse<any>>('/marketplace/me/analytics/summary');
 
 // ============================================================
+// MARKETPLACE ADMIN / MODERATION
+// ============================================================
+
+export interface PendingModerationListingDto {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  licenseType: string;
+  category: string;
+  tags: string[];
+  status: string;
+  views: number;
+  favorites: number;
+  sales: number;
+  avgRating: number;
+  reviewsCount: number;
+  imageUrl: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+  author: { id: string; username: string; avatarUrl: string | null };
+  scenario: { id: string; name: string; version: number };
+}
+
+export const getPendingModeration = () =>
+  apiClient.get<ApiResponse<PendingModerationListingDto[]>>('/marketplace/admin/pending');
+
+export const moderateListing = (id: string, data: { action: 'approve' | 'reject' | 'block'; reason?: string }) =>
+  apiClient.patch<ApiResponse<PendingModerationListingDto>>(`/marketplace/admin/${id}/moderate`, data);
+
+// ============================================================
 // LISTING QUESTIONS
 // ============================================================
 
