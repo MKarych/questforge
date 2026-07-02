@@ -10,6 +10,7 @@ import { Prisma, $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service';
 import { EngineOrchestrator } from '../../engine/orchestrator/engine-orchestrator';
+import { LicenseEngineService } from '../commerce/license-engine/license-engine.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { validateTransition, canCancel, canReschedule } from './state-machine/game-state-machine';
@@ -78,6 +79,7 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly engineOrchestrator: EngineOrchestrator,
+    private readonly licenseEngineService: LicenseEngineService,
   ) {}
 
   // ============================================================
@@ -144,6 +146,43 @@ export class GamesService {
         throw new BadRequestException({
           code: 'SCENARIO_NOT_PUBLISHED',
           message: 'Сценарий должен быть опубликован',
+        });
+      }
+    }
+
+    // 6a. Если указан scenarioListingId — проверяем лицензию
+    if (data.scenarioListingId) {
+      // Находим листинг, чтобы получить versionId
+      const listing = await this.prisma.marketplaceListing.findUnique({
+        where: { id: data.scenarioListingId },
+        select: { publishedVersionId: true },
+      });
+
+      if (!listing) {
+        throw new BadRequestException({
+          code: 'LISTING_NOT_FOUND',
+          message: 'Листинг не найден',
+        });
+      }
+
+      if (!listing.publishedVersionId) {
+        throw new BadRequestException({
+          code: 'LISTING_NOT_PUBLISHED',
+          message: 'Листинг ещё не опубликован',
+        });
+      }
+
+      // Проверяем лицензию через LicenseEngine
+      const validation = await this.licenseEngineService.validateLicense(
+        organizerId,
+        data.scenarioListingId,
+        listing.publishedVersionId,
+      );
+
+      if (!validation.allowed) {
+        throw new ForbiddenException({
+          code: 'LICENSE_REQUIRED',
+          message: 'Для запуска этого сценария требуется лицензия',
         });
       }
     }
@@ -273,6 +312,27 @@ export class GamesService {
     const slug = slugify(data.title);
     const shareLink = generateShareLink();
 
+    // Если указан scenarioListingId — записываем запуск лицензии
+    let scenarioLicenseId: string | null = null;
+    let scenarioRunId: string | null = null;
+
+    if (data.scenarioListingId) {
+      const listing = await this.prisma.marketplaceListing.findUnique({
+        where: { id: data.scenarioListingId },
+        select: { publishedVersionId: true },
+      });
+
+      if (listing?.publishedVersionId) {
+        const run = await this.licenseEngineService.recordRun(
+          organizerId,
+          data.scenarioListingId,
+          listing.publishedVersionId,
+        );
+        scenarioLicenseId = run.licenseId;
+        scenarioRunId = run.runId;
+      }
+    }
+
     const game = await this.prisma.game.create({
       data: {
         slug,
@@ -298,6 +358,9 @@ export class GamesService {
         allowLateRegistration: data.allowLateRegistration ?? false,
         organizerId,
         scenarioId: data.scenarioId,
+        scenarioListingId: data.scenarioListingId ?? null,
+        scenarioLicenseId,
+        scenarioRunId,
       },
       include: {
         organizer: {

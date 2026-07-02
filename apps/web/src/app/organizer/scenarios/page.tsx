@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getScenarios, publishScenario, deleteScenario, type Scenario } from '@/lib/api/client';
+import { getScenarios, publishScenario, deleteScenario, getListingByScenarioId, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -17,13 +17,32 @@ export default function ScenariosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [listingsMap, setListingsMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     async function loadScenarios() {
       try {
         // No published filter — show ALL user scenarios (drafts + published)
         const response = await getScenarios();
-        setScenarios(response.data.data);
+        const scenariosData = response.data.data;
+        setScenarios(scenariosData);
+
+        // Загружаем информацию о листингах для опубликованных сценариев
+        const publishedScenarios = scenariosData.filter(s => s.isPublished);
+        if (publishedScenarios.length > 0) {
+          const listingsMap: Record<string, boolean> = {};
+          await Promise.all(
+            publishedScenarios.map(async (s) => {
+              try {
+                const listingRes = await getListingByScenarioId(s.id);
+                listingsMap[s.id] = listingRes.data !== null;
+              } catch {
+                listingsMap[s.id] = false;
+              }
+            }),
+          );
+          setListingsMap(listingsMap);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарии';
         setError(message);
@@ -185,7 +204,23 @@ export default function ScenariosPage() {
                   >
                     Редактировать
                   </Link>
-                  {!scenario.isPublished && (
+                  {scenario.isPublished ? (
+                    listingsMap[scenario.id] === true ? (
+                      <Link
+                        href="/organizer/listings"
+                        className="btn-outline text-sm flex-1 text-center"
+                      >
+                        Перейти к листингу
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/marketplace/create?scenarioId=${scenario.id}`}
+                        className="btn-primary text-sm flex-1 text-center"
+                      >
+                        Выставить на продажу
+                      </Link>
+                    )
+                  ) : (
                     <button
                       className="btn-primary text-sm"
                       onClick={() => handlePublish(scenario.id)}

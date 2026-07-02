@@ -53,6 +53,10 @@ export class CreateGameDto {
 
   @IsString()
   @IsOptional()
+  scenarioListingId?: string;
+
+  @IsString()
+  @IsOptional()
   imageUrl?: string;
 
   @IsString()

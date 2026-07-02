@@ -567,4 +567,24 @@ export class MarketplaceService {
 
     return favorites.map(f => f.listing);
   }
+
+  /**
+   * Получить листинг по scenarioId
+   */
+  async getListingByScenarioId(scenarioId: string) {
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { scenarioId },
+      include: {
+        scenario: {
+          select: { id: true, name: true, version: true },
+        },
+      },
+    });
+
+    if (!listing || listing.deletedAt) {
+      return null;
+    }
+
+    return listing;
+  }
 }

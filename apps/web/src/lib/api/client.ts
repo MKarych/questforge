@@ -1988,6 +1988,9 @@ export const getMyAnalytics = (params?: { period?: string; limit?: number; offse
 export const getMyAnalyticsSummary = () =>
   apiClient.get<ApiResponse<any>>('/marketplace/me/analytics/summary');
 
+export const getListingByScenarioId = (scenarioId: string) =>
+  apiClient.get<ApiResponse<MarketplaceListingDto | null>>(`/marketplace/by-scenario/${scenarioId}`);
+
 // ============================================================
 // MARKETPLACE ADMIN / MODERATION
 // ============================================================

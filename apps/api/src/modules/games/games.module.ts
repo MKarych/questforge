@@ -6,6 +6,7 @@ import { GamesService } from './games.service';
 import { ChatService } from './chat.service';
 import { ActivityModule } from '../activity/activity.module';
 import { EngineModule } from '../../engine/engine.module';
+import { CommerceModule } from '../commerce/commerce.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { EngineModule } from '../../engine/engine.module';
     }),
     ActivityModule,
     EngineModule,
+    CommerceModule,
   ],
   controllers: [GamesController],
   providers: [GamesService, ChatService],

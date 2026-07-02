@@ -64,6 +64,11 @@ export class MarketplaceController {
     return this.marketplaceService.getLicenseTypes();
   }
 
+  @Get('by-scenario/:scenarioId')
+  async getByScenarioId(@Param('scenarioId') scenarioId: string) {
+    return this.marketplaceService.getListingByScenarioId(scenarioId);
+  }
+
   @Get(':id')
   async getById(@Param('id') id: string) {
     return this.marketplaceService.getById(id);

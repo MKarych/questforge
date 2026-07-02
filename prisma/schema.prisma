@@ -443,6 +443,11 @@ model Game {
   organizerId       String           @map("organizer_id") @db.Uuid
   scenarioId        String?          @map("scenario_id") @db.Uuid
 
+  // License Engine integration
+  scenarioListingId String?          @map("scenario_listing_id") @db.Uuid
+  scenarioLicenseId String?          @map("scenario_license_id") @db.Uuid
+  scenarioRunId     String?          @map("scenario_run_id") @db.Uuid
+
   publishedAt       DateTime?        @map("published_at")
   startedAt         DateTime?        @map("started_at")
   finishedAt        DateTime?        @map("finished_at")

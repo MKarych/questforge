@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
@@ -11,16 +11,22 @@ import {
   getMarketplaceCategories,
   getMarketplaceTypes,
   getScenarios,
+  getListingByScenarioId,
   type Scenario,
 } from '@/lib/api/client';
 
 export default function CreateListingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const scenarioIdParam = searchParams.get('scenarioId');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(!!scenarioIdParam);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [createdListingId, setCreatedListingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -28,7 +34,7 @@ export default function CreateListingPage() {
     licenseType: 'SINGLE',
     category: '',
     tags: '',
-    scenarioId: '',
+    scenarioId: scenarioIdParam || '',
   });
 
   useEffect(() => {
@@ -41,13 +47,39 @@ export default function CreateListingPage() {
         ]);
         setCategories(catRes.data);
         setLicenseTypes(typeRes.data);
-        setScenarios(scenRes.data.data);
+        const scenariosData = scenRes.data.data;
+        setScenarios(scenariosData);
+
+        // Если передан scenarioId — предзаполняем форму
+        if (scenarioIdParam) {
+          const scenario = scenariosData.find(s => s.id === scenarioIdParam);
+          if (scenario) {
+            setFormData(prev => ({
+              ...prev,
+              title: scenario.name,
+              scenarioId: scenario.id,
+            }));
+          }
+
+          // Проверяем, нет ли уже листинга для этого сценария
+          try {
+            const listingRes = await getListingByScenarioId(scenarioIdParam);
+            if (listingRes.data) {
+              setSuccessMessage('Для этого сценария уже создан листинг');
+              setCreatedListingId(listingRes.data.id);
+            }
+          } catch {
+            // листинга нет — можно создавать
+          }
+        }
       } catch {
         // ignore
+      } finally {
+        setInitialLoading(false);
       }
     }
     loadData();
-  }, []);
+  }, [scenarioIdParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,13 +102,49 @@ export default function CreateListingPage() {
         scenarioId: formData.scenarioId || undefined,
       });
 
-      router.push(`/marketplace/${res.data.id}`);
+      setSuccessMessage('Листинг успешно создан!');
+      setCreatedListingId(res.data.id);
     } catch (err: any) {
       setError(err.message || 'Ошибка при создании листинга');
     } finally {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
+          <LoadingSpinner size="lg" className="py-12" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Если листинг уже существует для этого сценария — показываем сообщение
+  if (successMessage && createdListingId && scenarioIdParam) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 px-6 py-4 rounded-lg mb-6">
+              <p className="font-medium mb-2">{successMessage}</p>
+              <Link
+                href={`/marketplace/${createdListingId}`}
+                className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm"
+              >
+                Перейти к листингу
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -97,6 +165,19 @@ export default function CreateListingPage() {
           </div>
         )}
 
+        {successMessage && createdListingId && !scenarioIdParam && (
+          <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 px-6 py-4 rounded-lg mb-6">
+            <p className="font-medium mb-2">{successMessage}</p>
+            <Link
+              href={`/marketplace/${createdListingId}`}
+              className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm"
+            >
+              Перейти к листингу
+            </Link>
+          </div>
+        )}
+
+        {!successMessage && (
         <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
           <div>
             <label className="block text-sm font-medium mb-1">Название *</label>
@@ -206,6 +287,7 @@ export default function CreateListingPage() {
             </Link>
           </div>
         </form>
+        )}
       </main>
 
       <Footer />
