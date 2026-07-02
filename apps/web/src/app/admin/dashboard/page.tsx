@@ -14,6 +14,7 @@ interface AdminStats {
   totalGames: number;
   activeGames: number;
   totalScenarios: number;
+  pendingScenarios: number;
   pendingGames: number;
   pendingApplications: number;
   pendingComplaints: number;
@@ -116,6 +117,19 @@ export default function AdminDashboardPage() {
           <div className="card">
             <div className="text-3xl font-bold text-text-primary mb-1">{stats.totalScenarios}</div>
             <div className="text-sm text-text-secondary">Сценариев</div>
+          </div>
+          <div className={`card ${stats.pendingScenarios > 0 ? 'border-warning' : ''}`}>
+            <div className={`text-3xl font-bold mb-1 ${stats.pendingScenarios > 0 ? 'text-warning' : 'text-text-primary'}`}>
+              {stats.pendingScenarios}
+            </div>
+            <div className="text-sm text-text-secondary">
+              {stats.pendingScenarios > 0 ? '🟡 Сценариев на модерации' : 'Сценариев на модерации'}
+            </div>
+            {stats.pendingScenarios > 0 && (
+              <Link href="/admin/scenarios" className="text-xs text-primary hover:underline mt-1 inline-block">
+                Перейти к модерации →
+              </Link>
+            )}
           </div>
           <div className={`card ${stats.pendingGames > 0 ? 'border-error' : ''}`}>
             <div className={`text-3xl font-bold mb-1 ${stats.pendingGames > 0 ? 'text-error' : 'text-text-primary'}`}>

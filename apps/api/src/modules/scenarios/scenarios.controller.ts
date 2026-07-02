@@ -15,6 +15,8 @@ import {
 import { ScenariosService } from './scenarios.service';
 import { CreateScenarioDto } from './dto/create-scenario.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @Controller('scenarios')
 @UseGuards(JwtAuthGuard)
@@ -83,6 +85,40 @@ export class ScenariosController {
     @Body('versionNote') versionNote?: string,
   ) {
     return this.scenariosService.createVersion(req.user.userId, scenarioId, nodes, versionNote);
+  }
+
+  // ============================================================
+  // Admin endpoints — модерация сценариев
+  // ============================================================
+
+  @Get('admin/pending')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  async adminGetPending(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.scenariosService.adminGetPending(Number(limit) || 20, Number(offset) || 0);
+  }
+
+  @Post('admin/:id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  async adminApprove(@Param('id') id: string, @Request() req: any) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.scenariosService.adminApprove(id, moderatorId);
+  }
+
+  @Post('admin/:id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  async adminReject(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @Request() req: any,
+  ) {
+    const moderatorId = req.user?.userId || req.user?.sub;
+    return this.scenariosService.adminReject(id, moderatorId, reason);
   }
 }
 

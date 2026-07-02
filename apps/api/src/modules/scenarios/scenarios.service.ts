@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateScenarioDto } from './dto/create-scenario.dto';
 import { ActivityService } from '../activity/activity.service';
@@ -206,10 +206,15 @@ export class ScenariosService {
       throw new ForbiddenException('You do not have access to this scenario');
     }
 
+    if (scenario.moderationStatus === 'PENDING') {
+      throw new BadRequestException('Сценарий уже отправлен на модерацию');
+    }
+
     const updated = await this.prisma.scenario.update({
       where: { id: scenarioId },
       data: {
-        isPublished: true,
+        moderationStatus: 'PENDING',
+        isPublished: false,
         publishedAt: new Date(),
         ...(price !== undefined && { price }),
         ...(licenseType !== undefined && { licenseType }),
@@ -231,6 +236,72 @@ export class ScenariosService {
     );
 
     return updated;
+  }
+
+  async adminGetPending(limit = 20, offset = 0) {
+    const [items, total] = await Promise.all([
+      this.prisma.scenario.findMany({
+        where: { moderationStatus: 'PENDING', deletedAt: null },
+        orderBy: { publishedAt: 'desc' },
+        take: limit,
+        skip: offset,
+        include: {
+          author: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      this.prisma.scenario.count({ where: { moderationStatus: 'PENDING', deletedAt: null } }),
+    ]);
+
+    return { items, total };
+  }
+
+  async adminApprove(scenarioId: string, moderatorId: string) {
+    const scenario = await this.prisma.scenario.findUnique({ where: { id: scenarioId } });
+
+    if (!scenario) {
+      throw new NotFoundException('Сценарий не найден');
+    }
+
+    if (scenario.moderationStatus !== 'PENDING') {
+      throw new BadRequestException('Сценарий не на модерации');
+    }
+
+    this.logger.log(`Scenario ${scenarioId} approved by moderator ${moderatorId}`);
+
+    return this.prisma.scenario.update({
+      where: { id: scenarioId },
+      data: {
+        moderationStatus: 'APPROVED',
+        isPublished: true,
+      },
+    });
+  }
+
+  async adminReject(scenarioId: string, moderatorId: string, reason: string) {
+    const scenario = await this.prisma.scenario.findUnique({ where: { id: scenarioId } });
+
+    if (!scenario) {
+      throw new NotFoundException('Сценарий не найден');
+    }
+
+    if (scenario.moderationStatus !== 'PENDING') {
+      throw new BadRequestException('Сценарий не на модерации');
+    }
+
+    this.logger.log(`Scenario ${scenarioId} rejected by moderator ${moderatorId}. Reason: ${reason}`);
+
+    return this.prisma.scenario.update({
+      where: { id: scenarioId },
+      data: {
+        moderationStatus: 'REJECTED',
+        isPublished: false,
+        validationErrors: {
+          rejectionReason: reason,
+          rejectedBy: moderatorId,
+          rejectedAt: new Date().toISOString(),
+        },
+      },
+    });
   }
 
   async delete(userId: string, scenarioId: string) {

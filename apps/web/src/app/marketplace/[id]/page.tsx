@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import ReportButton from '@/components/complaints/ReportButton';
 import {
   getMarketplaceListing,
   incrementListingViews,
@@ -343,6 +344,14 @@ export default function MarketplaceDetailPage() {
                   >
                     ❓ Задать вопрос
                   </Link>
+
+                  <ReportButton
+                    targetType={'SCENARIO' as any}
+                    targetId={listing.scenario?.id || id}
+                    targetLabel={listing.title}
+                    variant="text"
+                    className="w-full justify-center py-2.5 border border-border rounded-xl hover:bg-surface-secondary text-sm"
+                  />
                 </div>
               )}
 

@@ -9,6 +9,7 @@ export interface AdminNotificationCounts {
   pendingApplications: number;
   pendingComplaints: number;
   newSupportTickets: number;
+  pendingScenarios: number;
 }
 
 interface AdminNavProps {
@@ -18,6 +19,7 @@ interface AdminNavProps {
 const NAV_ITEMS = [
   { href: '/admin/dashboard', label: '📊 Дашборд', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/games', label: '🎮 Все игры', roles: ['ADMIN', 'MODERATOR'] },
+  { href: '/admin/scenarios', label: '📜 Сценарии', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/complaints', label: '🚨 Жалобы', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/requests', label: '📋 Заявки', roles: ['ADMIN', 'MODERATOR'] },
   { href: '/admin/support', label: '📬 Поддержка', roles: ['ADMIN', 'MODERATOR'] },
@@ -31,6 +33,7 @@ const COUNT_MAP: Record<string, keyof AdminNotificationCounts> = {
   '/admin/complaints': 'pendingComplaints',
   '/admin/requests': 'pendingApplications',
   '/admin/support': 'newSupportTickets',
+  '/admin/scenarios': 'pendingScenarios',
 };
 
 export default function AdminNav({ userRole }: AdminNavProps) {

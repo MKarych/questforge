@@ -7,6 +7,7 @@ export interface AdminNotificationCounts {
   pendingApplications: number;
   pendingComplaints: number;
   newSupportTickets: number;
+  pendingScenarios: number;
 }
 
 interface AdminNotificationBadgeProps {
@@ -63,6 +64,7 @@ export default function AdminNotificationBadge({
     pendingApplications: 0,
     pendingComplaints: 0,
     newSupportTickets: 0,
+    pendingScenarios: 0,
   });
   const prevTotalRef = useRef(0);
 
@@ -72,7 +74,7 @@ export default function AdminNotificationBadge({
       const newCounts = res.data;
       setCounts(newCounts);
 
-      const total = newCounts.pendingApplications + newCounts.pendingComplaints + newCounts.newSupportTickets;
+      const total = newCounts.pendingApplications + newCounts.pendingComplaints + newCounts.newSupportTickets + newCounts.pendingScenarios;
       const prevTotal = prevTotalRef.current;
 
       // Читаем настройки напрямую из localStorage каждый раз,
@@ -83,7 +85,7 @@ export default function AdminNotificationBadge({
       // Если появились новые уведомления (total > 0 и раньше было меньше)
       if (total > 0 && total > prevTotal) {
         // Уникальный ключ для этой комбинации уведомлений
-        const notificationKey = `apps:${newCounts.pendingApplications}-complaints:${newCounts.pendingComplaints}-tickets:${newCounts.newSupportTickets}`;
+        const notificationKey = `apps:${newCounts.pendingApplications}-complaints:${newCounts.pendingComplaints}-tickets:${newCounts.newSupportTickets}-scenarios:${newCounts.pendingScenarios}`;
 
         // Показываем уведомление только если эта комбинация ещё не была показана
         if (!shownNotificationKeys.has(notificationKey)) {
@@ -105,6 +107,9 @@ export default function AdminNotificationBadge({
             if (newCounts.newSupportTickets > 0) {
               showToast('📬', `Новый тикет поддержки!`, '/admin/support');
             }
+            if (newCounts.pendingScenarios > 0) {
+              showToast('📜', `Новый сценарий на модерацию!`, '/admin/scenarios');
+            }
           }
         }
       }
@@ -122,7 +127,7 @@ export default function AdminNotificationBadge({
     return () => clearInterval(interval);
   }, [fetchCounts]);
 
-  const totalUnread = counts.pendingApplications + counts.pendingComplaints + counts.newSupportTickets;
+  const totalUnread = counts.pendingApplications + counts.pendingComplaints + counts.newSupportTickets + counts.pendingScenarios;
 
   return (
     <>

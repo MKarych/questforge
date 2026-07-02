@@ -1430,6 +1430,7 @@ class ApiClient {
     totalGames: number;
     activeGames: number;
     totalScenarios: number;
+    pendingScenarios: number;
     pendingGames: number;
     pendingApplications: number;
     pendingComplaints: number;
@@ -1443,6 +1444,7 @@ class ApiClient {
     pendingApplications: number;
     pendingComplaints: number;
     newSupportTickets: number;
+    pendingScenarios: number;
   }>> {
     return this.request('/admin/notification-counts');
   }
