@@ -302,7 +302,7 @@ export default function MarketplaceDetailPage() {
                   <div className="text-green-500 text-lg mb-2">✓</div>
                   <p className="text-sm text-green-500 font-medium">Сценарий куплен!</p>
                   <Link
-                    href="/profile/licenses"
+                    href="/marketplace/me/licenses"
                     className="text-primary text-sm hover:underline mt-2 inline-block"
                   >
                     Мои лицензии →

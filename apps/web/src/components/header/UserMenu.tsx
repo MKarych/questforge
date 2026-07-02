@@ -167,6 +167,14 @@ export default function UserMenu({ user, loading }: UserMenuProps) {
               Мои сценарии
             </Link>
             <Link
+              href="/organizer/seller"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>🏪</span>
+              Кабинет продавца
+            </Link>
+            <Link
               href="/profile/payouts"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
               onClick={() => setIsOpen(false)}
