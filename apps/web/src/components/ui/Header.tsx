@@ -206,6 +206,13 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
     { label: 'Инструкция', href: '/help/editor-guide' },
   ];
 
+  const marketplaceDropdownItems = [
+    { label: 'Каталог', href: '/marketplace' },
+    { label: 'Мои покупки', href: '/marketplace/me/purchases' },
+    { label: 'Мои лицензии', href: '/marketplace/me/licenses' },
+    { label: 'Инструкция', href: '/help/marketplace-guide' },
+  ];
+
   const showOrganizer = ['ORGANIZER', 'ADMIN'].includes(userRole as any);
 
   // Админка — выпадающее меню, только ADMIN
@@ -278,6 +285,14 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             {/* Center: Desktop Navigation (lg+) — только на десктопе */}
             <nav className="hidden lg:flex items-center gap-1">
               {visibleMainNav.map((item) => renderNavLink(item))}
+
+              {/* Маркетплейс — выпадающее меню, только для авторизованных */}
+              {user && (
+                <>
+                  <span className="mx-1 w-px h-5 bg-border" />
+                  <DropdownNav label="Маркетплейс" items={marketplaceDropdownItems} pathname={pathname} />
+                </>
+              )}
 
               {/* Организаторские выпадающие меню — только на десктопе (lg+) */}
               {showOrganizer && (
@@ -509,6 +524,29 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                     </Link>
                   ))}
                 </div>
+
+                {/* Маркетплейс — пункты для авторизованных */}
+                {user && (
+                  <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-border">
+                    <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      Маркетплейс
+                    </p>
+                    {marketplaceDropdownItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                          pathname.startsWith(item.href)
+                            ? 'text-primary bg-primary/10 font-medium'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                        }`}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
                 {/* Организаторские пункты — выпадающие группы */}
                 {showOrganizer && (
