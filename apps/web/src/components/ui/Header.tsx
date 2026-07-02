@@ -189,7 +189,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   // Основная навигация — видна всем
   const mainNavItems = [
     { label: 'Каталог игр', href: '/games', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
-    { label: 'Маркетплейс', href: '/marketplace', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
     { label: 'Команды', href: '/teams', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
   ];
 
@@ -286,12 +285,14 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
             <nav className="hidden lg:flex items-center gap-1">
               {visibleMainNav.map((item) => renderNavLink(item))}
 
-              {/* Маркетплейс — выпадающее меню, только для авторизованных */}
-              {user && (
+              {/* Маркетплейс — для GUEST простая ссылка, для авторизованных выпадающее меню */}
+              {user ? (
                 <>
                   <span className="mx-1 w-px h-5 bg-border" />
                   <DropdownNav label="Маркетплейс" items={marketplaceDropdownItems} pathname={pathname} />
                 </>
+              ) : (
+                renderNavLink({ label: 'Маркетплейс', href: '/marketplace' })
               )}
 
               {/* Организаторские выпадающие меню — только на десктопе (lg+) */}
@@ -523,6 +524,20 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                       {item.label}
                     </Link>
                   ))}
+                  {/* Маркетплейс — для неавторизованных простая ссылка */}
+                  {!user && (
+                    <Link
+                      href="/marketplace"
+                      className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                        pathname.startsWith('/marketplace')
+                          ? 'text-primary bg-primary/10 font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                      }`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Маркетплейс
+                    </Link>
+                  )}
                 </div>
 
                 {/* Маркетплейс — пункты для авторизованных */}
