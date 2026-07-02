@@ -1,12 +1,16 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { PurchaseService } from '../purchase/purchase.service';
 import { LicenseType } from '@prisma/client';
 
 @Injectable()
 export class CartService {
   private readonly logger = new Logger(CartService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly purchaseService: PurchaseService,
+  ) {}
 
   /**
    * Получить корзину пользователя (создать если нет)
@@ -235,11 +239,13 @@ export class CartService {
 
     for (const item of cart.items) {
       try {
+        await this.purchaseService.purchase(item.listingId, userId, item.licenseType);
         results.push({
           listingId: item.listingId,
           success: true,
         });
       } catch (error: any) {
+        this.logger.error(`Checkout failed for listing ${item.listingId}: ${error.message}`);
         results.push({
           listingId: item.listingId,
           success: false,
@@ -253,8 +259,16 @@ export class CartService {
       where: { cartId: cart.id },
     });
 
+    const allSuccess = results.every(r => r.success);
+
+    if (allSuccess) {
+      this.logger.log(`Checkout completed for user ${userId}: ${cart.items.length} items`);
+    } else {
+      this.logger.warn(`Checkout partially completed for user ${userId}: ${results.filter(r => r.success).length}/${cart.items.length} succeeded`);
+    }
+
     return {
-      success: results.every(r => r.success),
+      success: allSuccess,
       results,
       totalItems: cart.items.length,
     };

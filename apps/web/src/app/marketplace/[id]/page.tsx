@@ -48,7 +48,7 @@ export default function MarketplaceDetailPage() {
   const loadReviews = useCallback(async () => {
     try {
       const res = await getListingReviews(id);
-      setReviews(res.data?.data || res.data || []);
+      setReviews(res.data?.items || res.data?.data || []);
     } catch {
       // ignore
     }
