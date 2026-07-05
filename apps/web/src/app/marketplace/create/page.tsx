@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
@@ -15,8 +15,7 @@ import {
   type Scenario,
 } from '@/lib/api/client';
 
-export default function CreateListingPage() {
-  const router = useRouter();
+function CreateListingForm() {
   const searchParams = useSearchParams();
   const scenarioIdParam = searchParams.get('scenarioId');
   const [loading, setLoading] = useState(false);
@@ -292,5 +291,21 @@ export default function CreateListingPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CreateListingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
+          <LoadingSpinner />
+        </main>
+        <Footer />
+      </div>
+    }>
+      <CreateListingForm />
+    </Suspense>
   );
 }

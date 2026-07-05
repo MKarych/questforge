@@ -158,6 +158,10 @@ export interface EditorActions {
   addSyncPoint: (point: SyncPoint) => void;
   updateSyncPoint: (id: string, data: Partial<SyncPoint>) => void;
   removeSyncPoint: (id: string) => void;
+  clearTriggers: () => void;
+  clearRoles: () => void;
+  clearParallelScenarios: () => void;
+  clearSyncPoints: () => void;
 
   // Cross-Scenario Communication
   addGlobalVariable: (def: CrossScenarioCommunication['globalVariables'][0]) => void;
@@ -1015,6 +1019,35 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   removeSyncPoint: (id) => {
     set((state) => ({
       syncPoints: state.syncPoints.filter((sp) => sp.id !== id),
+      isDirty: true,
+    }));
+  },
+
+  clearTriggers: () => {
+    set(() => ({
+      triggers: [],
+      isDirty: true,
+    }));
+  },
+
+  clearRoles: () => {
+    set(() => ({
+      roles: [],
+      isDirty: true,
+    }));
+  },
+
+  clearParallelScenarios: () => {
+    set(() => ({
+      parallelScenarios: [],
+      syncPoints: [],
+      isDirty: true,
+    }));
+  },
+
+  clearSyncPoints: () => {
+    set(() => ({
+      syncPoints: [],
       isDirty: true,
     }));
   },

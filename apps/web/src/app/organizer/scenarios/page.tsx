@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getScenarios, publishScenario, deleteScenario, getListingByScenarioId, type Scenario } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { exportScenarioToJson, importScenarioFromJson } from '@/lib/scenario-json/scenario-json';
 
 export default function ScenariosPage() {
   const router = useRouter();
@@ -15,9 +16,11 @@ export default function ScenariosPage() {
   const [error, setError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [listingsMap, setListingsMap] = useState<Record<string, boolean>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadScenarios() {
@@ -96,6 +99,107 @@ export default function ScenariosPage() {
     setDeleteTargetId(null);
   };
 
+  // Экспорт сценария в JSON-файл
+  const handleExport = async (id: string, name: string) => {
+    setExportingId(id);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+      const response = await fetch(`${API_URL}/scenarios/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+      const scenarioData = result?.data || result;
+
+      const scenario = {
+        id: scenarioData.id,
+        name: scenarioData.name,
+        description: scenarioData.description || '',
+        scenes: scenarioData.nodes || [],
+        edges: scenarioData.edges || [],
+        variables: scenarioData.metadata?.variables || [],
+        settings: scenarioData.metadata?.settings || {},
+        triggers: scenarioData.triggers || [],
+        roles: scenarioData.roles || [],
+        parallelScenarios: scenarioData.parallelScenarios || [],
+        syncPoints: scenarioData.syncPoints || [],
+      };
+
+      const json = exportScenarioToJson(scenario as any);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}-${id.slice(0, 8)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Не удалось экспортировать сценарий');
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  // Импорт сценария из JSON-файла
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const result = importScenarioFromJson(text);
+
+      if (!result.validation.valid) {
+        const msgs = result.validation.errors.map(e => e.message).join('; ');
+        setError(`Ошибка валидации: ${msgs}`);
+        return;
+      }
+
+      const imported = result.scenario as any;
+
+      // Создаём сценарий через API
+      const token = localStorage.getItem('auth_token');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+      const response = await fetch(`${API_URL}/scenarios`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: imported.name || file.name.replace('.json', ''),
+          description: imported.description || '',
+          nodes: imported.scenes || [],
+          edges: result.edges || [],
+          metadata: {
+            settings: imported.settings || {},
+            variables: imported.variables || [],
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Ошибка при создании сценария');
+
+      const apiResult = await response.json();
+      const newId = apiResult?.data?.id || apiResult?.id;
+
+      if (newId) {
+        router.push(`/organizer/scenarios/${newId}/edit`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка импорта';
+      setError(message);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -135,6 +239,16 @@ export default function ScenariosPage() {
               Управление сценариями для игр
             </p>
           </div>
+          <input
+            type="file"
+            accept=".json"
+            ref={fileInputRef}
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+          <button onClick={handleImportClick} className="btn-outline">
+            📂 Импорт JSON
+          </button>
           <Link href="/organizer/scenarios/create" className="btn-primary">
             + Создать сценарий
           </Link>
@@ -204,6 +318,14 @@ export default function ScenariosPage() {
                   >
                     Редактировать
                   </Link>
+                  <button
+                    onClick={() => handleExport(scenario.id, scenario.name)}
+                    disabled={exportingId === scenario.id}
+                    className="btn-outline text-sm px-2"
+                    title="Скачать JSON"
+                  >
+                    {exportingId === scenario.id ? '...' : '💾'}
+                  </button>
                   {scenario.isPublished ? (
                     listingsMap[scenario.id] === true ? (
                       <Link

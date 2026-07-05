@@ -18,12 +18,6 @@ import {
 
 type Tab = 'pending' | 'all';
 
-interface ModerationAction {
-  listingId: string;
-  action: 'approve' | 'reject' | 'block';
-  reason?: string;
-}
-
 // ==================== Helpers ====================
 
 function formatPrice(price: number): string {

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
 import Footer from '@/components/ui/Footer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import EmptyState from '@/components/ui/EmptyState';
 import {
   getMyAnalytics,
   getMyAnalyticsSummary,

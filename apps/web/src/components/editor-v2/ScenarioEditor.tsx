@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { exportScenarioToJson, importScenarioFromJson } from '@/lib/scenario-json/scenario-json';
 import { shallow } from 'zustand/shallow';
 import ReactFlow, {
   Background,
@@ -301,6 +302,93 @@ function ScenarioEditorInner({
   const [showRoleManager, setShowRoleManager] = useState(false);
   const [showTriggerEditor, setShowTriggerEditor] = useState(false);
   const [showParallelManager, setShowParallelManager] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Экспорт сценария в JSON-файл
+  const handleExportJson = useCallback(() => {
+    const scenario = {
+      id: store.scenarioId || '',
+      name: store.name,
+      description: store.description,
+      scenes: store.scenes,
+      edges: store.edges,
+      variables: store.variables,
+      settings: store.settings,
+      triggers: store.triggers,
+      roles: store.roles,
+      parallelScenarios: store.parallelScenarios,
+      syncPoints: store.syncPoints,
+    };
+    const json = exportScenarioToJson(scenario as any);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${store.name.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_') || 'scenario'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [store]);
+
+  // Импорт сценария из JSON-файла
+  const handleImportJson = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const result = importScenarioFromJson(text);
+
+      if (!result.validation.valid) {
+        const msgs = result.validation.errors.map(e => e.message).join('; ');
+        alert(`Ошибка валидации: ${msgs}`);
+        return;
+      }
+
+      const imported = result.scenario as any;
+
+      // Загружаем в стор
+      store.loadScenario({
+        name: imported.name || file.name.replace('.json', ''),
+        description: imported.description || '',
+        scenes: imported.scenes || [],
+        edges: result.edges || [],
+        variables: imported.variables || [],
+        settings: imported.settings || {},
+      });
+
+      // Загружаем триггеры
+      if (imported.triggers && Array.isArray(imported.triggers)) {
+        store.clearTriggers();
+        imported.triggers.forEach((t: any) => store.addTrigger(t));
+      }
+
+      // Загружаем роли
+      if (imported.roles && Array.isArray(imported.roles)) {
+        store.clearRoles();
+        imported.roles.forEach((r: any) => store.addRole(r));
+      }
+
+      // Загружаем параллельные сценарии
+      if (imported.parallelScenarios && Array.isArray(imported.parallelScenarios)) {
+        store.clearParallelScenarios();
+        imported.parallelScenarios.forEach((ps: any) => store.addParallelScenario(ps));
+      }
+
+      // Загружаем точки синхронизации
+      if (imported.syncPoints && Array.isArray(imported.syncPoints)) {
+        store.clearSyncPoints();
+        imported.syncPoints.forEach((sp: any) => store.addSyncPoint(sp));
+      }
+    } catch (err) {
+      alert('Ошибка при импорте файла');
+    } finally {
+      e.target.value = '';
+    }
+  }, [store]);
 
   // Initialize store with initial data
   useEffect(() => {
@@ -698,6 +786,20 @@ function ScenarioEditorInner({
           >
             📋
           </button>
+          {/* Экспорт/Импорт JSON */}
+          <button onClick={handleExportJson} className={tbBtn()} title="Экспорт в JSON">
+            {tbContent('💾', 'Экспорт')}
+          </button>
+          <button onClick={handleImportJson} className={tbBtn()} title="Импорт из JSON">
+            {tbContent('📂', 'Импорт')}
+          </button>
+          <input
+            type="file"
+            accept=".json"
+            ref={fileInputRef}
+            onChange={handleFileSelected}
+            className="hidden"
+          />
           <span
             className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
               isPublished

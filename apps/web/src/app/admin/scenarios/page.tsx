@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -27,11 +26,6 @@ interface PendingScenario {
     name: string;
     email: string;
   };
-}
-
-interface PendingScenariosResponse {
-  items: PendingScenario[];
-  total: number;
 }
 
 // ==================== Helpers ====================
@@ -84,8 +78,8 @@ export default function AdminScenariosPage() {
       }
 
       const res = await apiClient.get<{ items: PendingScenario[]; total: number }>('/scenarios/admin/pending');
-      setScenarios(res.data?.items || []);
-      setTotal(res.data?.total || 0);
+      setScenarios(res.items || []);
+      setTotal(res.total || 0);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарии';
       setError(message);
