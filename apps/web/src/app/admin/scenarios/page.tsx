@@ -6,7 +6,7 @@ import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 import AdminNav from '@/components/admin/AdminNav';
-import { apiClient, getProfile } from '@/lib/api/client';
+import { apiClient, getProfile, type ApiResponse } from '@/lib/api/client';
 
 // ==================== Types ====================
 
@@ -77,9 +77,9 @@ export default function AdminScenariosPage() {
         return;
       }
 
-      const res = await apiClient.get<{ items: PendingScenario[]; total: number }>('/scenarios/admin/pending');
-      setScenarios(res.items || []);
-      setTotal(res.total || 0);
+      const res = await apiClient.get<ApiResponse<{ items: PendingScenario[]; total: number }>>('/scenarios/admin/pending');
+      setScenarios(res.data.items || []);
+      setTotal(res.data.total || 0);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось загрузить сценарии';
       setError(message);
