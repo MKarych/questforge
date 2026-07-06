@@ -1,4 +1,4 @@
-import { GameStatus } from '@prisma/client';
+import { GameStatus, GameMode } from '@prisma/client';
 
 /**
  * Публичное DTO для игроков (без чувствительных данных).
@@ -15,6 +15,7 @@ export class PublicGameDto {
   duration!: number;
   price!: number;
   maxTeams!: number;
+  mode!: GameMode;
   imageUrl!: string | null;
   bannerUrl!: string | null;
   tags!: string[];

@@ -1,7 +1,7 @@
-> **Дата:** 27.06.2026  
-> **Статус:** Утвержден  
-> **Версия:** 1.0  
-> **Класс:** Архитектурный контракт (10/10)  
+> **Дата:** 05.07.2026
+> **Статус:** Утвержден
+> **Версия:** 1.1
+> **Класс:** Архитектурный контракт (10/10)
 > **Цель:** Описать полный игровой процесс — от регистрации команды до финиша.
 
 ---
@@ -367,3 +367,141 @@ for (const reg of registrations) {
 - [ ] Fallback-баннер на странице регистрации
 - [ ] Бейдж "Вы участвуете" на GameCard
 - [ ] MyActiveGames в сетке 4 колонки
+
+---
+
+## 11. Соло-режим (Solo Mode)
+
+### 11.1. Концепция
+
+Соло-режим позволяет игроку участвовать в игре **индивидуально**, без создания или вступления в команду. Организатор выбирает режим при создании игры (`TEAM | SOLO`), и он не может быть изменён после.
+
+### 11.2. Модель данных
+
+```prisma
+enum GameMode {
+  TEAM
+  SOLO
+}
+
+model Game {
+  // ... существующие поля
+  mode              GameMode          @default(TEAM) @map("mode")
+  soloRegistrations SoloRegistration[]
+}
+
+model SoloRegistration {
+  id        String         @id @default(cuid())
+  gameId    String
+  userId    String
+  status    SoloRegStatus  @default(REGISTERED)
+  readyAt   DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@map("solo_registrations")
+}
+
+enum SoloRegStatus {
+  REGISTERED
+  READY
+}
+```
+
+### 11.3. Архитектурное решение: виртуальные команды
+
+**Проблема:** `EngineOrchestrator`, `SessionState`, `EventStore` и все плагины работают с `teamId`. Переписывать их для поддержки `userId` напрямую — слишком дорого и рискованно.
+
+**Решение:** При `startGame()` для каждого соло-игрока создаётся **виртуальная команда** — одноразовая `Team` с `captainId = userId`. Это позволяет:
+
+- Не менять `EngineOrchestrator` — он продолжает работать с `teamId`
+- Не менять `SessionState` — состояние хранится по `teamId`
+- Не менять плагины — все они получают `teamId`
+- Не менять `EventStore` — события привязаны к `teamId`
+
+```mermaid
+flowchart LR
+    A[Соло-игрок] --> B[registerSolo]
+    B --> C[SoloRegistration]
+    C --> D[startGame]
+    D --> E[Создание Team<br/>captainId = userId]
+    E --> F[GameRegistration<br/>status: READY]
+    F --> G[GameTeam]
+    G --> H[engineOrchestrator<br/>.startSession]
+    H --> I[SessionState<br/>с teamId]
+```
+
+### 11.4. Flow соло-игрока
+
+```
+СОЗДАНИЕ (mode: SOLO) → ПУБЛИКАЦИЯ → РЕГИСТРАЦИЯ → ЛОББИ → СТАРТ → ИГРА → ФИНИШ
+                              ↓               ↓        ↓        ↓       ↓
+                         Игрок видит     Кнопка     Список    Сессии   Результаты
+                         игру в каталоге "Участвовать игроков   созданы  (как у команд)
+                                           соло"               автом.
+```
+
+#### 11.4.1. Регистрация
+
+1. Игрок находит игру в каталоге → переходит на страницу игры
+2. Если `game.mode === 'SOLO'` → видит кнопку **"🎯 Участвовать соло"**
+3. Нажимает → вызывается `POST /games/:id/register-solo`
+4. Создаётся `SoloRegistration` со статусом `REGISTERED`
+5. Редирект в `/play/:shareLink/lobby`
+
+#### 11.4.2. Лобби (LOBBY)
+
+- Игрок видит заголовок **"Зарегистрированные игроки"** (вместо "Команды")
+- У каждого игрока бейдж **"✅ Зарегистрирован"** (без статуса готовности)
+- Нет кнопки "Готов" — для соло-режима готовность не требуется
+- Организатор видит тот же список в панели управления
+
+#### 11.4.3. Старт игры (RUNNING)
+
+При `startGame()` для каждого соло-игрока:
+
+1. Создаётся `Team` с `captainId = userId` и именем `"Соло: {user.name}"`
+2. Создаётся `GameRegistration` со статусом `READY`
+3. Создаётся `GameTeam`
+4. Вызывается `engineOrchestrator.startSession(teamId, gameId, teamName, startNodeId)`
+
+Игрок получает `sessionId` через `getMyTeamStatus()` и переходит на страницу прохождения.
+
+### 11.5. Эндпоинты
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/games/:id/register-solo` | Регистрация соло-игрока |
+| GET | `/games/:id/my-team-status` | Возвращает `registered: true, teamId: null` для соло |
+| GET | `/games/:id/teams-status` | Возвращает список соло-регистраций (для организатора) |
+| GET | `/games/my-active-registrations` | Возвращает соло-регистрации с `teamId: null, teamName: 'Соло'` |
+
+### 11.6. Изменения в существующих методах
+
+| Метод | Изменение |
+|-------|-----------|
+| `createGame()` | Сохраняет `mode: 'TEAM' \| 'SOLO'` |
+| `findOnePublic()` | Проверяет `SoloRegistration` для `isRegistered` |
+| `startGame()` | Для SOLO: проверяет `soloRegistration.count()`, создаёт виртуальные команды |
+| `getMyTeamStatus()` | Проверяет `SoloRegistration`, возвращает `teamId: null` |
+| `getMyActiveRegistrations()` | Возвращает соло-регистрации + командные |
+| `getTeamsStatus()` | Для SOLO: возвращает список соло-регистраций |
+| `areAllTeamsReady()` | Для SOLO: всегда `true` |
+
+### 11.7. Чек-лист для соло-режима
+
+- [ ] Организатор может создать игру в SOLO-режиме
+- [ ] Игрок видит кнопку "Участвовать соло" на странице игры
+- [ ] Игрок может зарегистрироваться (POST register-solo)
+- [ ] Игрок видит лобби со списком участников
+- [ ] Организатор видит участников в панели управления
+- [ ] При старте создаются виртуальные команды
+- [ ] Игрок может проходить игру (сессия создана)
+- [ ] Повторный вход работает (my-team-status → редирект)
+- [ ] findOnePublic() корректно показывает isRegistered для соло
+- [ ] MyActiveGames показывает соло-регистрации
+- [ ] ActiveGameBanner показывает соло-регистрации

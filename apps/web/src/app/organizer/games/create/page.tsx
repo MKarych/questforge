@@ -22,6 +22,7 @@ export default function CreateGamePage() {
     duration: 180,
     price: 0,
     maxTeams: 20,
+    mode: 'TEAM',
     scenarioId: '',
   });
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -153,6 +154,7 @@ export default function CreateGamePage() {
         duration: formData.duration,
         price: formData.price,
         maxTeams: formData.maxTeams,
+        mode: formData.mode,
         ...(formData.scenarioId && { scenarioId: formData.scenarioId }),
       };
 
@@ -285,7 +287,7 @@ export default function CreateGamePage() {
                 </div>
 
                 <div>
-                  <label className="label">Макс. команд</label>
+                  <label className="label">{formData.mode === 'SOLO' ? 'Макс. игроков' : 'Макс. команд'}</label>
                   <input
                     type="number"
                     name="maxTeams"
@@ -297,6 +299,24 @@ export default function CreateGamePage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Режим игры</label>
+                <select
+                  name="mode"
+                  value={formData.mode}
+                  onChange={handleChange}
+                  className="input-field"
+                >
+                  <option value="TEAM">Командный</option>
+                  <option value="SOLO">Соло (индивидуальный)</option>
+                </select>
+                <p className="text-xs text-text-secondary mt-1">
+                  {formData.mode === 'SOLO'
+                    ? 'Каждый игрок регистрируется сам за себя. Команды не используются.'
+                    : 'Игроки регистрируются командами. Требуется минимум 1 участник в команде.'}
+                </p>
               </div>
 
               <div>

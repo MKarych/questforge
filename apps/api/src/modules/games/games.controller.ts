@@ -372,6 +372,19 @@ export class GamesController {
   }
 
   // ============================================================
+  // 29.5.5. Регистрация соло-игрока
+  // ============================================================
+
+  @Post(':id/register-solo')
+  @UseGuards(JwtAuthGuard)
+  async registerSolo(
+    @Param('id') gameId: string,
+    @Request() req: any,
+  ) {
+    return this.gamesService.registerSolo(gameId, req.user.userId);
+  }
+
+  // ============================================================
   // 29.6. Статус регистрации команды
   // ============================================================
 

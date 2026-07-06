@@ -26,6 +26,10 @@ export class CreateGameDto {
 
   @IsString()
   @IsOptional()
+  mode?: string; // 'TEAM' | 'SOLO', по умолчанию 'TEAM'
+
+  @IsString()
+  @IsOptional()
   @MaxLength(500)
   address?: string;
 

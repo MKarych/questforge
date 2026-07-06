@@ -247,20 +247,24 @@ export default function GamePage() {
                   <p className="text-text-primary font-medium">{game.price} ₽</p>
                 </div>
                 <div>
-                  <span className="text-sm text-text-secondary">Макс. команд</span>
+                  <span className="text-sm text-text-secondary">Режим</span>
+                  <p className="text-text-primary font-medium">{game.mode === 'SOLO' ? '👤 Соло' : '👥 Командный'}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-text-secondary">{game.mode === 'SOLO' ? 'Макс. игроков' : 'Макс. команд'}</span>
                   <p className="text-text-primary font-medium">{game.maxTeams}</p>
                 </div>
               </div>
             </div>
 
-            {/* Teams List */}
+            {/* Teams / Players List */}
             {['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status) && (
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-text-primary">
-                    📋 Команды ({totalCount})
+                    {game.mode === 'SOLO' ? '👤 Участники' : '📋 Команды'} ({totalCount})
                   </h2>
-                  {game.status === 'LOBBY' && (
+                  {game.status === 'LOBBY' && game.mode !== 'SOLO' && (
                     <span className="text-sm text-text-secondary">
                       Готовы: {readyCount}/{totalCount}
                     </span>
@@ -269,7 +273,7 @@ export default function GamePage() {
 
                 {teams.length === 0 ? (
                   <p className="text-text-secondary text-center py-4">
-                    Пока нет зарегистрированных команд
+                    {game.mode === 'SOLO' ? 'Пока нет зарегистрированных участников' : 'Пока нет зарегистрированных команд'}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -285,23 +289,31 @@ export default function GamePage() {
                           <div>
                             <span className="text-text-primary font-medium">{t.team.name}</span>
                             <div className="text-xs text-text-muted">
-                              Зарегистрированы: {new Date(t.registeredAt).toLocaleString('ru-RU')}
+                              {game.mode === 'SOLO' ? 'Зарегистрирован' : 'Зарегистрированы'}: {new Date(t.registeredAt).toLocaleString('ru-RU')}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          {t.readyAt && (
-                            <span className="text-xs text-text-muted">
-                              Готовы с: {new Date(t.readyAt).toLocaleTimeString('ru-RU')}
+                        {game.mode !== 'SOLO' && (
+                          <div className="flex items-center gap-3">
+                            {t.readyAt && (
+                              <span className="text-xs text-text-muted">
+                                Готовы с: {new Date(t.readyAt).toLocaleTimeString('ru-RU')}
+                              </span>
+                            )}
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                              t.status === 'READY' ? 'bg-success/10 text-success' : 'bg-surface text-text-muted'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'READY' ? 'bg-success' : 'bg-text-muted'}`} />
+                              {t.status === 'READY' ? 'Готовы' : 'Ожидание'}
                             </span>
-                          )}
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                            t.status === 'READY' ? 'bg-success/10 text-success' : 'bg-surface text-text-muted'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'READY' ? 'bg-success' : 'bg-text-muted'}`} />
-                            {t.status === 'READY' ? 'Готовы' : 'Ожидание'}
+                          </div>
+                        )}
+                        {game.mode === 'SOLO' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                            ✅ Зарегистрирован
                           </span>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -393,7 +405,7 @@ export default function GamePage() {
               <h2 className="text-lg font-semibold text-text-primary mb-4">Статистика</h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Команд</span>
+                  <span className="text-text-secondary">{game.mode === 'SOLO' ? 'Участников' : 'Команд'}</span>
                   <span className="text-text-primary font-medium">{game.teamsCount}</span>
                 </div>
                 <div className="flex justify-between">

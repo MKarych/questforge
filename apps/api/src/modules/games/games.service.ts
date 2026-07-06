@@ -350,6 +350,7 @@ export class GamesService {
         bannerUrl: data.bannerUrl || null,
         tags: data.tags || [],
         status: GAME_STATUS.DRAFT,
+        mode: (data.mode as 'TEAM' | 'SOLO') || 'TEAM',
         version: 1,
         autoStart: data.autoStart ?? false,
         autoStartDelay: data.autoStartDelay ?? 0,
@@ -771,6 +772,15 @@ export class GamesService {
         select: { id: true },
       });
       isRegistered = !!registration;
+
+      // Если не найден через команды — проверяем соло-регистрацию
+      if (!isRegistered) {
+        const soloReg = await this.prisma.soloRegistration.findUnique({
+          where: { gameId_userId: { gameId, userId } },
+          select: { id: true },
+        });
+        isRegistered = !!soloReg;
+      }
     }
 
     return {
@@ -1404,16 +1414,27 @@ export class GamesService {
 
     validateTransition(game.status, GAME_STATUS.RUNNING);
 
-    // Проверка: минимум 1 зарегистрированная команда
-    const registrationsCount = await this.prisma.gameRegistration.count({
-      where: { gameId },
-    });
-
-    if (registrationsCount === 0) {
-      throw new BadRequestException({
-        code: 'NO_TEAMS_REGISTERED',
-        message: 'Необходимо зарегистрировать хотя бы одну команду перед запуском игры',
+    // Проверка: минимум 1 зарегистрированная команда/игрок
+    if (game.mode === 'SOLO') {
+      const soloCount = await this.prisma.soloRegistration.count({
+        where: { gameId },
       });
+      if (soloCount === 0) {
+        throw new BadRequestException({
+          code: 'NO_PLAYERS_REGISTERED',
+          message: 'Необходимо зарегистрировать хотя бы одного игрока перед запуском игры',
+        });
+      }
+    } else {
+      const registrationsCount = await this.prisma.gameRegistration.count({
+        where: { gameId },
+      });
+      if (registrationsCount === 0) {
+        throw new BadRequestException({
+          code: 'NO_TEAMS_REGISTERED',
+          message: 'Необходимо зарегистрировать хотя бы одну команду перед запуском игры',
+        });
+      }
     }
 
     // Вычисляем время старта: date + time
@@ -1433,7 +1454,7 @@ export class GamesService {
       }
 
       // Проверка: все команды готовы (правило 16)
-      const allReady = await this.areAllTeamsReady(gameId);
+      const allReady = await this.areAllTeamsReady(gameId, game.mode);
       if (!allReady) {
         throw new BadRequestException({
           code: 'TEAMS_NOT_READY',
@@ -1468,12 +1489,6 @@ export class GamesService {
       { gameId: game.id, gameTitle: game.title },
     );
 
-    // Создаём сессии для всех зарегистрированных команд
-    const registrations = await this.prisma.gameRegistration.findMany({
-      where: { gameId },
-      include: { team: { select: { name: true } } },
-    });
-
     // Определяем стартовый узел из сценария
     let startNodeId = 'start';
     if (game.scenarioId) {
@@ -1487,18 +1502,76 @@ export class GamesService {
       }
     }
 
-    for (const reg of registrations) {
-      try {
-        await this.engineOrchestrator.startSession(
-          reg.teamId,
-          gameId,
-          reg.team.name,
-          startNodeId,
-        );
-        this.logger.log(`Session started for team ${reg.teamId} in game ${gameId}`);
-      } catch (err) {
-        this.logger.error(`Failed to start session for team ${reg.teamId}: ${err}`);
-        // Не прерываем запуск игры — продолжаем с остальными командами
+    if (game.mode === 'SOLO') {
+      // Соло-режим: создаём виртуальные команды и сессии для каждого игрока
+      const soloRegistrations = await this.prisma.soloRegistration.findMany({
+        where: { gameId },
+        include: { user: { select: { id: true, name: true } } },
+      });
+
+      for (const reg of soloRegistrations) {
+        try {
+          // Создаём виртуальную команду для соло-игрока
+          const soloTeam = await this.prisma.team.create({
+            data: {
+              name: `@${reg.user.name}`,
+              slug: `solo-${reg.user.id}-${gameId}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+              captainId: reg.user.id,
+              members: {
+                create: {
+                  userId: reg.user.id,
+                  role: 'CAPTAIN',
+                },
+              },
+            },
+          });
+
+          // Регистрируем виртуальную команду на игру (статус READY — соло всегда готов)
+          await this.prisma.gameRegistration.create({
+            data: {
+              gameId,
+              teamId: soloTeam.id,
+              status: 'READY',
+              readyAt: new Date(),
+            },
+          });
+
+          await this.prisma.gameTeam.create({
+            data: { gameId, teamId: soloTeam.id },
+          });
+
+          // Создаём сессию
+          await this.engineOrchestrator.startSession(
+            soloTeam.id,
+            gameId,
+            soloTeam.name,
+            startNodeId,
+          );
+          this.logger.log(`Solo session started for user ${reg.user.id} in game ${gameId}`);
+        } catch (err) {
+          this.logger.error(`Failed to start solo session for user ${reg.user.id}: ${err}`);
+        }
+      }
+    } else {
+      // Командный режим: создаём сессии для всех зарегистрированных команд
+      const registrations = await this.prisma.gameRegistration.findMany({
+        where: { gameId },
+        include: { team: { select: { name: true } } },
+      });
+
+      for (const reg of registrations) {
+        try {
+          await this.engineOrchestrator.startSession(
+            reg.teamId,
+            gameId,
+            reg.team.name,
+            startNodeId,
+          );
+          this.logger.log(`Session started for team ${reg.teamId} in game ${gameId}`);
+        } catch (err) {
+          this.logger.error(`Failed to start session for team ${reg.teamId}: ${err}`);
+          // Не прерываем запуск игры — продолжаем с остальными командами
+        }
       }
     }
 
@@ -1662,7 +1735,7 @@ export class GamesService {
         canStartNow = true;
       } else if (game.allowEarlyStart) {
         // Проверяем, все ли команды готовы
-        const allReady = await this.areAllTeamsReady(gameId);
+        const allReady = await this.areAllTeamsReady(gameId, game.mode);
         canStartNow = allReady;
       }
     }
@@ -1703,7 +1776,7 @@ export class GamesService {
 
     // Время ещё не пришло
     if (game.allowEarlyStart) {
-      const allReady = await this.areAllTeamsReady(gameId);
+      const allReady = await this.areAllTeamsReady(gameId, game.mode);
       if (allReady) {
         return {
           canStart: true,
@@ -1900,6 +1973,70 @@ export class GamesService {
   }
 
   /**
+   * registerSolo: регистрация соло-игрока (без команды).
+   * Доступно только для игр в режиме SOLO.
+   */
+  async registerSolo(gameId: string, userId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    // Проверка: режим SOLO
+    if (game.mode !== 'SOLO') {
+      throw new BadRequestException({
+        code: 'NOT_SOLO_MODE',
+        message: 'Эта игра командная. Используйте регистрацию команды.',
+      });
+    }
+
+    // Проверка: статус PUBLISHED или REGISTRATION_OPEN
+    if (game.status !== GAME_STATUS.REGISTRATION_OPEN && game.status !== GAME_STATUS.PUBLISHED) {
+      throw new BadRequestException({
+        code: 'REGISTRATION_CLOSED',
+        message: 'Регистрация на эту игру закрыта',
+      });
+    }
+
+    // Проверка: игрок уже зарегистрирован
+    const existing = await this.prisma.soloRegistration.findUnique({
+      where: { gameId_userId: { gameId, userId } },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'ALREADY_REGISTERED',
+        message: 'Вы уже зарегистрированы на эту игру',
+      });
+    }
+
+    // Проверка: maxPlayers (maxTeams) не превышен
+    const registrationsCount = await this.prisma.soloRegistration.count({
+      where: { gameId },
+    });
+    if (registrationsCount >= game.maxTeams) {
+      throw new BadRequestException({
+        code: 'GAME_FULL',
+        message: 'Все места заняты',
+      });
+    }
+
+    // Создаём регистрацию
+    const registration = await this.prisma.soloRegistration.create({
+      data: {
+        gameId,
+        userId,
+        status: 'REGISTERED',
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    this.logger.log(`User ${userId} registered solo for game ${gameId}`);
+
+    return registration;
+  }
+
+  /**
    * unregisterTeam: отмена регистрации команды.
    */
   async unregisterTeam(gameId: string, teamId: string, userId: string) {
@@ -1965,6 +2102,24 @@ export class GamesService {
   async getTeamsStatus(gameId: string) {
     const game = await this.findGameOrThrow(gameId);
 
+    if (game.mode === 'SOLO') {
+      const soloRegs = await this.prisma.soloRegistration.findMany({
+        where: { gameId },
+        include: {
+          user: { select: { id: true, name: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      return soloRegs.map((r) => ({
+        teamId: r.userId,
+        team: { id: r.user.id, name: r.user.name, slug: r.user.name, avatar: r.user.avatarUrl },
+        status: r.status,
+        readyAt: r.readyAt,
+        registeredAt: r.createdAt,
+      }));
+    }
+
     const registrations = await this.prisma.gameRegistration.findMany({
       where: { gameId },
       include: {
@@ -2007,6 +2162,42 @@ export class GamesService {
    */
   async getMyTeamStatus(gameId: string, userId: string) {
     const game = await this.findGameOrThrow(gameId);
+
+    // Проверка: может быть соло-регистрация
+    const soloReg = await this.prisma.soloRegistration.findUnique({
+      where: { gameId_userId: { gameId, userId } },
+    });
+
+    if (soloReg) {
+      let sessionId: string | null = null;
+      if (game.status === 'RUNNING') {
+        // Ищем виртуальную команду соло-игрока
+        const soloTeam = await this.prisma.team.findFirst({
+          where: {
+            captainId: userId,
+            members: { some: { userId } },
+            registrations: { some: { gameId } },
+          },
+        });
+        if (soloTeam) {
+          const snapshot = await this.prisma.sessionState.findFirst({
+            where: { teamId: soloTeam.id },
+            orderBy: { sequence: 'desc' },
+          });
+          const state = snapshot?.state as Record<string, unknown> | null;
+          sessionId = (state?.sessionId as string) || null;
+        }
+      }
+
+      return {
+        registered: true,
+        teamId: null,
+        teamName: null,
+        registrationStatus: soloReg.status,
+        gameStatus: game.status,
+        sessionId,
+      };
+    }
 
     // Находим все команды пользователя
     const myMemberships = await this.prisma.teamMember.findMany({
@@ -2064,7 +2255,7 @@ export class GamesService {
    * Используется для баннера в Header и виджета на главной.
    */
   async getMyActiveRegistrations(userId: string) {
-    // Находим все команды пользователя
+    // 1. Находим все команды пользователя
     const myMemberships = await this.prisma.teamMember.findMany({
       where: { userId },
       include: {
@@ -2074,85 +2265,114 @@ export class GamesService {
       },
     });
 
-    if (myMemberships.length === 0) {
-      return [];
+    let teamResults: Array<{
+      gameId: string; gameTitle: string; shareLink: string; gameStatus: string;
+      teamId: string | null; teamName: string; sessionId: string | null;
+      timer: { canStart: boolean; timeUntilStart: number; startTime: string } | null;
+      city: string; duration: number;
+    }> = [];
+
+    if (myMemberships.length > 0) {
+      const teamIds = myMemberships.map((m) => m.teamId);
+
+      const registrations = await this.prisma.gameRegistration.findMany({
+        where: {
+          teamId: { in: teamIds },
+          game: {
+            status: { in: ['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'] },
+            deletedAt: null,
+          },
+        },
+        include: {
+          game: {
+            select: { id: true, title: true, shareLink: true, status: true, date: true, time: true, duration: true, city: true, allowEarlyStart: true },
+          },
+          team: { select: { id: true, name: true } },
+        },
+      });
+
+      teamResults = await Promise.all(
+        registrations.map(async (reg) => {
+          let sessionId: string | null = null;
+          if (reg.game.status === 'RUNNING') {
+            const snapshot = await this.prisma.sessionState.findFirst({
+              where: { teamId: reg.teamId },
+              orderBy: { sequence: 'desc' },
+            });
+            const state = snapshot?.state as Record<string, unknown> | null;
+            sessionId = (state?.sessionId as string) || null;
+          }
+
+          let timer = null;
+          if (['LOBBY', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(reg.game.status)) {
+            const startTime = this.calculateStartTime(reg.game.date, reg.game.time);
+            const now = new Date();
+            const timeUntilStart = startTime.getTime() - now.getTime();
+            timer = { canStart: now >= startTime, timeUntilStart: Math.max(0, timeUntilStart), startTime: startTime.toISOString() };
+          }
+
+          return {
+            gameId: reg.game.id, gameTitle: reg.game.title, shareLink: reg.game.shareLink,
+            gameStatus: reg.game.status, teamId: reg.teamId, teamName: reg.team.name,
+            sessionId, timer, city: reg.game.city, duration: reg.game.duration,
+          };
+        }),
+      );
     }
 
-    const teamIds = myMemberships.map((m) => m.teamId);
-
-    // Находим все регистрации этих команд на игры
-    const registrations = await this.prisma.gameRegistration.findMany({
+    // 2. Находим соло-регистрации пользователя
+    const soloRegistrations = await this.prisma.soloRegistration.findMany({
       where: {
-        teamId: { in: teamIds },
+        userId,
         game: {
-          status: {
-            in: ['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'],
-          },
+          status: { in: ['PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'] },
           deletedAt: null,
         },
       },
       include: {
         game: {
-          select: {
-            id: true,
-            title: true,
-            shareLink: true,
-            status: true,
-            date: true,
-            time: true,
-            duration: true,
-            city: true,
-            allowEarlyStart: true,
-          },
-        },
-        team: {
-          select: { id: true, name: true },
+          select: { id: true, title: true, shareLink: true, status: true, date: true, time: true, duration: true, city: true, allowEarlyStart: true },
         },
       },
     });
 
-    // Для каждой регистрации проверяем sessionId (если RUNNING)
-    const result = await Promise.all(
-      registrations.map(async (reg) => {
+    const soloResults = await Promise.all(
+      soloRegistrations.map(async (reg) => {
         let sessionId: string | null = null;
         if (reg.game.status === 'RUNNING') {
-          const snapshot = await this.prisma.sessionState.findFirst({
-            where: { teamId: reg.teamId },
-            orderBy: { sequence: 'desc' },
+          const soloTeam = await this.prisma.team.findFirst({
+            where: {
+              captainId: userId,
+              registrations: { some: { gameId: reg.gameId } },
+            },
           });
-          const state = snapshot?.state as Record<string, unknown> | null;
-          sessionId = (state?.sessionId as string) || null;
+          if (soloTeam) {
+            const snapshot = await this.prisma.sessionState.findFirst({
+              where: { teamId: soloTeam.id },
+              orderBy: { sequence: 'desc' },
+            });
+            const state = snapshot?.state as Record<string, unknown> | null;
+            sessionId = (state?.sessionId as string) || null;
+          }
         }
 
-        // Вычисляем таймер
         let timer = null;
         if (['LOBBY', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(reg.game.status)) {
           const startTime = this.calculateStartTime(reg.game.date, reg.game.time);
           const now = new Date();
           const timeUntilStart = startTime.getTime() - now.getTime();
-          timer = {
-            canStart: now >= startTime,
-            timeUntilStart: Math.max(0, timeUntilStart),
-            startTime: startTime.toISOString(),
-          };
+          timer = { canStart: now >= startTime, timeUntilStart: Math.max(0, timeUntilStart), startTime: startTime.toISOString() };
         }
 
         return {
-          gameId: reg.game.id,
-          gameTitle: reg.game.title,
-          shareLink: reg.game.shareLink,
-          gameStatus: reg.game.status,
-          teamId: reg.teamId,
-          teamName: reg.team.name,
-          sessionId,
-          timer,
-          city: reg.game.city,
-          duration: reg.game.duration,
+          gameId: reg.game.id, gameTitle: reg.game.title, shareLink: reg.game.shareLink,
+          gameStatus: reg.game.status, teamId: null, teamName: 'Соло',
+          sessionId, timer, city: reg.game.city, duration: reg.game.duration,
         };
       }),
     );
 
-    return result;
+    return [...teamResults, ...soloResults];
   }
 
   /**
@@ -2359,7 +2579,12 @@ export class GamesService {
     return startTime;
   }
 
-  private async areAllTeamsReady(gameId: string): Promise<boolean> {
+  private async areAllTeamsReady(gameId: string, mode?: string): Promise<boolean> {
+    // Для соло-режима готовность не требуется — всегда true
+    if (mode === 'SOLO') {
+      return true;
+    }
+
     const registrations = await this.prisma.gameRegistration.findMany({
       where: { gameId },
       select: { status: true },

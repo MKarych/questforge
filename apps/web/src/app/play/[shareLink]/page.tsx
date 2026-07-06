@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiClient, getMyTeams, registerTeam, getMyTeamStatus, type GameDetails, type MyTeam } from '@/lib/api/client';
+import { apiClient, getMyTeams, registerTeam, registerSolo, getMyTeamStatus, type GameDetails, type MyTeam } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 
 interface PlayLobbyPageParams {
@@ -104,6 +104,22 @@ export default function PlayLobbyPage() {
     }
   };
 
+  const handleRegisterSolo = async () => {
+    if (!game) return;
+
+    setRegistering(true);
+    setError(null);
+
+    try {
+      await registerSolo(game.id);
+      router.replace(`/play/${shareLink}/lobby`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка регистрации');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -175,12 +191,36 @@ export default function PlayLobbyPage() {
                 <div className="flex flex-wrap justify-center gap-3 mt-4 text-sm text-text-muted">
                   <span>📍 {game.city}</span>
                   <span>⏱️ {game.duration} мин</span>
-                  <span>👥 До {game.maxTeams} команд</span>
+                  {game.mode === 'SOLO' ? (
+                    <span>👤 Соло-режим · До {game.maxTeams} игроков</span>
+                  ) : (
+                    <span>👥 До {game.maxTeams} команд</span>
+                  )}
                 </div>
               )}
             </div>
 
-            {myTeams.length > 0 ? (
+            {game?.mode === 'SOLO' ? (
+              <div className="space-y-4">
+                {error && (
+                  <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleRegisterSolo}
+                  disabled={registering}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {registering ? 'Регистрация...' : '🎯 Участвовать соло'}
+                </button>
+
+                <p className="text-sm text-text-secondary text-center">
+                  Вы будете участвовать в игре индивидуально, без команды.
+                </p>
+              </div>
+            ) : myTeams.length > 0 ? (
               <div className="space-y-4">
                 <div>
                   <label className="label">Выберите команду</label>

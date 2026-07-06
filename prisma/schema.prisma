@@ -123,6 +123,7 @@ model User {
   payments               Payment[]
   supportTickets         SupportTicket[]
   assignedSupportTickets SupportTicket[] @relation("SupportAssignee")
+  soloRegistrations      SoloRegistration[]
 
   // === SOCIAL RELATIONS ===
   friends                Friend[]               @relation("FriendTarget")
@@ -430,6 +431,7 @@ model Game {
   bannerUrl         String?          @map("banner_url")
   tags              String[]         @default([]) @map("tags")
   status            GameStatus       @default(DRAFT)
+  mode              GameMode         @default(TEAM) @map("mode")
   moderationComment String?          @map("moderation_comment")
   version           Int              @default(1) // Optimistic locking
 
@@ -462,6 +464,7 @@ model Game {
   events            Event[]
   gameTeams         GameTeam[]
   registrations     GameRegistration[]
+  soloRegistrations SoloRegistration[]
   gameComments           GameComment[]
   gameQuestions          GameQuestion[]
   heatmapData       HeatmapData[]
@@ -497,6 +500,27 @@ model GameRegistration {
   @@index([gameId])
   @@index([teamId])
   @@index([status])
+}
+
+// ============================================================
+// SOLO REGISTRATION (индивидуальное участие без команды)
+// ============================================================
+
+model SoloRegistration {
+  id        String   @id @default(uuid()) @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  status    String   @default("REGISTERED") // REGISTERED, READY
+  readyAt   DateTime? @map("ready_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("solo_registrations")
 }
 
 // ============================================================
@@ -1534,6 +1558,11 @@ enum OrganizerStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum GameMode {
+  TEAM
+  SOLO
 }
 
 enum GameStatus {

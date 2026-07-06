@@ -207,6 +207,7 @@ export interface Game {
   duration: number;
   price: number;
   maxTeams: number;
+  mode: string;
   shareLink: string;
   status: string;
   imageUrl: string | null;
@@ -411,6 +412,7 @@ export interface CreateGameRequest {
   duration: number;
   price: number;
   maxTeams: number;
+  mode?: string; // 'TEAM' | 'SOLO'
   scenarioId?: string | null;
   status?: string;
 }
@@ -1139,6 +1141,12 @@ class ApiClient {
     });
   }
 
+  async registerSolo(gameId: string): Promise<ApiResponse<{ id: string; gameId: string; userId: string; status: string }>> {
+    return this.request(`/games/${gameId}/register-solo`, {
+      method: 'POST',
+    });
+  }
+
   async addReview(gameId: string, rating: number, text?: string): Promise<ApiResponse<{ id: string; rating: number; text: string | null; createdAt: string; user: { id: string; name: string; avatarUrl: string | null } }>> {
     return this.request(`/games/${gameId}/reviews`, {
       method: 'POST',
@@ -1769,6 +1777,7 @@ export const getMyTeam = () => apiClient.getMyTeam();
 export const getMyTeams = () => apiClient.getMyTeams();
 export const registerTeam = (gameId: string, teamId: string) => apiClient.registerTeam(gameId, teamId);
 export const registerTeamByName = (gameId: string, teamName: string) => apiClient.registerTeamByName(gameId, teamName);
+export const registerSolo = (gameId: string) => apiClient.registerSolo(gameId);
 export const addReview = (gameId: string, rating: number, text?: string) => apiClient.addReview(gameId, rating, text);
 export const startGame = (gameId: string) => apiClient.startGame(gameId);
 export const getMyActiveRegistrations = () => apiClient.getMyActiveRegistrations();

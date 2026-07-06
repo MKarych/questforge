@@ -235,7 +235,11 @@ export default function PlayLobbyPage() {
                 <div className="flex flex-wrap justify-center gap-3 mt-3 text-sm text-text-muted">
                   <span>📍 {game.city}</span>
                   <span>⏱️ {game.duration} мин</span>
-                  <span>👥 До {game.maxTeams} команд</span>
+                  {game.mode === 'SOLO' ? (
+                    <span>👤 Соло-режим · До {game.maxTeams} игроков</span>
+                  ) : (
+                    <span>👥 До {game.maxTeams} команд</span>
+                  )}
                 </div>
               )}
             </div>
@@ -271,8 +275,23 @@ export default function PlayLobbyPage() {
             </div>
           </div>
 
-          {/* My Team */}
-          {selectedTeam && (
+          {/* Solo Mode: Player info */}
+          {game?.mode === 'SOLO' ? (
+            <div className="card mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">
+                  👤 Моё участие
+                </h2>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-success/10 text-success">
+                  <span className="w-2 h-2 rounded-full bg-success" />
+                  Зарегистрирован
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-success/10 text-success text-center text-sm">
+                ✅ Вы зарегистрированы. Ожидайте начала игры.
+              </div>
+            </div>
+          ) : selectedTeam && (
             <div className="card mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-text-primary">
@@ -304,18 +323,23 @@ export default function PlayLobbyPage() {
             </div>
           )}
 
-          {/* Teams List */}
+          {/* Teams / Players List */}
           <div className="card mb-6">
             <h2 className="text-lg font-semibold text-text-primary mb-4">
-              📋 Зарегистрированные команды ({totalCount})
-              <span className="text-sm text-text-secondary ml-2">
-                (готовы: {readyCount}/{totalCount})
-              </span>
+              {game?.mode === 'SOLO' ? (
+                <>📋 Зарегистрированные игроки ({totalCount})</>
+              ) : (
+                <>📋 Зарегистрированные команды ({totalCount})
+                  <span className="text-sm text-text-secondary ml-2">
+                    (готовы: {readyCount}/{totalCount})
+                  </span>
+                </>
+              )}
             </h2>
 
             {teams.length === 0 ? (
               <p className="text-text-secondary text-center py-4">
-                Пока нет зарегистрированных команд
+                {game?.mode === 'SOLO' ? 'Пока нет зарегистрированных игроков' : 'Пока нет зарегистрированных команд'}
               </p>
             ) : (
               <div className="space-y-3">
@@ -323,7 +347,7 @@ export default function PlayLobbyPage() {
                   <div
                     key={t.teamId}
                     className={`flex items-center justify-between p-3 rounded-lg ${
-                      t.teamId === selectedTeam?.id ? 'bg-primary/5 border border-primary/20' : 'bg-surface-elevated'
+                      !game?.mode || game.mode === 'TEAM' && t.teamId === selectedTeam?.id ? 'bg-primary/5 border border-primary/20' : 'bg-surface-elevated'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -333,21 +357,32 @@ export default function PlayLobbyPage() {
                       <div>
                         <span className="text-text-primary font-medium">
                           {t.team.name}
-                          {t.teamId === selectedTeam?.id && (
+                          {game?.mode !== 'SOLO' && t.teamId === selectedTeam?.id && (
                             <span className="text-xs text-primary ml-2">(это вы)</span>
                           )}
                         </span>
                         <div className="text-xs text-text-muted">
-                          Зарегистрированы: {new Date(t.registeredAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                          {game?.mode === 'SOLO' ? (
+                            <>Зарегистрирован: {new Date(t.registeredAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</>
+                          ) : (
+                            <>Зарегистрированы: {new Date(t.registeredAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      t.status === 'READY' ? 'bg-success/10 text-success' : 'bg-surface text-text-muted'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'READY' ? 'bg-success' : 'bg-text-muted'}`} />
-                      {t.status === 'READY' ? 'Готовы' : 'Ожидание'}
-                    </span>
+                    {game?.mode !== 'SOLO' && (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                        t.status === 'READY' ? 'bg-success/10 text-success' : 'bg-surface text-text-muted'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'READY' ? 'bg-success' : 'bg-text-muted'}`} />
+                        {t.status === 'READY' ? 'Готовы' : 'Ожидание'}
+                      </span>
+                    )}
+                    {game?.mode === 'SOLO' && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
+                        ✅ Зарегистрирован
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
