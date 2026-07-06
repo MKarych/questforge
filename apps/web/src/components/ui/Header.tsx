@@ -46,7 +46,7 @@ function DropdownNav({ label, items, pathname, counts }: { label: string; items:
 
   // Считаем общее количество непрочитанных для админки
   const totalUnread = counts
-    ? counts.pendingApplications + counts.pendingComplaints + counts.newSupportTickets
+    ? counts.pendingApplications + counts.pendingComplaints + counts.newSupportTickets + counts.pendingScenarios
     : 0;
 
   // Маппинг href -> количество
@@ -55,6 +55,7 @@ function DropdownNav({ label, items, pathname, counts }: { label: string; items:
     countMap['/admin/complaints'] = counts.pendingComplaints;
     countMap['/admin/requests'] = counts.pendingApplications;
     countMap['/admin/support'] = counts.newSupportTickets;
+    countMap['/admin/scenarios'] = counts.pendingScenarios;
   }
 
   return (
@@ -218,6 +219,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const adminDropdownItems = [
     { label: 'Дашборд', href: '/admin/dashboard' },
     { label: 'Все игры', href: '/admin/games' },
+    { label: 'Сценарии', href: '/admin/scenarios' },
     { label: 'Жалобы', href: '/admin/complaints' },
     { label: 'Заявки', href: '/admin/requests' },
     { label: 'Поддержка', href: '/admin/support' },
@@ -618,6 +620,7 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                         countMap['/admin/complaints'] = adminCounts.pendingComplaints;
                         countMap['/admin/requests'] = adminCounts.pendingApplications;
                         countMap['/admin/support'] = adminCounts.newSupportTickets;
+                        countMap['/admin/scenarios'] = adminCounts.pendingScenarios;
                       }
                       const itemCount = countMap[item.href];
                       return (
