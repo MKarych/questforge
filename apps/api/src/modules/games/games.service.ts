@@ -2175,7 +2175,6 @@ export class GamesService {
         const soloTeam = await this.prisma.team.findFirst({
           where: {
             captainId: userId,
-            members: { some: { userId } },
             registrations: { some: { gameId } },
           },
         });

@@ -505,6 +505,17 @@ export default function GamePage() {
                   </button>
                 )}
 
+                {/* REGISTRATION_CLOSED → REGISTRATION_OPEN (шаг назад) */}
+                {game.status === 'REGISTRATION_CLOSED' && (
+                  <button
+                    className="btn-secondary text-center"
+                    onClick={() => handleAction('openRegistration', () => openRegistration(gameId))}
+                    disabled={actionLoading === 'openRegistration'}
+                  >
+                    {actionLoading === 'openRegistration' ? '...' : '📝 Открыть регистрацию'}
+                  </button>
+                )}
+
                 {/* REGISTRATION_CLOSED → LOBBY */}
                 {game.status === 'REGISTRATION_CLOSED' && (
                   <button
@@ -516,8 +527,8 @@ export default function GamePage() {
                   </button>
                 )}
 
-                {/* LOBBY → RUNNING */}
-                {game.status === 'LOBBY' && (
+                {/* PUBLISHED / REGISTRATION_OPEN / LOBBY → RUNNING */}
+                {['PUBLISHED', 'REGISTRATION_OPEN', 'LOBBY'].includes(game.status) && (
                   <button
                     className="btn-success text-center"
                     onClick={() => handleAction('startGame', () => startGame(gameId))}

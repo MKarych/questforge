@@ -118,12 +118,47 @@ export default function PlayLobbyPage() {
     loadData();
   }, [loadData]);
 
-  // Авто-обновление каждые 5 секунд
+  // Авто-обновление каждые 5 секунд + проверка статуса игры
   useEffect(() => {
-    if (!gameId || game?.status === 'RUNNING' || game?.status === 'FINISHED') return;
+    if (!gameId) return;
 
     const interval = setInterval(async () => {
       try {
+        // Проверяем текущий статус игры
+        const gameResponse = await apiClient.get<any>(`/games/public/share/${shareLink}`);
+        const currentGame = (gameResponse as any).data;
+
+        // Если игра RUNNING — редиректим на страницу прохождения
+        if (currentGame?.status === 'RUNNING') {
+          try {
+            const statusResponse = await getMyTeamStatus(currentGame.id);
+            if (statusResponse.data?.sessionId) {
+              router.replace(`/play/${shareLink}/${statusResponse.data.sessionId}`);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          router.replace(`/play/${shareLink}/${currentGame.id}`);
+          return;
+        }
+
+        // Если игра FINISHED — редиректим на финиш
+        if (currentGame?.status === 'FINISHED') {
+          try {
+            const statusResponse = await getMyTeamStatus(currentGame.id);
+            if (statusResponse.data?.sessionId) {
+              router.replace(`/play/${shareLink}/${statusResponse.data.sessionId}/finish`);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          router.replace(`/play/${shareLink}/${currentGame.id}/finish`);
+          return;
+        }
+
+        // Обновляем список команд и таймер
         const [statusResponse, timerResponse] = await Promise.all([
           getGameRegistrations(gameId),
           apiClient.get<any>(`/games/${gameId}/timer`).catch(() => null),
@@ -142,7 +177,7 @@ export default function PlayLobbyPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [gameId, game?.status]);
+  }, [gameId, shareLink, router]);
 
   const handleReady = async () => {
     if (!gameId || !selectedTeam) return;

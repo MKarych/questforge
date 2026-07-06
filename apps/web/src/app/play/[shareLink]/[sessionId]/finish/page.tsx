@@ -110,7 +110,7 @@ export default function PlayFinishPage() {
               Игра завершена!
             </h1>
             <p className="text-text-secondary mb-8 text-lg">
-              Команда «{sessionState.teamName}» успешно прошла игру
+              {sessionState.teamName === 'Соло' ? 'Вы успешно прошли игру' : `Команда «${sessionState.teamName}» успешно прошла игру`}
             </p>
 
             {/* Main Stats */}

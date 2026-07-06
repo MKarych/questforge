@@ -121,7 +121,7 @@ export default function ActiveGameBanner() {
                   <div className="flex items-center gap-3 text-xs text-text-muted">
                     <span>📍 {reg.city}</span>
                     <span>⏱ {reg.duration} мин</span>
-                    <span>👥 {reg.teamName}</span>
+                    <span>{reg.teamId ? '👥' : '👤'} {reg.teamName}</span>
                     {reg.timer && !reg.timer.canStart && reg.gameStatus !== 'RUNNING' && (
                       <span className="font-mono">
                         ⏳ {formatTime(reg.timer.timeUntilStart)}

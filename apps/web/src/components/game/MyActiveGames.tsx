@@ -110,7 +110,7 @@ export default function MyActiveGames() {
 
               <div className="flex items-center justify-between">
                 <div className="text-sm text-text-muted truncate">
-                  👥 {reg.teamName}
+                  {reg.teamId ? '👥' : '👤'} {reg.teamName}
                   {reg.timer && !reg.timer.canStart && reg.gameStatus !== 'RUNNING' && (
                     <span className="ml-3 font-mono">
                       ⏳ {formatTime(reg.timer.timeUntilStart)}
