@@ -6,6 +6,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma, $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service';
@@ -45,6 +46,8 @@ function slugify(text: string): string {
   const suffix = Math.random().toString(36).substring(2, 8);
   return `${base}-${suffix}`;
 }
+
+const ARCHIVE_AFTER_DAYS = 3;
 
 function generateShareLink(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -705,7 +708,7 @@ export class GamesService {
       where: {
         id: gameId,
         deletedAt: null,
-        status: { notIn: [$Enums.GameStatus.DRAFT, $Enums.GameStatus.CANCELLED, $Enums.GameStatus.ARCHIVED, $Enums.GameStatus.HIDDEN, $Enums.GameStatus.BLOCKED] },
+        status: { notIn: [$Enums.GameStatus.DRAFT, $Enums.GameStatus.CANCELLED, $Enums.GameStatus.HIDDEN, $Enums.GameStatus.BLOCKED] },
       },
       include: {
         organizer: {
@@ -1581,6 +1584,8 @@ export class GamesService {
   /**
    * finishGame: RUNNING → FINISHED
    * Завершение игры организатором.
+   * После завершения проверяет, все ли участники прошли игру,
+   * и если да — автоматически переводит в ARCHIVED.
    */
   async finishGame(gameId: string, userId: string) {
     const game = await this.findGameOrThrow(gameId);
@@ -1611,6 +1616,9 @@ export class GamesService {
       user?.avatarUrl || null,
       { gameId: game.id, gameTitle: game.title },
     );
+
+    // Проверяем, можно ли автоматически архивировать игру
+    await this.tryAutoArchive(gameId);
 
     return updatedGame;
   }
@@ -2520,6 +2528,259 @@ export class GamesService {
     this.logger.log(`Review added: game ${gameId} by user ${userId}, rating ${rating}`);
 
     return review;
+  }
+
+  // ============================================================
+  // Archive Methods
+  // ============================================================
+
+  /**
+   * getArchivedGames: получить список архивных игр.
+   * Доступно только авторизованным пользователям.
+   */
+  async getArchivedGames(params: {
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: Record<string, unknown> = {
+      deletedAt: null,
+      status: GAME_STATUS.ARCHIVED,
+    };
+
+    if (params.city) {
+      where.city = params.city;
+    }
+
+    const [games, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where,
+        take: params.limit || 20,
+        skip: params.offset || 0,
+        orderBy: { finishedAt: 'desc' },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          description: true,
+          city: true,
+          date: true,
+          time: true,
+          duration: true,
+          price: true,
+          maxTeams: true,
+          shareLink: true,
+          imageUrl: true,
+          bannerUrl: true,
+          tags: true,
+          status: true,
+          finishedAt: true,
+          organizer: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              gameTeams: true,
+              reviews: true,
+              comments: true,
+            },
+          },
+        },
+      }),
+      this.prisma.game.count({ where }),
+    ]);
+
+    return {
+      data: games.map((g) => ({
+        ...g,
+        averageRating: 0,
+        reviewsCount: g._count.reviews,
+        teamsCount: g._count.gameTeams,
+        commentsCount: g._count.comments,
+      })),
+      meta: {
+        total,
+        limit: params.limit || 20,
+        offset: params.offset || 0,
+      },
+    };
+  }
+
+  /**
+   * tryAutoArchive: проверяет, все ли участники завершили игру,
+   * и если да — переводит игру в ARCHIVED.
+   * Вызывается после finishGame().
+   */
+  private async tryAutoArchive(gameId: string): Promise<void> {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      select: { mode: true, status: true },
+    });
+
+    if (!game || game.status !== 'FINISHED') return;
+
+    let allCompleted = false;
+
+    if (game.mode === 'SOLO') {
+      // Соло-режим: проверяем сессии соло-игроков
+      const soloRegs = await this.prisma.soloRegistration.findMany({
+        where: { gameId },
+      });
+
+      if (soloRegs.length === 0) {
+        allCompleted = true;
+      } else {
+        const results = await Promise.all(
+          soloRegs.map(async (reg) => {
+            const soloTeam = await this.prisma.team.findFirst({
+              where: {
+                captainId: reg.userId,
+                registrations: { some: { gameId } },
+              },
+            });
+            if (!soloTeam) return false;
+            return this.isTeamSessionCompleted(soloTeam.id);
+          }),
+        );
+        allCompleted = results.every(Boolean);
+      }
+    } else {
+      // Командный режим
+      const registrations = await this.prisma.gameRegistration.findMany({
+        where: { gameId },
+      });
+
+      if (registrations.length === 0) {
+        allCompleted = true;
+      } else {
+        const results = await Promise.all(
+          registrations.map((reg) => this.isTeamSessionCompleted(reg.teamId)),
+        );
+        allCompleted = results.every(Boolean);
+      }
+    }
+
+    if (allCompleted) {
+      await this.prisma.game.update({
+        where: { id: gameId },
+        data: { status: GAME_STATUS.ARCHIVED },
+      });
+      this.logger.log(`Game auto-archived: ${gameId} — all participants completed`);
+    }
+  }
+
+  /**
+   * isTeamSessionCompleted: проверяет, завершена ли сессия команды.
+   * Сессия считается завершённой, если последний SessionState имеет статус FINISHED.
+   */
+  private async isTeamSessionCompleted(teamId: string): Promise<boolean> {
+    const snapshot = await this.prisma.sessionState.findFirst({
+      where: { teamId },
+      orderBy: { sequence: 'desc' },
+    });
+
+    if (!snapshot) return false;
+
+    const state = snapshot.state as Record<string, unknown> | null;
+    return state?.status === 'FINISHED';
+  }
+
+  /**
+   * autoArchiveAbandonedGames: находит все PUBLISHED игры, у которых
+   * date + time + ARCHIVE_AFTER_DAYS дней уже прошло, и архивирует их.
+   * Вызывается по cron-расписанию.
+   */
+  async autoArchiveAbandonedGames(): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - ARCHIVE_AFTER_DAYS);
+
+    const abandonedGames = await this.prisma.game.findMany({
+      where: {
+        deletedAt: null,
+        status: GAME_STATUS.PUBLISHED,
+      },
+    });
+
+    let archivedCount = 0;
+
+    for (const game of abandonedGames) {
+      const startTime = this.calculateStartTime(game.date, game.time);
+      if (startTime < cutoff) {
+        await this.prisma.game.update({
+          where: { id: game.id },
+          data: { status: GAME_STATUS.ARCHIVED },
+        });
+        this.logger.log(`Abandoned game auto-archived: ${game.id} — "${game.title}" (started at ${startTime.toISOString()})`);
+        archivedCount++;
+      }
+    }
+
+    if (archivedCount > 0) {
+      this.logger.log(`Auto-archived ${archivedCount} abandoned game(s)`);
+    }
+
+    return archivedCount;
+  }
+
+  /**
+   * handleAbandonedGamesCron: запускается каждый час и архивирует заброшенные игры.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleAbandonedGamesCron() {
+    this.logger.log('Running abandoned games auto-archive cron...');
+    const count = await this.autoArchiveAbandonedGames();
+    this.logger.log(`Abandoned games cron completed: ${count} game(s) archived`);
+  }
+
+  /**
+   * getArchiveInfo: возвращает информацию о том, когда игра будет автоматически
+   * архивирована (для PUBLISHED игр, у которых дата старта прошла).
+   * Используется для отображения предупреждения на странице организатора.
+   */
+  async getArchiveInfo(gameId: string) {
+    const game = await this.findGameOrThrow(gameId);
+
+    if (game.status !== GAME_STATUS.PUBLISHED) {
+      return {
+        willBeArchived: false,
+        archiveAt: null,
+        remainingMs: null,
+        reason: 'Игра будет архивирована только в статусе "Опубликована"',
+      };
+    }
+
+    const startTime = this.calculateStartTime(game.date, game.time);
+    const now = new Date();
+
+    // Если время старта ещё не наступило — архивация не грозит
+    if (startTime > now) {
+      return {
+        willBeArchived: false,
+        archiveAt: null,
+        remainingMs: null,
+        reason: 'Время старта игры ещё не наступило',
+      };
+    }
+
+    // Дата архивации = startTime + ARCHIVE_AFTER_DAYS дней
+    const archiveAt = new Date(startTime);
+    archiveAt.setDate(archiveAt.getDate() + ARCHIVE_AFTER_DAYS);
+
+    const remainingMs = archiveAt.getTime() - now.getTime();
+    const willBeArchived = remainingMs <= 0;
+
+    return {
+      willBeArchived,
+      archiveAt: archiveAt.toISOString(),
+      remainingMs: Math.max(0, remainingMs),
+      reason: willBeArchived
+        ? 'Игра будет архивирована при следующем запуске cron'
+        : `Игра будет автоматически архивирована через ${ARCHIVE_AFTER_DAYS} дня после старта`,
+    };
   }
 
   // ============================================================

@@ -691,7 +691,19 @@ export default function GameDetailsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-text-secondary">
                   <span className="text-lg">📋</span>
-                  <span className="text-sm">{game.status === 'REGISTRATION_OPEN' || game.status === 'PUBLISHED' ? 'Регистрация открыта' : game.status === 'RUNNING' ? 'Идёт игра' : game.status === 'FINISHED' ? 'Завершена' : game.status === 'LOBBY' ? 'Ожидание старта' : game.status}</span>
+                  <span className="text-sm">
+                    {game.status === 'REGISTRATION_OPEN' || game.status === 'PUBLISHED'
+                      ? 'Регистрация открыта'
+                      : game.status === 'RUNNING'
+                      ? 'Идёт игра'
+                      : game.status === 'FINISHED'
+                      ? 'Завершена'
+                      : game.status === 'ARCHIVED'
+                      ? 'В архиве'
+                      : game.status === 'LOBBY'
+                      ? 'Ожидание старта'
+                      : game.status}
+                  </span>
                 </div>
               </div>
 
@@ -744,6 +756,19 @@ export default function GameDetailsPage() {
                   {game.status === 'FINISHED' && (
                     <p className="text-xs text-text-muted text-center">📊 Игра завершена</p>
                   )}
+                  {game.status === 'ARCHIVED' && (
+                    <p className="text-xs text-text-muted text-center">📦 Игра в архиве</p>
+                  )}
+                </div>
+              )}
+
+              {/* Архивная игра — для всех пользователей */}
+              {game.status === 'ARCHIVED' && (
+                <div className="text-center mb-6">
+                  <p className="text-text-secondary text-sm mb-3">📦 Игра в архиве</p>
+                  <p className="text-text-muted text-xs">
+                    Игра завершена. Вы можете оставить комментарий в обсуждении ниже.
+                  </p>
                 </div>
               )}
 

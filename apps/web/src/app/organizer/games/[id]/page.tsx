@@ -7,7 +7,7 @@ import {
   getGame, publishGame, removeGame,
   openRegistration, closeRegistration, moveToLobby,
   startGame, finishGame, cancelGame,
-  getGameRegistrations, type GameDetails,
+  getGameRegistrations, getArchiveInfo, type GameDetails,
 } from '@/lib/api/client';
 import Header from '@/components/ui/Header';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -69,6 +69,12 @@ export default function GamePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [archiveInfo, setArchiveInfo] = useState<{
+    willBeArchived: boolean;
+    archiveAt: string | null;
+    remainingMs: number | null;
+    reason: string;
+  } | null>(null);
 
   const loadGame = useCallback(async () => {
     try {
@@ -126,6 +132,29 @@ export default function GamePage() {
     }
   }, [game, loadTeams, loadTimer]);
 
+  // Загружаем информацию об архивации для PUBLISHED игр
+  useEffect(() => {
+    if (!game || game.status !== 'PUBLISHED') {
+      setArchiveInfo(null);
+      return;
+    }
+
+    async function loadArchiveInfo() {
+      try {
+        const response = await getArchiveInfo(gameId);
+        setArchiveInfo(response.data);
+      } catch {
+        // ignore
+      }
+    }
+
+    loadArchiveInfo();
+
+    // Обновляем каждые 30 секунд для актуального таймера
+    const interval = setInterval(loadArchiveInfo, 30000);
+    return () => clearInterval(interval);
+  }, [game, gameId]);
+
   // Авто-обновление команд и таймера
   useEffect(() => {
     if (!game || !['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status)) return;
@@ -165,6 +194,19 @@ export default function GamePage() {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatRemainingTime = (ms: number): string => {
+    if (ms <= 0) return '0 минут';
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}`);
+    if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`);
+    if (minutes > 0) parts.push(`${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'}`);
+    return parts.join(' ') || 'менее минуты';
   };
 
   if (loading) {
@@ -256,6 +298,43 @@ export default function GamePage() {
                 </div>
               </div>
             </div>
+
+            {/* Archive Warning for PUBLISHED games */}
+            {game.status === 'PUBLISHED' && archiveInfo && archiveInfo.remainingMs !== null && (
+              <div className="card border-warning/50 bg-warning/5">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-warning mb-1">⚠️ Внимание: автоматическая архивация</h3>
+                    <p className="text-sm text-text-secondary mb-2">
+                      {archiveInfo.willBeArchived
+                        ? 'Дата старта этой игры прошла более 3 дней назад. Игра будет автоматически архивирована при следующем запуске cron.'
+                        : `Если вы не начнёте игру, она будет автоматически архивирована через ${formatRemainingTime(archiveInfo.remainingMs)}.`
+                      }
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        className="btn-primary text-sm"
+                        onClick={() => handleAction('openRegistration', () => openRegistration(gameId))}
+                        disabled={actionLoading === 'openRegistration'}
+                      >
+                        {actionLoading === 'openRegistration' ? '...' : '📝 Открыть регистрацию'}
+                      </button>
+                      <Link
+                        href={`/organizer/games/${gameId}/edit`}
+                        className="btn-secondary text-sm"
+                      >
+                        📅 Перенести игру
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Teams / Players List */}
             {['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LOBBY', 'RUNNING'].includes(game.status) && (

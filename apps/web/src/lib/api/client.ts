@@ -826,6 +826,28 @@ class ApiClient {
     return this.request(`/games/public${query ? `?${query}` : ''}`);
   }
 
+  async getArchivedGames(params?: {
+    city?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ data: Game[]; meta: { total: number; limit: number; offset: number } }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.city) queryParams.append('city', params.city);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const query = queryParams.toString();
+    return this.request(`/games/archive${query ? `?${query}` : ''}`);
+  }
+
+  async getArchiveInfo(gameId: string): Promise<ApiResponse<{
+    willBeArchived: boolean;
+    archiveAt: string | null;
+    remainingMs: number | null;
+    reason: string;
+  }>> {
+    return this.request(`/games/${gameId}/archive-info`);
+  }
+
   async getPublicGame(id: string): Promise<ApiResponse<GameDetails>> {
     return this.request(`/games/public/${id}`);
   }
@@ -1737,6 +1759,12 @@ export const getPublicGames = (params?: {
   limit?: number;
   offset?: number;
 }) => apiClient.getPublicGames(params);
+export const getArchivedGames = (params?: {
+  city?: string;
+  limit?: number;
+  offset?: number;
+}) => apiClient.getArchivedGames(params);
+export const getArchiveInfo = (gameId: string) => apiClient.getArchiveInfo(gameId);
 export const getPublicGame = (id: string) => apiClient.getPublicGame(id);
 export const createGame = (data: CreateGameRequest) => apiClient.createGame(data);
 export const getMyGames = (params?: { status?: string }) => apiClient.getMyGames(params);

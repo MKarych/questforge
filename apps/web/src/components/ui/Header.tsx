@@ -187,10 +187,10 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   const userRole = user?.role || 'PLAYER';
   const isAuthPage = pathname.startsWith('/auth');
 
-  // Основная навигация — видна всем
-  const mainNavItems = [
-    { label: 'Каталог игр', href: '/games', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
-    { label: 'Команды', href: '/teams', roles: ['GUEST', 'PLAYER', 'ORGANIZER', 'ADMIN'] },
+  // Выпадающее меню для "Каталог игр" — только для авторизованных
+  const gamesCatalogDropdownItems = [
+    { label: 'Актуальные', href: '/games' },
+    { label: 'Архив игр', href: '/games?tab=archived' },
   ];
 
   // Организаторские выпадающие меню — только ORGANIZER / ADMIN
@@ -229,8 +229,6 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
   ];
 
   const showAdmin = userRole === 'ADMIN';
-
-  const visibleMainNav = mainNavItems.filter((item) => item.roles.includes(userRole as any));
 
   const renderNavLink = (item: { label: string; href: string }, mobile = false) => (
     <Link
@@ -285,7 +283,14 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
 
             {/* Center: Desktop Navigation (lg+) — только на десктопе */}
             <nav className="hidden lg:flex items-center gap-1">
-              {visibleMainNav.map((item) => renderNavLink(item))}
+              {/* Каталог игр — для GUEST простая ссылка, для авторизованных выпадающее меню */}
+              {user ? (
+                <DropdownNav label="Каталог игр" items={gamesCatalogDropdownItems} pathname={pathname} />
+              ) : (
+                renderNavLink({ label: 'Каталог игр', href: '/games' })
+              )}
+
+              {renderNavLink({ label: 'Команды', href: '/teams' })}
 
               {/* Маркетплейс — для GUEST простая ссылка, для авторизованных выпадающее меню */}
               {user ? (
@@ -512,20 +517,53 @@ export default function Header({ systemStatus = null, featureFlags = { search: t
                   <p className="px-3 py-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                     Основное
                   </p>
-                  {visibleMainNav.map((item) => (
+
+                  {/* Каталог игр — для авторизованных с подпунктами */}
+                  {user ? (
+                    <>
+                      <p className="px-3 py-1 text-xs font-medium text-text-muted">Каталог игр</p>
+                      {gamesCatalogDropdownItems.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                            pathname.startsWith(item.href)
+                              ? 'text-primary bg-primary/10 font-medium'
+                              : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                          }`}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </>
+                  ) : (
                     <Link
-                      key={item.href}
-                      href={item.href}
+                      href="/games"
                       className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
-                        pathname.startsWith(item.href)
+                        pathname.startsWith('/games')
                           ? 'text-primary bg-primary/10 font-medium'
                           : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item.label}
+                      Каталог игр
                     </Link>
-                  ))}
+                  )}
+
+                  {/* Команды */}
+                  <Link
+                    href="/teams"
+                    className={`block px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                      pathname.startsWith('/teams')
+                        ? 'text-primary bg-primary/10 font-medium'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Команды
+                  </Link>
+
                   {/* Маркетплейс — для неавторизованных простая ссылка */}
                   {!user && (
                     <Link

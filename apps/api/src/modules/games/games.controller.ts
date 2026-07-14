@@ -69,6 +69,26 @@ export class GamesController {
     });
   }
 
+  @Get('archive')
+  @UseGuards(JwtAuthGuard)
+  async getArchivedGames(
+    @Query('city') city?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.gamesService.getArchivedGames({
+      city,
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Get(':id/archive-info')
+  @UseGuards(JwtAuthGuard)
+  async getArchiveInfo(@Param('id') id: string) {
+    return this.gamesService.getArchiveInfo(id);
+  }
+
   @Get('public/share/:shareLink')
   async findOneByShareLink(@Param('shareLink') shareLink: string) {
     return this.gamesService.findOneByShareLink(shareLink);
